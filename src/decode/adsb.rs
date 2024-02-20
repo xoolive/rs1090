@@ -140,7 +140,7 @@ impl Typecode {
                 writeln!(f, "  Category:      {tc}{ca}")?;
             }
             Typecode::SurfacePosition(surface_position) => {
-                writeln!(f, " Extended Squitter{transponder}Surface position")?;
+                writeln!(f, " DF17 - Extended Squitter Surface position (BDS 0,6)")?;
                 writeln!(f, "  Address:       {icao} {address_type}")?;
                 write!(f, "{surface_position}")?;
             }
