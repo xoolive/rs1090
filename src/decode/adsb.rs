@@ -191,7 +191,11 @@ impl Typecode {
                     )?;
                     writeln!(f, "  Address:       {icao} {address_type}")?;
                     writeln!(f, "  Air/Ground:    {capability}")?;
-                    writeln!(f, "  IAS:           {} kt", airspeed_decoding.airspeed)?;
+                    writeln!(
+                        f,
+                        "  {}:           {} kt",
+                        airspeed_decoding.airspeed_type, airspeed_decoding.airspeed
+                    )?;
                     if airborne_velocity.vrate_value > 0 {
                         writeln!(
                             f,
@@ -320,5 +324,23 @@ impl Typecode {
             }
         }
         Ok(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::decode::{Message, DF};
+    use hexlit::hex;
+
+    #[test]
+    fn test_icao24() {
+        let bytes = hex!("8D406B902015A678D4D220AA4BDA");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        if let DF::ADSB(msg) = msg.df {
+            assert_eq!(format!("{}", msg.icao24), "406b90");
+            return;
+        }
+        unreachable!();
     }
 }

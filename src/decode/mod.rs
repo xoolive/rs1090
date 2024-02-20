@@ -329,8 +329,17 @@ impl fmt::Display for Message {
 }
 
 /// ICAO Address; Mode S transponder code
-#[derive(Debug, PartialEq, Eq, PartialOrd, DekuRead, Hash, Copy, Clone, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, DekuRead, Hash, Copy, Clone, Ord)]
 pub struct ICAO(pub [u8; 3]);
+
+impl fmt::Debug for ICAO {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:02x}", self.0[0])?;
+        write!(f, "{:02x}", self.0[1])?;
+        write!(f, "{:02x}", self.0[2])?;
+        Ok(())
+    }
+}
 
 impl fmt::Display for ICAO {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

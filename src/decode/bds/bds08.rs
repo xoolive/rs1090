@@ -95,3 +95,26 @@ pub fn callsign_read(
 
     Ok((inside_rest, encoded))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::decode::Typecode::AircraftIdentification;
+    use crate::decode::{Message, DF::ADSB};
+    use hexlit::hex;
+
+    #[test]
+    fn test_callsign() {
+        let bytes = hex!("8d406b902015a678d4d220aa4bda");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        if let ADSB(adsb_msg) = msg.df {
+            if let AircraftIdentification(Identification { tc, ca, callsign }) = adsb_msg.message {
+                assert_eq!(format!("{tc}"), "A");
+                assert_eq!(ca, 0);
+                assert_eq!(callsign, "EZY85MH");
+                return;
+            }
+        }
+        unreachable!();
+    }
+}

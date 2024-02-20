@@ -11,7 +11,7 @@ fn today() -> i64 {
     86_400
         * (SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("SystemTime before UNIX EPOCH!")
+            .expect("SystemTime before unix epoch")
             .as_secs() as i64
             / 86_400)
 }
@@ -49,10 +49,10 @@ fn process_radarcape(msg: &[u8]) {
     };
 
     println!(
-        "{:?} {}\n{}",
+        "{:?} {}\n{:#?}",
         today() as f64 + ts,
         msg.frame,
-        msg.message.to_string()
+        msg.message
     );
 
     println!(

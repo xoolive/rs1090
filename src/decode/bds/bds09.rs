@@ -4,13 +4,13 @@ use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 
-#[derive(Debug, PartialEq, Eq, DekuRead, Clone)]
+#[derive(Debug, PartialEq, DekuRead, Clone)]
 pub struct AirborneVelocity {
     #[deku(bits = "3")]
-    pub st: u8,
+    pub subtype: u8,
     #[deku(bits = "5")]
     pub nac_v: u8,
-    #[deku(ctx = "*st")]
+    #[deku(ctx = "*subtype")]
     pub sub_type: AirborneVelocitySubType,
     pub vrate_src: VerticalRateSource,
     pub vrate_sign: Sign,
@@ -35,7 +35,7 @@ impl AirborneVelocity {
             let v_ns = f64::from((ground_speed.ns_vel as i16 - 1) * ground_speed.ns_sign.value());
             let h = libm::atan2(v_ew, v_ns) * (360.0 / (2.0 * std::f64::consts::PI));
             let track = if h < 0.0 { h + 360.0 } else { h };
-
+            let speed = libm::hypot(v_ew, v_ns);
             let vrate = self
                 .vrate_value
                 .checked_sub(1)
@@ -43,7 +43,7 @@ impl AirborneVelocity {
                 .map(|v| (v as i16) * self.vrate_sign.value());
 
             if let Some(vrate) = vrate {
-                return Some((track as f32, libm::hypot(v_ew, v_ns), vrate));
+                return Some((track as f32, speed, vrate));
             }
         }
         None
@@ -51,8 +51,8 @@ impl AirborneVelocity {
 }
 
 /// Airborne Velocity Message “Subtype” Code Field Encoding
-#[derive(Debug, PartialEq, Eq, DekuRead, Clone)]
-#[deku(ctx = "st: u8", id = "st")]
+#[derive(Debug, PartialEq, DekuRead, Clone)]
+#[deku(ctx = "subtype: u8", id = "subtype")]
 pub enum AirborneVelocitySubType {
     #[deku(id = "0")]
     Reserved0(#[deku(bits = "22")] u32),
@@ -96,7 +96,7 @@ impl fmt::Display for Sign {
         )
     }
 }
-/// [`ME::AirborneVelocity`] && [`AirborneVelocitySubType::GroundSpeedDecoding`]
+
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
 pub struct GroundSpeedDecoding {
     pub ew_sign: Sign,
@@ -107,15 +107,17 @@ pub struct GroundSpeedDecoding {
     pub ns_vel: u16,
 }
 
-/// [`ME::AirborneVelocity`] && [`AirborneVelocitySubType::AirspeedDecoding`]
-#[derive(Debug, PartialEq, Eq, DekuRead, Clone)]
+#[derive(Debug, PartialEq, DekuRead, Clone)]
 pub struct AirspeedDecoding {
     #[deku(bits = "1")]
     pub status_heading: u8,
-    #[deku(endian = "big", bits = "10")]
-    pub mag_heading: u16,
-    #[deku(bits = "1")]
-    pub airspeed_type: u8,
+    #[deku(
+        endian = "big",
+        bits = "10",
+        map = "|mag_heading: u16| -> Result<_, DekuError> { Ok(mag_heading as f32 * 360. / 1024.)}"
+    )]
+    pub mag_heading: f32,
+    pub airspeed_type: AirspeedType,
     #[deku(
         endian = "big",
         bits = "10",
@@ -124,6 +126,26 @@ pub struct AirspeedDecoding {
     pub airspeed: u16,
 }
 #[derive(Copy, Clone, Debug, PartialEq, Eq, DekuRead)]
+#[deku(type = "u8", bits = "1")]
+pub enum AirspeedType {
+    IAS = 0,
+    TAS = 1,
+}
+
+impl fmt::Display for AirspeedType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::IAS => "IAS",
+                Self::TAS => "TAS",
+            }
+        )
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, DekuRead)]
 #[deku(type = "u8", bits = "3")]
 pub enum AirborneVelocityType {
     Subsonic = 1,
@@ -131,22 +153,22 @@ pub enum AirborneVelocityType {
 }
 
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
-#[deku(ctx = "t: AirborneVelocityType")]
+#[deku(ctx = "subtype: AirborneVelocityType")]
 pub struct AirborneVelocitySubFields {
     pub dew: DirectionEW,
-    #[deku(reader = "Self::read_v(deku::rest, t)")]
+    #[deku(reader = "Self::read_v(deku::rest, subtype)")]
     pub vew: u16,
     pub dns: DirectionNS,
-    #[deku(reader = "Self::read_v(deku::rest, t)")]
+    #[deku(reader = "Self::read_v(deku::rest, subtype)")]
     pub vns: u16,
 }
 
 impl AirborneVelocitySubFields {
     fn read_v(
         rest: &BitSlice<u8, Msb0>,
-        t: AirborneVelocityType,
+        subtype: AirborneVelocityType,
     ) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
-        match t {
+        match subtype {
             AirborneVelocityType::Subsonic => {
                 u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))
                     .map(|(rest, value)| (rest, value - 1))
@@ -190,5 +212,53 @@ impl fmt::Display for VerticalRateSource {
                 Self::GeometricAltitude => "GNSS",
             }
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::decode::Typecode::AirborneVelocity;
+    use crate::decode::{Message, DF::ADSB};
+    use hexlit::hex;
+
+    extern crate approx;
+    use approx::assert_relative_eq;
+
+    #[test]
+    fn test_groundspeed_velocity() {
+        let bytes = hex!("8D485020994409940838175B284F");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        if let ADSB(adsb_msg) = msg.df {
+            if let AirborneVelocity(velocity) = adsb_msg.message {
+                if let AirborneVelocitySubType::GroundSpeedDecoding(_gsd) = velocity.sub_type {
+                    if let Some((trk, gs, vr)) = velocity.calculate() {
+                        assert_relative_eq!(gs, 159., max_relative = 1e-2);
+                        assert_relative_eq!(trk, 182.88, max_relative = 1e-2);
+                        assert_eq!(vr, -832);
+                        assert_eq!(velocity.gnss_baro_diff, 550);
+                    }
+                }
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_airspeed_velocity() {
+        let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        if let ADSB(adsb_msg) = msg.df {
+            if let AirborneVelocity(velocity) = adsb_msg.message {
+                if let AirborneVelocitySubType::AirspeedDecoding(asd) = velocity.sub_type {
+                    assert_eq!(asd.airspeed, 375);
+                    assert_relative_eq!(asd.mag_heading, 244., max_relative = 1e-2);
+                    //assert_eq!(velocity.vrate, -2304);
+                }
+                return;
+            }
+        }
+        unreachable!();
     }
 }

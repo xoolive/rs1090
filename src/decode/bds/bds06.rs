@@ -86,21 +86,17 @@ mod tests {
     use hexlit::hex;
 
     #[test]
-    fn test_groundspeed_track() {
+    fn test_surface_position() {
         let bytes = hex!("8c4841753a9a153237aef0f275be");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ADSB(adsb_msg) = msg.df {
-            match adsb_msg.message {
-                SurfacePosition(sp) => {
-                    println!("{:}", sp.mov);
-                    assert_eq!(sp.status, StatusForGroundTrack::Valid);
-                    assert_eq!(sp.read_track(), Some(92.8125));
-                    assert_eq!(sp.read_groundspeed(), Some(17.));
-                }
-                _ => panic!("Not a surface position message"),
+            if let SurfacePosition(sp) = adsb_msg.message {
+                assert_eq!(sp.status, StatusForGroundTrack::Valid);
+                assert_eq!(sp.read_track(), Some(92.8125));
+                assert_eq!(sp.read_groundspeed(), Some(17.));
+                return;
             }
-        } else {
-            panic!("Not an ADSB message")
         }
+        unreachable!();
     }
 }
