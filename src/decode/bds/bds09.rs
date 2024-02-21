@@ -47,7 +47,9 @@ impl Serialize for AirborneVelocity {
                     state.serialize_field("vertical_rate", &vrate)?;
                     let vrate_src = match &self.vrate_src {
                         VerticalRateSource::GeometricAltitude => "GNSS",
-                        VerticalRateSource::BarometricPressureAltitude => "barometric",
+                        VerticalRateSource::BarometricPressureAltitude => {
+                            "barometric"
+                        }
                     };
                     state.serialize_field("vrate_src", &vrate_src)?;
                 }
@@ -85,10 +87,17 @@ impl AirborneVelocity {
     /// Return effective (`track`, `ground_speed`, `vertical_rate`) for groundspeed
     #[must_use]
     pub fn calculate(&self) -> Option<(f32, f64, i16)> {
-        if let AirborneVelocitySubType::GroundSpeedDecoding(ground_speed) = &self.sub_type {
-            let v_ew = f64::from((ground_speed.ew_vel as i16 - 1) * ground_speed.ew_sign.value());
-            let v_ns = f64::from((ground_speed.ns_vel as i16 - 1) * ground_speed.ns_sign.value());
-            let h = libm::atan2(v_ew, v_ns) * (360.0 / (2.0 * std::f64::consts::PI));
+        if let AirborneVelocitySubType::GroundSpeedDecoding(ground_speed) =
+            &self.sub_type
+        {
+            let v_ew = f64::from(
+                (ground_speed.ew_vel as i16 - 1) * ground_speed.ew_sign.value(),
+            );
+            let v_ns = f64::from(
+                (ground_speed.ns_vel as i16 - 1) * ground_speed.ns_sign.value(),
+            );
+            let h = libm::atan2(v_ew, v_ns)
+                * (360.0 / (2.0 * std::f64::consts::PI));
             let track = if h < 0.0 { h + 360.0 } else { h };
             let speed = libm::hypot(v_ew, v_ns);
             let vrate = self
@@ -224,14 +233,16 @@ impl AirborneVelocitySubFields {
         subtype: AirborneVelocityType,
     ) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
         match subtype {
-            AirborneVelocityType::Subsonic => {
-                u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))
-                    .map(|(rest, value)| (rest, value - 1))
-            }
-            AirborneVelocityType::Supersonic => {
-                u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))
-                    .map(|(rest, value)| (rest, 4 * (value - 1)))
-            }
+            AirborneVelocityType::Subsonic => u16::read(
+                rest,
+                (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
+            )
+            .map(|(rest, value)| (rest, value - 1)),
+            AirborneVelocityType::Supersonic => u16::read(
+                rest,
+                (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
+            )
+            .map(|(rest, value)| (rest, 4 * (value - 1))),
         }
     }
 }
@@ -284,7 +295,9 @@ mod tests {
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ADSB(adsb_msg) = msg.df {
             if let AirborneVelocity(velocity) = adsb_msg.message {
-                if let AirborneVelocitySubType::GroundSpeedDecoding(_gsd) = velocity.sub_type {
+                if let AirborneVelocitySubType::GroundSpeedDecoding(_gsd) =
+                    velocity.sub_type
+                {
                     if let Some((trk, gs, vr)) = velocity.calculate() {
                         assert_relative_eq!(gs, 159., max_relative = 1e-2);
                         assert_relative_eq!(trk, 182.88, max_relative = 1e-2);
@@ -304,9 +317,15 @@ mod tests {
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ADSB(adsb_msg) = msg.df {
             if let AirborneVelocity(velocity) = adsb_msg.message {
-                if let AirborneVelocitySubType::AirspeedDecoding(asd) = velocity.sub_type {
+                if let AirborneVelocitySubType::AirspeedDecoding(asd) =
+                    velocity.sub_type
+                {
                     assert_eq!(asd.airspeed, 375);
-                    assert_relative_eq!(asd.mag_heading, 244., max_relative = 1e-2);
+                    assert_relative_eq!(
+                        asd.mag_heading,
+                        244.,
+                        max_relative = 1e-2
+                    );
                     //assert_eq!(velocity.vrate, -2304);
                 }
                 return;

@@ -29,7 +29,8 @@ pub struct OperationStatusAirborne {
     /// OM
     pub operational_mode: OperationalMode,
 
-    #[deku(pad_bytes_before = "1")] // reserved: OM last 8 bits (diff for airborne/surface)
+    #[deku(pad_bytes_before = "1")]
+    // reserved: OM last 8 bits (diff for airborne/surface)
     pub version_number: ADSBVersion,
 
     #[deku(bits = "1")]

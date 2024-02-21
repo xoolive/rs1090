@@ -73,7 +73,11 @@ mod tests {
                 assert_eq!(state.is_fms, false);
                 assert_eq!(state.qnh, 1012.8);
                 assert_eq!(state.is_heading, true);
-                assert_relative_eq!(state.selected_heading, 66.8, max_relative = 1e-2);
+                assert_relative_eq!(
+                    state.selected_heading,
+                    66.8,
+                    max_relative = 1e-2
+                );
                 assert_eq!(state.autopilot, true);
                 assert_eq!(state.vnav_mode, true);
                 assert_eq!(state.lnav_mode, true);

@@ -61,7 +61,8 @@ fn read_track(
     rest: &BitSlice<u8, Msb0>,
     status: StatusForGroundTrack,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
-    let (rest, value) = u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(7)))?;
+    let (rest, value) =
+        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(7)))?;
     let track = match status {
         StatusForGroundTrack::Invalid => None,
         StatusForGroundTrack::Valid => Some(value as f64 * 360. / 128.),
