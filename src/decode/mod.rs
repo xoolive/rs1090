@@ -3,11 +3,11 @@ pub mod bds;
 pub mod crc;
 
 use adsb::{Typecode, ADSB};
-use bds::{decode_id13_field, mode_a_to_mode_c, BDS};
+use bds::BDS;
 use crc::modes_checksum;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::ser::{Serialize, Serializer};
 use std::fmt;
 
 /**
@@ -27,8 +27,9 @@ use std::fmt;
 | 24       | [`Comm-D`]                          | 3.1.2.7.3   |
  */
 
-#[derive(Debug, PartialEq, DekuRead, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "5")]
+#[serde(tag = "type")]
 pub enum DF {
     #[deku(id = "0")]
     ShortAirAirSurveillance {
@@ -40,22 +41,26 @@ pub enum DF {
         cc: u8,
         /// Spare
         #[deku(bits = "1")]
+        #[serde(skip_serializing)]
         unused: u8,
         /// SL: Sensitivity level, ACAS
         #[deku(bits = "3")]
         sl: u8,
         /// Spare
         #[deku(bits = "2")]
+        #[serde(skip_serializing)]
         unused1: u8,
         /// RI: Reply Information
         #[deku(bits = "4")]
         ri: u8,
         /// Spare
         #[deku(bits = "2")]
+        #[serde(skip_serializing)]
         unused2: u8,
         /// AC: altitude code
         altitude: AC13Field,
         /// AP: address, parity
+        #[serde(skip_serializing)]
         parity: ICAO,
     },
     #[deku(id = "4")]
@@ -63,8 +68,10 @@ pub enum DF {
         /// FS: Flight Status
         fs: FlightStatus,
         /// DR: DownlinkRequest
+        #[serde(skip_serializing)]
         dr: DownlinkRequest,
         /// UM: Utility Message
+        #[serde(skip_serializing)]
         um: UtilityMessage,
         /// AC: AltitudeCode
         ac: AC13Field,
@@ -76,8 +83,10 @@ pub enum DF {
         /// FS: Flight Status
         fs: FlightStatus,
         /// DR: Downlink Request
+        #[serde(skip_serializing)]
         dr: DownlinkRequest,
         /// UM: UtilityMessage
+        #[serde(skip_serializing)]
         um: UtilityMessage,
         /// ID: Identity
         id: IdentityCode,
@@ -133,7 +142,7 @@ pub enum DF {
 
     /// 19: Extended Squitter Military Application, Downlink Format 19 (3.1.2.8.8)
     #[deku(id = "19")]
-    ExtendedQuitterMilitaryApplication {
+    ExtendedSquitterMilitaryApplication {
         /// Reserved
         #[deku(bits = "3")]
         af: u8,
@@ -144,42 +153,51 @@ pub enum DF {
         /// FS: Flight Status
         flight_status: FlightStatus,
         /// DR: Downlink Request
+        #[serde(skip_serializing)]
         dr: DownlinkRequest,
         /// UM: Utility Message
+        #[serde(skip_serializing)]
         um: UtilityMessage,
         /// AC: Altitude Code
-        alt: AC13Field,
+        altitude: AC13Field,
         /// MB Message, Comm-B
+        #[serde(skip_serializing)]
         bds: BDS,
         /// AP: address/parity
         parity: ICAO,
     },
+
     #[deku(id = "21")]
     CommBIdentityReply {
         /// FS: Flight Status
         fs: FlightStatus,
         /// DR: Downlink Request
+        #[serde(skip_serializing)]
         dr: DownlinkRequest,
         /// UM: Utility Message
+        #[serde(skip_serializing)]
         um: UtilityMessage,
         /// ID: Identity
         #[deku(
             bits = "13",
             endian = "big",
-            map = "|squawk: u32| -> Result<_, DekuError> {Ok(bds::decode_id13_field(squawk))}"
+            map = "|squawk: u32| -> Result<_, DekuError> {Ok(decode_id13(squawk))}"
         )]
         id: u32,
         /// MB Message, Comm-B
+        #[serde(skip_serializing)]
         bds: BDS,
         /// AP address/parity
         parity: ICAO,
     },
+
     #[deku(id_pat = "24..=31")]
     CommDExtendedLengthMessage {
         /// Spare - 1 bit
         #[deku(bits = "1")]
         spare: u8,
         /// KE: control, ELM
+        #[serde(skip_serializing)]
         ke: KE,
         /// ND: number of D-segment
         #[deku(bits = "4")]
@@ -193,32 +211,15 @@ pub enum DF {
 }
 
 /// Downlink ADS-B Packet
-#[derive(Debug, PartialEq, DekuRead, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 pub struct Message {
     /// Starting with 5 bit identifier, decode packet
+    #[serde(flatten)]
     pub df: DF,
 
     // Calculated from all bits, used as ICAO for Response packets
     #[deku(reader = "Self::read_crc(df, deku::input_bits)")]
     pub crc: u32,
-}
-
-impl Serialize for Message {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("Message", 10)?;
-        state.serialize_field("crc", &self.crc)?;
-        match &self.df {
-            DF::ADSB(adsb) => {
-                state.serialize_field("adsb", &adsb)?;
-            }
-            _ => {}
-        }
-
-        state.end()
-    }
 }
 
 impl Message {
@@ -305,11 +306,11 @@ impl fmt::Display for Message {
                 write!(f, "{cf}")?;
             }
             // TODO
-            DF::ExtendedQuitterMilitaryApplication { .. } => {} // DF19
-            DF::CommBAltitudeReply { bds, alt, .. } => {
+            DF::ExtendedSquitterMilitaryApplication { .. } => {} // DF19
+            DF::CommBAltitudeReply { bds, altitude, .. } => {
                 writeln!(f, " DF20. Comm-B, Altitude Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:x?} (Mode S / ADS-B)")?;
-                let altitude = alt.0;
+                let altitude = altitude.0;
                 writeln!(f, "  Altitude:      {altitude} ft")?;
                 write!(f, "  {bds}")?;
             }
@@ -372,12 +373,15 @@ impl core::str::FromStr for ICAO {
 }
 
 /// 13 bit identity code
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
 pub struct IdentityCode(#[deku(reader = "Self::read(deku::rest)")] pub u16);
 
 impl IdentityCode {
-    fn read(rest: &BitSlice<u8, Msb0>) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
-        let (rest, num) = u32::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
+    fn read(
+        rest: &BitSlice<u8, Msb0>,
+    ) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
+        let (rest, num) =
+            u32::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
 
         let c1 = (num & 0b1_0000_0000_0000) >> 12;
         let a1 = (num & 0b0_1000_0000_0000) >> 11;
@@ -403,32 +407,32 @@ impl IdentityCode {
 }
 
 /// 13 bit encoded altitude
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, DekuRead, Copy, Clone)]
 pub struct AC13Field(#[deku(reader = "Self::read(deku::rest)")] pub u16);
 
 impl AC13Field {
-    // TODO Add unit
-    fn read(rest: &BitSlice<u8, Msb0>) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
-        let (rest, num) = u32::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
+    fn read(
+        rest: &BitSlice<u8, Msb0>,
+    ) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
+        let (rest, ac13field) =
+            u32::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
 
-        let m_bit = num & 0x0040;
-        let q_bit = num & 0x0010;
+        let m_bit = ac13field & 0x0040;
+        let q_bit = ac13field & 0x0010;
 
         if m_bit != 0 {
-            // TODO: this might be wrong?
-            Ok((rest, 0))
+            let meters = ((ac13field & 0x1f80) >> 2) | (ac13field & 0x3f);
+            // convert to ft
+            Ok((rest, (meters as f32 * 3.28084) as u16))
         } else if q_bit != 0 {
-            let n = ((num & 0x1f80) >> 2) | ((num & 0x0020) >> 1) | (num & 0x000f);
-            let n = n * 25;
-            if n > 1000 {
-                Ok((rest, (n - 1000) as u16))
-            } else {
-                // TODO: add error
-                Ok((rest, 0))
-            }
+            // 11 bit integer resulting from the removal of bit Q and M
+            let n = ((ac13field & 0x1f80) >> 2)
+                | ((ac13field & 0x0020) >> 1)
+                | (ac13field & 0x000f);
+            Ok((rest, (n * 25 - 1000) as u16)) // 25 ft interval
         } else {
-            // TODO 11 bit gillham coded altitude
-            if let Ok(n) = mode_a_to_mode_c(decode_id13_field(num)) {
+            // 11 bit Gillham coded altitude
+            if let Ok(n) = gray2alt(decode_id13(ac13field)) {
                 Ok((rest, (100 * n) as u16))
             } else {
                 Ok((rest, 0))
@@ -438,7 +442,7 @@ impl AC13Field {
 }
 
 /// Transponder level and additional information (3.1.2.5.2.2.1)
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[allow(non_camel_case_types)]
 pub enum Capability {
@@ -476,7 +480,7 @@ impl fmt::Display for Capability {
 }
 
 /// Airborne / Ground and SPI
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 pub enum FlightStatus {
     NoAlertNoSPIAirborne = 0b000,
@@ -539,7 +543,7 @@ pub enum UtilityMessageType {
 /// Control Field (B.3) for [`crate::DF::TisB`]
 ///
 /// reference: ICAO 9871
-#[derive(Debug, PartialEq, DekuRead, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 pub struct ControlField {
     t: ControlFieldType,
     /// AA: Address, Announced
@@ -553,13 +557,16 @@ impl fmt::Display for ControlField {
         write!(
             f,
             "{}",
-            self.me
-                .to_string(self.aa, &format!("{}", self.t), Capability::AG_DR0, false,)?
+            self.me.to_string(
+                self.aa,
+                &format!("{}", self.t),
+                Capability::AG_DR0
+            )?
         )
     }
 }
 
-#[derive(Debug, PartialEq, Eq, DekuRead, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[allow(non_camel_case_types)]
 pub enum ControlFieldType {
@@ -602,7 +609,9 @@ impl fmt::Display for ControlFieldType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s_type = match self {
             Self::ADSB_ES_NT | Self::ADSB_ES_NT_ALT => "(ADS-B)",
-            Self::TISB_COARSE | Self::TISB_ADSB_RELAY | Self::TISB_FINE => "(TIS-B)",
+            Self::TISB_COARSE | Self::TISB_ADSB_RELAY | Self::TISB_FINE => {
+                "(TIS-B)"
+            }
             Self::TISB_MANAGE | Self::TISB_ADSB => "(ADS-R)",
             Self::Reserved => "(unknown addressing scheme)",
         };
@@ -616,4 +625,102 @@ impl fmt::Display for ControlFieldType {
 pub enum KE {
     DownlinkELMTx = 0,
     UplinkELMAck = 1,
+}
+
+//=========================================================================
+//
+// In the squawk (identity) field bits are interleaved as follows in
+// (message bit 20 to bit 32):
+//
+// C1-A1-C2-A2-C4-A4-ZERO-B1-D1-B2-D2-B4-D4
+//
+// So every group of three bits A, B, C, D represent an integer from 0 to 7.
+//
+// The actual meaning is just 4 octal numbers, but we convert it into a hex
+// number tha happens to represent the four octal numbers.
+//
+// For more info: http://en.wikipedia.org/wiki/Gillham_code
+//
+
+#[rustfmt::skip]
+pub fn decode_id13(id13_field: u32) -> u32 {
+    let mut hex_gillham: u32 = 0;
+
+    if id13_field & 0x1000 != 0 { hex_gillham |= 0x0010; } // Bit 12 = C1
+    if id13_field & 0x0800 != 0 { hex_gillham |= 0x1000; } // Bit 11 = A1
+    if id13_field & 0x0400 != 0 { hex_gillham |= 0x0020; } // Bit 10 = C2
+    if id13_field & 0x0200 != 0 { hex_gillham |= 0x2000; } // Bit  9 = A2
+    if id13_field & 0x0100 != 0 { hex_gillham |= 0x0040; } // Bit  8 = C4
+    if id13_field & 0x0080 != 0 { hex_gillham |= 0x4000; } // Bit  7 = A4
+    // if id13_field & 0x0040 != 0 {hex_gillham |= 0x0800;} // Bit  6 = X  or M
+    if id13_field & 0x0020 != 0 { hex_gillham |= 0x0100; } // Bit  5 = B1
+    if id13_field & 0x0010 != 0 { hex_gillham |= 0x0001; } // Bit  4 = D1 or Q
+    if id13_field & 0x0008 != 0 { hex_gillham |= 0x0200; } // Bit  3 = B2
+    if id13_field & 0x0004 != 0 { hex_gillham |= 0x0002; } // Bit  2 = D2
+    if id13_field & 0x0002 != 0 { hex_gillham |= 0x0400; } // Bit  1 = B4
+    if id13_field & 0x0001 != 0 { hex_gillham |= 0x0004; } // Bit  0 = D4
+
+    hex_gillham
+}
+
+#[rustfmt::skip]
+pub fn gray2alt(gray: u32) -> Result<i32, &'static str> {
+    let mut five_hundreds: u32 = 0;
+    let mut one_hundreds: u32 = 0;
+
+    // check zero bits are zero, D1 set is illegal; C1,,C4 cannot be Zero
+    if (gray & 0xffff_8889) != 0 || (gray & 0x0000_00f0) == 0 {
+        return Err("Invalid altitude");
+    }
+
+    if gray & 0x0010 != 0 { one_hundreds ^= 0x007; } // C1
+    if gray & 0x0020 != 0 { one_hundreds ^= 0x003; } // C2
+    if gray & 0x0040 != 0 { one_hundreds ^= 0x001; } // C4
+
+    // Remove 7s from OneHundreds (Make 7->5, snd 5->7).
+    if (one_hundreds & 5) == 5 { one_hundreds ^= 2; }
+
+    // Check for invalid codes, only 1 to 5 are valid
+    if one_hundreds > 5 { return Err("Invalid altitude"); }
+
+    // if gray & 0x0001 {five_hundreds ^= 0x1FF;} // D1 never used for altitude
+    if gray & 0x0002 != 0 { five_hundreds ^= 0x0ff; } // D2
+    if gray & 0x0004 != 0 { five_hundreds ^= 0x07f; } // D4
+    if gray & 0x1000 != 0 { five_hundreds ^= 0x03f; } // A1
+    if gray & 0x2000 != 0 { five_hundreds ^= 0x01f; } // A2
+    if gray & 0x4000 != 0 { five_hundreds ^= 0x00f; } // A4
+    if gray & 0x0100 != 0 { five_hundreds ^= 0x007; } // B1
+    if gray & 0x0200 != 0 { five_hundreds ^= 0x003; } // B2
+    if gray & 0x0400 != 0 { five_hundreds ^= 0x001; } // B4
+
+    // Correct order of one_hundreds.
+    if five_hundreds & 1 != 0 && one_hundreds <= 6 {
+        one_hundreds = 6 - one_hundreds;
+    }
+
+    let n = (five_hundreds * 5) + one_hundreds;
+    if n >= 13 {
+        Ok(n as i32 - 13)
+    } else {
+        Err("Invalid altitude")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use hexlit::hex;
+
+    #[test]
+    fn test_ac13field() {
+        let bytes = hex!("A02014B400000000000000F9D514");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        match msg.df {
+            DF::CommBAltitudeReply { altitude, .. } => {
+                assert_eq!(altitude.0, 32300);
+            }
+            _ => unreachable!(),
+        }
+    }
 }

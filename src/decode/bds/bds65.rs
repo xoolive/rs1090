@@ -2,9 +2,10 @@ extern crate alloc;
 
 use alloc::fmt;
 use deku::prelude::*;
+use serde::Serialize;
 
 /// Aircraft Operational Status Subtype
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 pub enum OperationStatus {
     #[deku(id = "0")]
@@ -13,14 +14,14 @@ pub enum OperationStatus {
     #[deku(id = "1")]
     Surface(OperationStatusSurface),
 
+    #[serde(skip_serializing)]
     #[deku(id_pat = "2..=7")]
     Reserved(#[deku(bits = "5")] u8, [u8; 5]),
 }
 
-/// [`ME::AircraftOperationStatus`] && [`OperationStatus`] == 0
 ///
 /// Version 2 support only
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct OperationStatusAirborne {
     /// CC (16 bits)
     pub capability_class: CapabilityClassAirborne,
@@ -89,8 +90,7 @@ impl fmt::Display for OperationStatusAirborne {
     }
 }
 
-/// [`ME::AircraftOperationStatus`]
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct CapabilityClassAirborne {
     #[deku(bits = "2", assert_eq = "0")]
     pub reserved0: u8,
@@ -141,7 +141,7 @@ impl fmt::Display for CapabilityClassAirborne {
 /// [`ME::AircraftOperationStatus`] && [`OperationStatus`] == 1
 ///
 /// Version 2 support only
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct OperationStatusSurface {
     /// CC (14 bits)
     pub capability_class: CapabilityClassSurface,
@@ -219,8 +219,7 @@ impl fmt::Display for OperationStatusSurface {
     }
 }
 
-/// [`ME::AircraftOperationStatus`]
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct CapabilityClassSurface {
     /// 0, 0 in current version, reserved as id for later versions
     #[deku(bits = "2", assert_eq = "0")]
@@ -261,7 +260,7 @@ impl fmt::Display for CapabilityClassSurface {
 }
 
 /// `OperationMode` field not including the last 8 bits that are different for Surface/Airborne
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct OperationalMode {
     /// (0, 0) in Version 2, reserved for other values
     #[deku(bits = "2", assert_eq = "0")]
@@ -307,7 +306,7 @@ impl fmt::Display for OperationalMode {
 /// ADS-B Defined from different ICAO documents
 ///
 /// reference: ICAO 9871 (5.3.2.3)
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 pub enum ADSBVersion {
     #[deku(id = "0")]

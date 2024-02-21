@@ -16,3 +16,8 @@ tokio = { version="1.36.0", features = ["full"] }
 [dev-dependencies]
 approx = "0.5.1"
 hexlit = "0.5.5"
+
+[profile.release]
+lto = true
+strip = true
+overflow-checks = true

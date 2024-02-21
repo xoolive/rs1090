@@ -3,6 +3,7 @@ extern crate alloc;
 use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 
 #[derive(Debug, PartialEq, DekuRead, Clone)]
 pub struct AirborneVelocity {
@@ -24,6 +25,60 @@ pub struct AirborneVelocity {
         map = "|gnss_baro_diff: u16| -> Result<_, DekuError> {Ok(if gnss_baro_diff > 1 {(gnss_baro_diff - 1) * 25} else { 0 })}"
     )]
     pub gnss_baro_diff: u16,
+}
+
+impl Serialize for AirborneVelocity {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Message", 6)?;
+        state.serialize_field("NACv", &self.nac_v)?;
+        let baro_diff = match self.gnss_sign {
+            Sign::Positive => self.gnss_baro_diff as i32,
+            Sign::Negative => -1 * (self.gnss_baro_diff as i32),
+        };
+        state.serialize_field("gnss_baro_diff", &baro_diff)?;
+        match &self.sub_type {
+            AirborneVelocitySubType::GroundSpeedDecoding(_gs) => {
+                if let Some((track, gs, vrate)) = &self.calculate() {
+                    state.serialize_field("track", &track)?;
+                    state.serialize_field("groundspeed", &gs)?;
+                    state.serialize_field("vertical_rate", &vrate)?;
+                    let vrate_src = match &self.vrate_src {
+                        VerticalRateSource::GeometricAltitude => "GNSS",
+                        VerticalRateSource::BarometricPressureAltitude => "barometric",
+                    };
+                    state.serialize_field("vrate_src", &vrate_src)?;
+                }
+            }
+
+            AirborneVelocitySubType::AirspeedDecoding(airspeed) => {
+                match airspeed.airspeed_type {
+                    AirspeedType::IAS => {
+                        state.serialize_field("IAS", &airspeed.airspeed)?;
+                    }
+                    AirspeedType::TAS => {
+                        state.serialize_field("TAS", &airspeed.airspeed)?;
+                    }
+                }
+                if self.vrate_value > 0 {
+                    let baro_rate = {
+                        let value = ((&self.vrate_value - 1) * 64) as i32;
+                        match &self.vrate_sign {
+                            Sign::Positive => value,
+                            Sign::Negative => -1 * value,
+                        }
+                    };
+                    state.serialize_field("vertical_rate", &baro_rate)?;
+                    state.serialize_field("vrate_src", "barometric")?;
+                }
+            }
+            _ => (),
+        }
+
+        state.end()
+    }
 }
 
 impl AirborneVelocity {
@@ -220,10 +275,8 @@ mod tests {
     use super::*;
     use crate::decode::Typecode::AirborneVelocity;
     use crate::decode::{Message, DF::ADSB};
-    use hexlit::hex;
-
-    extern crate approx;
     use approx::assert_relative_eq;
+    use hexlit::hex;
 
     #[test]
     fn test_groundspeed_velocity() {

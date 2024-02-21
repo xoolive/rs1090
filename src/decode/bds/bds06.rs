@@ -4,6 +4,7 @@ use super::bds05::CPRFormat;
 use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 
 /*
  * +----+-----+---+-----+---+---+---------+---------+
@@ -33,6 +34,27 @@ pub struct SurfacePosition {
     pub lat_cpr: u32,
     #[deku(bits = "17", endian = "big")]
     pub lon_cpr: u32,
+}
+
+impl Serialize for SurfacePosition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Message", 6)?;
+        state.serialize_field("NUCp", &(14 - self.tc))?;
+        state.serialize_field("groundspeed", &self.groundspeed)?;
+        state.serialize_field("track", &self.track)?;
+        let flag = match self.odd_flag {
+            CPRFormat::Odd => "odd",
+            CPRFormat::Even => "even",
+        };
+        state.serialize_field("odd_flag", &flag)?;
+        state.serialize_field("lat_cpr", &self.lat_cpr)?;
+        state.serialize_field("lon_cpr", &self.lon_cpr)?;
+
+        state.end()
+    }
 }
 
 fn read_track(
@@ -113,7 +135,7 @@ mod tests {
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         assert_eq!(
             format!("{msg}"),
-            r#" DF17 - Extended Squitter Surface position (BDS 0,6)
+            r#" DF17. Extended Squitter Surface position (BDS 0,6)
   Address:       484175 (Mode S / ADS-B)
   Groundspeed:   17 kts
   Track angle:   92.8125°

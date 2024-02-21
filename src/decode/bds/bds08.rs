@@ -3,6 +3,7 @@ extern crate alloc;
 use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 
 /**
  * +------+------+------+------+------+------+------+------+------+------+
@@ -24,6 +25,19 @@ pub struct Identification {
     /// Callsign
     #[deku(reader = "callsign_read(deku::rest)")]
     pub callsign: String,
+}
+
+impl Serialize for Identification {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Message", 2)?;
+        state.serialize_field("callsign", &self.callsign)?;
+        let category = format!("{}{}", self.tc, self.ca);
+        state.serialize_field("category", &category)?;
+        state.end()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
@@ -109,8 +123,7 @@ mod tests {
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ADSB(adsb_msg) = msg.df {
             if let AircraftIdentification(Identification { tc, ca, callsign }) = adsb_msg.message {
-                assert_eq!(format!("{tc}"), "A");
-                assert_eq!(ca, 0);
+                assert_eq!(format!("{tc}{ca}"), "A0");
                 assert_eq!(callsign, "EZY85MH");
                 return;
             }

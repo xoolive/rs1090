@@ -20,7 +20,7 @@ fn today() -> i64 {
 struct TimedMessage<'a> {
     timestamp: f64,
 
-    #[serde(skip_serializing)]
+    //#[serde(skip_serializing)]
     frame: &'a String,
 
     #[serde(flatten)]
@@ -48,12 +48,12 @@ fn process_radarcape(msg: &[u8]) {
         message: frame,
     };
 
-    println!(
+    /*println!(
         "{:?} {}\n{:#?}",
         today() as f64 + ts,
         msg.frame,
         msg.message
-    );
+    );*/
 
     println!(
         "{}",

@@ -5,7 +5,9 @@ use tokio::net::TcpStream;
 
 use std::collections::HashSet;
 
-pub async fn next_beast_msg(mut stream: TcpStream) -> impl Stream<Item = Vec<u8>> {
+pub async fn next_beast_msg(
+    mut stream: TcpStream,
+) -> impl Stream<Item = Vec<u8>> {
     /*
     *  Iterate in Beast binary feed.
     * <esc> "1" : 6 byte MLAT timestamp, 1 byte signal level,
@@ -23,7 +25,8 @@ pub async fn next_beast_msg(mut stream: TcpStream) -> impl Stream<Item = Vec<u8>
     * wiki.modesbeast.com/Radarcape:Firmware_Versions#The_GPS_timestamp
     */
     // Initialize a HashSet to check for valid message types
-    let valid_msg_types: HashSet<u8> = vec![0x31, 0x32, 0x33, 0x34].into_iter().collect();
+    let valid_msg_types: HashSet<u8> =
+        vec![0x31, 0x32, 0x33, 0x34].into_iter().collect();
 
     let mut data = Vec::new();
     stream! {

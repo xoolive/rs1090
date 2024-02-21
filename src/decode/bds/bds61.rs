@@ -1,21 +1,34 @@
 extern crate alloc;
 
-use super::decode_id13_field;
+use crate::decode::decode_id13;
 use alloc::fmt;
 use deku::prelude::*;
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 
 /// Table: A-2-97
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AircraftStatus {
     pub sub_type: AircraftStatusType,
     pub emergency_state: EmergencyState,
     #[deku(
         bits = "13",
         endian = "big",
-        map = "|squawk: u32| -> Result<_, DekuError> {Ok(decode_id13_field(squawk))}"
+        map = "|squawk: u32| -> Result<_, DekuError> {Ok(decode_id13(squawk))}"
     )]
     pub squawk: u32,
+}
+
+impl Serialize for AircraftStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Message", 2)?;
+        state.serialize_field("squawk", &self.squawk)?;
+        let emergency = format!("{}", &self.emergency_state);
+        state.serialize_field("emergency", &emergency)?;
+        state.end()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
