@@ -1,5 +1,6 @@
 pub mod adsb;
 pub mod bds;
+pub mod commb;
 pub mod crc;
 
 use adsb::{Typecode, ADSB};
@@ -32,99 +33,128 @@ use std::fmt;
 #[serde(tag = "type")]
 pub enum DF {
     #[deku(id = "0")]
+    #[serde(rename = "DF0")]
     ShortAirAirSurveillance {
         /// VS: Vertical Status
         #[deku(bits = "1")]
+        #[serde(skip)]
         vs: u8,
         /// CC:
         #[deku(bits = "1")]
+        #[serde(skip)]
         cc: u8,
         /// Spare
         #[deku(bits = "1")]
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         unused: u8,
         /// SL: Sensitivity level, ACAS
         #[deku(bits = "3")]
+        #[serde(skip)]
         sl: u8,
         /// Spare
         #[deku(bits = "2")]
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         unused1: u8,
         /// RI: Reply Information
         #[deku(bits = "4")]
+        #[serde(skip)]
         ri: u8,
         /// Spare
         #[deku(bits = "2")]
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         unused2: u8,
         /// AC: altitude code
-        altitude: AC13Field,
+        #[serde(rename = "altitude")]
+        ac: AC13Field,
         /// AP: address, parity
-        #[serde(skip_serializing)]
-        parity: ICAO,
+        #[serde(rename = "icao24")]
+        ap: ICAO,
     },
     #[deku(id = "4")]
+    #[serde(rename = "DF4")]
     SurveillanceAltitudeReply {
         /// FS: Flight Status
+        #[serde(skip)]
         fs: FlightStatus,
         /// DR: DownlinkRequest
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         dr: DownlinkRequest,
         /// UM: Utility Message
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         um: UtilityMessage,
         /// AC: AltitudeCode
+        #[serde(rename = "altitude")]
         ac: AC13Field,
         /// AP: Address/Parity
+        #[serde(rename = "icao24")]
         ap: ICAO,
     },
     #[deku(id = "5")]
+    #[serde(rename = "DF5")]
     SurveillanceIdentityReply {
         /// FS: Flight Status
         fs: FlightStatus,
         /// DR: Downlink Request
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         dr: DownlinkRequest,
         /// UM: UtilityMessage
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         um: UtilityMessage,
         /// ID: Identity
+        #[serde(rename = "squawk")]
         id: IdentityCode,
         /// AP: Address/Parity
+        #[serde(rename = "icao24")]
         ap: ICAO,
     },
+
     /// 11: (Mode S) All-call reply, Downlink format 11 (2.1.2.5.2.2)
     #[deku(id = "11")]
+    #[serde(rename = "DF11")]
     AllCallReply {
         /// CA: Capability
         capability: Capability,
         /// AA: Address Announced
+        #[serde(rename = "icao24")]
         icao: ICAO,
         /// PI: Parity/Interrogator identifier
+        #[serde(skip)]
         p_icao: ICAO,
     },
+
     #[deku(id = "16")]
+    #[serde(rename = "DF16")]
     LongAirAir {
         #[deku(bits = "1")]
+        #[serde(skip)]
         vs: u8,
         #[deku(bits = "2")]
+        #[serde(skip)]
         spare1: u8,
         #[deku(bits = "3")]
+        #[serde(skip)]
         sl: u8,
         #[deku(bits = "2")]
+        #[serde(skip)]
         spare2: u8,
         #[deku(bits = "4")]
+        #[serde(skip)]
         ri: u8,
         #[deku(bits = "2")]
+        #[serde(skip)]
         spare3: u8,
         /// AC: altitude code
-        altitude: AC13Field,
+        #[serde(rename = "altitude")]
+        ac: AC13Field,
         /// MV: message, acas
         #[deku(count = "7")]
+        #[serde(skip)]
         mv: Vec<u8>,
         /// AP: address, parity
-        parity: ICAO,
+        #[serde(rename = "icao24")]
+        ap: ICAO,
     },
+
     #[deku(id = "17")]
     ADSB(ADSB),
 
@@ -133,6 +163,7 @@ pub enum DF {
     /// Non-Transponder-based ADS-B Transmitting Subsystems and TIS-B Transmitting equipment.
     /// Equipment that cannot be interrogated.
     #[deku(id = "18")]
+    #[serde(skip)]
     TisB {
         /// Enum containing message
         cf: ControlField,
@@ -142,6 +173,7 @@ pub enum DF {
 
     /// 19: Extended Squitter Military Application, Downlink Format 19 (3.1.2.8.8)
     #[deku(id = "19")]
+    #[serde(skip)]
     ExtendedSquitterMilitaryApplication {
         /// Reserved
         #[deku(bits = "3")]
@@ -149,46 +181,49 @@ pub enum DF {
     },
 
     #[deku(id = "20")]
+    #[serde(rename = "DF20")]
     CommBAltitudeReply {
         /// FS: Flight Status
-        flight_status: FlightStatus,
+        #[serde(skip)]
+        fs: FlightStatus,
         /// DR: Downlink Request
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         dr: DownlinkRequest,
         /// UM: Utility Message
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         um: UtilityMessage,
         /// AC: Altitude Code
-        altitude: AC13Field,
+        #[serde(rename = "altitude")]
+        ac: AC13Field,
         /// MB Message, Comm-B
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         bds: BDS,
         /// AP: address/parity
-        parity: ICAO,
+        #[serde(skip)]
+        ap: ICAO,
     },
 
     #[deku(id = "21")]
+    #[serde(rename = "DF21")]
     CommBIdentityReply {
         /// FS: Flight Status
+        #[serde(skip)]
         fs: FlightStatus,
         /// DR: Downlink Request
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         dr: DownlinkRequest,
         /// UM: Utility Message
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         um: UtilityMessage,
         /// ID: Identity
-        #[deku(
-            bits = "13",
-            endian = "big",
-            map = "|squawk: u32| -> Result<_, DekuError> {Ok(decode_id13(squawk))}"
-        )]
-        id: u32,
+        #[serde(rename = "squawk")]
+        id: IdentityCode,
         /// MB Message, Comm-B
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         bds: BDS,
         /// AP address/parity
-        parity: ICAO,
+        #[serde(rename = "icao24")]
+        ap: ICAO,
     },
 
     #[deku(id_pat = "24..=31")]
@@ -197,7 +232,7 @@ pub enum DF {
         #[deku(bits = "1")]
         spare: u8,
         /// KE: control, ELM
-        #[serde(skip_serializing)]
+        #[serde(skip)]
         ke: KE,
         /// ND: number of D-segment
         #[deku(bits = "4")]
@@ -219,6 +254,7 @@ pub struct Message {
 
     // Calculated from all bits, used as ICAO for Response packets
     #[deku(reader = "Self::read_crc(df, deku::input_bits)")]
+    #[serde(skip)]
     pub crc: u32,
 }
 
@@ -252,11 +288,11 @@ impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let crc = self.crc;
         match &self.df {
-            DF::ShortAirAirSurveillance { altitude, .. } => {
+            DF::ShortAirAirSurveillance { ac, .. } => {
                 writeln!(f, " DF0. Short Air-Air Surveillance")?;
                 writeln!(f, "  ICAO Address:  {crc:06x} (Mode S / ADS-B)")?;
-                if altitude.0 > 0 {
-                    let altitude = altitude.0;
+                if ac.0 > 0 {
+                    let altitude = ac.0;
                     writeln!(f, "  Air/Ground:    airborne")?;
                     writeln!(f, "  Altitude:      {altitude} ft barometric")?;
                 } else {
@@ -273,11 +309,10 @@ impl fmt::Display for Message {
                 }
             }
             DF::SurveillanceIdentityReply { fs, id, .. } => {
-                let identity = id.0;
                 writeln!(f, " DF5. Surveillance, Identity Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:06x} (Mode S / ADS-B)")?;
                 writeln!(f, "  Air/Ground:    {fs}")?;
-                writeln!(f, "  Squawk:        {identity:04x}")?;
+                writeln!(f, "  Squawk:        {id}")?;
             }
             DF::AllCallReply {
                 capability, icao, ..
@@ -286,12 +321,12 @@ impl fmt::Display for Message {
                 writeln!(f, "  ICAO Address:  {icao} (Mode S / ADS-B)")?;
                 writeln!(f, "  Air/Ground:    {capability}")?;
             }
-            DF::LongAirAir { altitude, .. } => {
+            DF::LongAirAir { ac, .. } => {
                 writeln!(f, " DF16. Long Air-Air ACAS")?;
                 writeln!(f, "  ICAO Address:  {crc:06x} (Mode S / ADS-B)")?;
                 // TODO the airborne? should't be static
-                if altitude.0 > 0 {
-                    let altitude = altitude.0;
+                if ac.0 > 0 {
+                    let altitude = ac.0;
                     writeln!(f, "  Air/Ground:    airborne?")?;
                     writeln!(f, "  Baro altitude: {altitude} ft")?;
                 } else {
@@ -307,14 +342,14 @@ impl fmt::Display for Message {
             }
             // TODO
             DF::ExtendedSquitterMilitaryApplication { .. } => {} // DF19
-            DF::CommBAltitudeReply { bds, altitude, .. } => {
+            DF::CommBAltitudeReply { bds, ac, .. } => {
                 writeln!(f, " DF20. Comm-B, Altitude Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:x?} (Mode S / ADS-B)")?;
-                let altitude = altitude.0;
+                let altitude = ac.0;
                 writeln!(f, "  Altitude:      {altitude} ft")?;
                 write!(f, "  {bds}")?;
             }
-            DF::CommBIdentityReply { id, bds, .. } => {
+            DF::CommBIdentityReply { bds, id, .. } => {
                 writeln!(f, " DF21. Comm-B, Identity Reply")?;
                 writeln!(f, "    ICAO Address:  {crc:x?} (Mode S / ADS-B)")?;
                 writeln!(f, "    Squawk:        {id:x?}")?;
@@ -373,7 +408,7 @@ impl core::str::FromStr for ICAO {
 }
 
 /// 13 bit identity code
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
+#[derive(PartialEq, DekuRead, Copy, Clone)]
 pub struct IdentityCode(#[deku(reader = "Self::read(deku::rest)")] pub u16);
 
 impl IdentityCode {
@@ -381,28 +416,32 @@ impl IdentityCode {
         rest: &BitSlice<u8, Msb0>,
     ) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
         let (rest, num) =
-            u32::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
+            u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
+        Ok((rest, decode_id13(num)))
+    }
+}
 
-        let c1 = (num & 0b1_0000_0000_0000) >> 12;
-        let a1 = (num & 0b0_1000_0000_0000) >> 11;
-        let c2 = (num & 0b0_0100_0000_0000) >> 10;
-        let a2 = (num & 0b0_0010_0000_0000) >> 9;
-        let c4 = (num & 0b0_0001_0000_0000) >> 8;
-        let a4 = (num & 0b0_0000_1000_0000) >> 7;
-        let b1 = (num & 0b0_0000_0010_0000) >> 5;
-        let d1 = (num & 0b0_0000_0001_0000) >> 4;
-        let b2 = (num & 0b0_0000_0000_1000) >> 3;
-        let d2 = (num & 0b0_0000_0000_0100) >> 2;
-        let b4 = (num & 0b0_0000_0000_0010) >> 1;
-        let d4 = num & 0b0_0000_0000_0001;
+impl fmt::Debug for IdentityCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:04x}", self.0)?;
+        Ok(())
+    }
+}
 
-        let a = a4 << 2 | a2 << 1 | a1;
-        let b = b4 << 2 | b2 << 1 | b1;
-        let c = c4 << 2 | c2 << 1 | c1;
-        let d = d4 << 2 | d2 << 1 | d1;
+impl fmt::Display for IdentityCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:04x}", self.0)?;
+        Ok(())
+    }
+}
 
-        let num: u16 = (a << 12 | b << 8 | c << 4 | d) as u16;
-        Ok((rest, num))
+impl Serialize for IdentityCode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let squawk = format!("{:04x}", &self.0);
+        serializer.serialize_str(&squawk)
     }
 }
 
@@ -415,7 +454,7 @@ impl AC13Field {
         rest: &BitSlice<u8, Msb0>,
     ) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
         let (rest, ac13field) =
-            u32::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
+            u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
 
         let m_bit = ac13field & 0x0040;
         let q_bit = ac13field & 0x0010;
@@ -447,14 +486,18 @@ impl AC13Field {
 #[allow(non_camel_case_types)]
 pub enum Capability {
     /// Level 1 transponder (surveillance only), and either airborne or on the ground
+    #[serde(rename = "level1")]
     AG_LEVEL1 = 0x00,
     #[deku(id_pat = "0x01..=0x03")]
     AG_RESERVED,
     /// Level 2 or above transponder, on ground
+    #[serde(rename = "ground")]
     AG_GROUND = 0x04,
     /// Level 2 or above transponder, airborne
+    #[serde(rename = "airborne")]
     AG_AIRBORNE = 0x05,
     /// Level 2 or above transponder, either airborne or on ground
+    #[serde(rename = "ground/airborne")]
     AG_GROUND_AIRBORNE = 0x06,
     /// DR field is not equal to 0,
     /// or fs field equal 2, 3, 4, or 5,
@@ -479,16 +522,17 @@ impl fmt::Display for Capability {
     }
 }
 
-/// Airborne / Ground and SPI
+/// Airborne / Ground and Spi
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
+#[serde(rename_all = "snake_case")]
 pub enum FlightStatus {
-    NoAlertNoSPIAirborne = 0b000,
-    NoAlertNoSPIOnGround = 0b001,
-    AlertNoSPIAirborne = 0b010,
-    AlertNoSPIOnGround = 0b011,
-    AlertSPIAirborneGround = 0b100,
-    NoAlertSPIAirborneGround = 0b101,
+    NoAlertNoSpiAirborne = 0b000,
+    NoAlertNoSpiOnGround = 0b001,
+    AlertNoSpiAirborne = 0b010,
+    AlertNoSpiOnGround = 0b011,
+    AlertSpiAirborneGround = 0b100,
+    NoAlertSpiAirborneGround = 0b101,
     Reserved = 0b110,
     NotAssigned = 0b111,
 }
@@ -499,12 +543,12 @@ impl fmt::Display for FlightStatus {
             f,
             "{}",
             match self {
-                Self::NoAlertNoSPIAirborne
-                | Self::AlertSPIAirborneGround
-                | Self::NoAlertSPIAirborneGround => "airborne?",
-                Self::NoAlertNoSPIOnGround => "ground?",
-                Self::AlertNoSPIAirborne => "airborne",
-                Self::AlertNoSPIOnGround => "ground",
+                Self::NoAlertNoSpiAirborne
+                | Self::AlertSpiAirborneGround
+                | Self::NoAlertSpiAirborneGround => "airborne?",
+                Self::NoAlertNoSpiOnGround => "ground?",
+                Self::AlertNoSpiAirborne => "airborne",
+                Self::AlertNoSpiOnGround => "ground",
                 _ => "reserved",
             }
         )
@@ -643,8 +687,8 @@ pub enum KE {
 //
 
 #[rustfmt::skip]
-pub fn decode_id13(id13_field: u32) -> u32 {
-    let mut hex_gillham: u32 = 0;
+pub fn decode_id13(id13_field: u16) -> u16 {
+    let mut hex_gillham: u16 = 0;
 
     if id13_field & 0x1000 != 0 { hex_gillham |= 0x0010; } // Bit 12 = C1
     if id13_field & 0x0800 != 0 { hex_gillham |= 0x1000; } // Bit 11 = A1
@@ -664,12 +708,12 @@ pub fn decode_id13(id13_field: u32) -> u32 {
 }
 
 #[rustfmt::skip]
-pub fn gray2alt(gray: u32) -> Result<i32, &'static str> {
+pub fn gray2alt(gray: u16) -> Result<i32, &'static str> {
     let mut five_hundreds: u32 = 0;
     let mut one_hundreds: u32 = 0;
 
     // check zero bits are zero, D1 set is illegal; C1,,C4 cannot be Zero
-    if (gray & 0xffff_8889) != 0 || (gray & 0x0000_00f0) == 0 {
+    if (gray & 0x8889) != 0 || (gray & 0x00f0) == 0 {
         return Err("Invalid altitude");
     }
 
@@ -717,8 +761,8 @@ mod tests {
         let bytes = hex!("A02014B400000000000000F9D514");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         match msg.df {
-            DF::CommBAltitudeReply { altitude, .. } => {
-                assert_eq!(altitude.0, 32300);
+            DF::CommBAltitudeReply { ac, .. } => {
+                assert_eq!(ac.0, 32300);
             }
             _ => unreachable!(),
         }

@@ -1,55 +1,41 @@
 extern crate alloc;
 
-use crate::decode::decode_id13;
+use crate::decode::IdentityCode;
 use alloc::fmt;
 use deku::prelude::*;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::Serialize;
 
 /// Table: A-2-97
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct AircraftStatus {
     pub sub_type: AircraftStatusType,
     pub emergency_state: EmergencyState,
-    #[deku(
-        bits = "13",
-        endian = "big",
-        map = "|squawk: u32| -> Result<_, DekuError> {Ok(decode_id13(squawk))}"
-    )]
-    pub squawk: u32,
+    pub squawk: IdentityCode,
 }
 
-impl Serialize for AircraftStatus {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("Message", 2)?;
-        state.serialize_field("squawk", &self.squawk)?;
-        let emergency = format!("{}", &self.emergency_state);
-        state.serialize_field("emergency", &emergency)?;
-        state.end()
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
+#[serde(rename_all = "snake_case")]
 pub enum AircraftStatusType {
     #[deku(id = "0")]
     NoInformation,
     #[deku(id = "1")]
+    #[serde(rename = "emergency_priority")]
     EmergencyPriorityStatus,
     #[deku(id = "2")]
+    #[serde(rename = "acas_ra")]
     ACASRaBroadcast,
     #[deku(id_pat = "_")]
     Reserved,
 }
 
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
+#[serde(rename_all = "snake_case")]
 pub enum EmergencyState {
     None = 0,
     General = 1,
-    Lifeguard = 2,
+    Medical = 2,
     MinimumFuel = 3,
     NoCommunication = 4,
     UnlawfulCommunication = 5,
@@ -62,7 +48,7 @@ impl fmt::Display for EmergencyState {
         let s = match self {
             Self::None => "No emergency",
             Self::General => "General emergency",
-            Self::Lifeguard => "Lifeguard/medical",
+            Self::Medical => "Medical emergency",
             Self::MinimumFuel => "Minimum fuel",
             Self::NoCommunication => "No communication",
             Self::UnlawfulCommunication => "Unlawful communications",

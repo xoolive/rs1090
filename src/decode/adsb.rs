@@ -20,7 +20,7 @@ use std::fmt::Write;
 #[derive(Debug, PartialEq, DekuRead, Clone, Serialize)]
 pub struct ADSB {
     /// Transponder Capability
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub capability: Capability,
     /// ICAO aircraft address
     pub icao24: ICAO,
@@ -28,7 +28,7 @@ pub struct ADSB {
     #[serde(flatten)]
     pub message: Typecode, // We only read the typecode here, then distribute
     /// Parity/Interrogator ID
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub parity: ICAO,
 }
 
@@ -70,46 +70,59 @@ impl ADSB {
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "5")]
-#[serde(untagged)]
-//#[serde(tag = "type")]
+//#[serde(untagged)]
+#[serde(tag = "BDS")]
 pub enum Typecode {
     #[deku(id = "0")]
+    #[serde(skip)]
     NoPosition([u8; 6]),
 
     #[deku(id_pat = "1..=4")]
+    #[serde(rename = "0,8")]
     AircraftIdentification(bds08::Identification),
 
     #[deku(id_pat = "5..=8")]
+    #[serde(rename = "0,6")]
     SurfacePosition(bds06::SurfacePosition),
 
     #[deku(id_pat = "9..=18")]
+    #[serde(rename = "0,5")]
     AirbornePositionBaroAltitude(bds05::PositionAltitude),
 
     #[deku(id = "19")]
+    #[serde(rename = "0,9")]
     AirborneVelocity(bds09::AirborneVelocity),
 
     #[deku(id_pat = "20..=22")]
+    #[serde(rename = "0,5")]
     AirbornePositionGNSSAltitude(bds05::PositionAltitude),
 
     #[deku(id = "23")]
+    #[serde(skip)]
     Reserved0([u8; 6]),
 
     #[deku(id_pat = "24")]
+    #[serde(skip)]
     SurfaceSystemStatus([u8; 6]),
 
     #[deku(id_pat = "25..=27")]
+    #[serde(skip)]
     Reserved1([u8; 6]),
 
     #[deku(id = "28")]
+    #[serde(rename = "6,1")]
     AircraftStatus(bds61::AircraftStatus),
 
     #[deku(id = "29")]
+    #[serde(rename = "6,2")]
     TargetStateAndStatusInformation(bds62::TargetStateAndStatusInformation),
 
     #[deku(id = "30")]
+    #[serde(skip)]
     AircraftOperationalCoordination([u8; 6]),
 
     #[deku(id = "31")]
+    #[serde(rename = "6,5")]
     AircraftOperationStatus(bds65::OperationStatus),
 }
 
@@ -283,11 +296,9 @@ impl Typecode {
                     if target_info.is_fms { "FMS" } else { "MCP" },
                     target_info.selected_altitude
                 )?;
-                writeln!(
-                    f,
-                    "    Altimeter setting: {} millibars",
-                    target_info.qnh
-                )?;
+                if let Some(qnh) = target_info.qnh {
+                    writeln!(f, "    Altimeter setting: {qnh} millibars",)?;
+                }
                 if target_info.is_heading {
                     writeln!(
                         f,
@@ -295,7 +306,7 @@ impl Typecode {
                         target_info.selected_heading
                     )?;
                 }
-                if target_info.tcas {
+                if target_info.tcas_operational {
                     write!(f, "    ACAS:              operational ")?;
                     if target_info.autopilot {
                         write!(f, "autopilot ")?;
@@ -306,7 +317,7 @@ impl Typecode {
                     if target_info.alt_hold {
                         write!(f, "altitude-hold ")?;
                     }
-                    if target_info.approach {
+                    if target_info.approach_mode {
                         write!(f, " approach")?;
                     }
                     writeln!(f)?;
@@ -320,11 +331,9 @@ impl Typecode {
                     "    SIL:               {} (per sample)",
                     target_info.sil
                 )?;
-                writeln!(
-                    f,
-                    "    QNH:               {} millibars",
-                    target_info.qnh
-                )?;
+                if let Some(qnh) = target_info.qnh {
+                    writeln!(f, "    QNH:               {qnh} millibars",)?;
+                }
             }
             Typecode::AircraftOperationalCoordination(_) => {
                 writeln!(

@@ -20,7 +20,7 @@ fn today() -> i64 {
 struct TimedMessage<'a> {
     timestamp: f64,
 
-    //#[serde(skip_serializing)]
+    //#[serde(skip)]
     frame: &'a String,
 
     #[serde(flatten)]

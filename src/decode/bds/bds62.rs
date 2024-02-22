@@ -9,7 +9,7 @@ pub struct TargetStateAndStatusInformation {
     #[deku(bits = "2")]
     pub subtype: u8,
     #[deku(bits = "1")]
-    pub is_fms: bool,
+    pub is_fms: bool, // TODO change to ENUM 0=> MCP/FCU 1=>FMS
     #[deku(
         bits = "12",
         endian = "big",
@@ -19,9 +19,9 @@ pub struct TargetStateAndStatusInformation {
     #[deku(
         bits = "9",
         endian = "big",
-        map = "|qnh: u32| -> Result<_, DekuError> {if qnh == 0 { Ok(0.0) } else { Ok(800.0 + ((qnh - 1) as f32) * 0.8)}}"
+        map = "|qnh: u32| -> Result<_, DekuError> {if qnh == 0 { Ok(None) } else { Ok(Some(800.0 + ((qnh - 1) as f32) * 0.8))}}"
     )]
-    pub qnh: f32,
+    pub qnh: Option<f32>,
     #[deku(bits = "1")]
     pub is_heading: bool,
     #[deku(
@@ -31,26 +31,28 @@ pub struct TargetStateAndStatusInformation {
     )]
     pub selected_heading: f32,
     #[deku(bits = "4")]
+    #[serde(rename = "NACp")]
     pub nacp: u8,
     #[deku(bits = "1")]
     pub nicbaro: u8,
     #[deku(bits = "2")]
+    #[serde(rename = "SIL")]
     pub sil: u8,
     #[deku(bits = "1")]
     pub mode_validity: bool,
-    #[deku(bits = "1")]
+    #[deku(bits = "1")] // bit 47, TODO only valid if mode_validity
     pub autopilot: bool,
-    #[deku(bits = "1")]
+    #[deku(bits = "1")] // bit 48, TODO only valid if mode_validity
     pub vnav_mode: bool,
-    #[deku(bits = "1")]
+    #[deku(bits = "1")] // bit 49, TODO only valid if mode_validity
     pub alt_hold: bool,
     #[deku(bits = "1")]
     pub imf: bool,
-    #[deku(bits = "1")]
-    pub approach: bool,
-    #[deku(bits = "1")]
-    pub tcas: bool,
-    #[deku(bits = "1")]
+    #[deku(bits = "1")] // bit 51, TODO only valid if mode_validity
+    pub approach_mode: bool,
+    #[deku(bits = "1")] // bit 52, TODO it's bit 51 if subtype is 0
+    pub tcas_operational: bool,
+    #[deku(bits = "1")] // bit 53, TODO only valid if mode_validity
     #[deku(pad_bits_after = "2")] // reserved
     pub lnav_mode: bool,
 }
@@ -71,19 +73,20 @@ mod tests {
             if let TargetStateAndStatusInformation(state) = adsb_msg.message {
                 assert_eq!(state.selected_altitude, 16992);
                 assert_eq!(state.is_fms, false);
-                assert_eq!(state.qnh, 1012.8);
+                assert_eq!(state.qnh, Some(1012.8));
                 assert_eq!(state.is_heading, true);
                 assert_relative_eq!(
                     state.selected_heading,
                     66.8,
                     max_relative = 1e-2
                 );
+                assert_eq!(state.mode_validity, true);
                 assert_eq!(state.autopilot, true);
                 assert_eq!(state.vnav_mode, true);
                 assert_eq!(state.lnav_mode, true);
                 assert_eq!(state.alt_hold, false);
-                assert_eq!(state.approach, false);
-                assert_eq!(state.tcas, true);
+                assert_eq!(state.approach_mode, false);
+                assert_eq!(state.tcas_operational, true);
 
                 return;
             }

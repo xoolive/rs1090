@@ -59,7 +59,7 @@ fn decode_ac12(
     rest: &BitSlice<u8, Msb0>,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
     let (rest, num) =
-        u32::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(12)))?;
+        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(12)))?;
 
     let q = num & 0x10;
 
