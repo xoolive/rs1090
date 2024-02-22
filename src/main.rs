@@ -57,18 +57,16 @@ fn process_radarcape(msg: &[u8]) {
 
     println!(
         "{}",
-        serde_json::to_string_pretty(&msg).expect("Failed to serialize")
+        serde_json::to_string(&msg).expect("Failed to serialize")
     );
 }
 
 #[tokio::main]
 async fn main() {
-    // Replace "127.0.0.1:8080" with the IP address and port of the server you want to connect to
     let server_address = "radarcape:10005";
 
     match TcpStream::connect(server_address).await {
         Ok(stream) => {
-            println!("Connected to server!");
             let message_stream = next_beast_msg(stream).await;
             pin_mut!(message_stream); // needed for iteration
             while let Some(msg) = message_stream.next().await {
@@ -76,7 +74,7 @@ async fn main() {
             }
         }
         Err(e) => {
-            println!("Failed to connect: {}", e);
+            panic!("Failed to connect: {}", e);
         }
     }
 }
