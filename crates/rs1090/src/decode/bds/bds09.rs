@@ -384,8 +384,9 @@ impl fmt::Display for AirborneVelocity {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::decode::Message;
+    use crate::decode::DF::ADSB;
     use crate::decode::ME::BDS09;
-    use crate::decode::{Message, DF::ADSB};
     use approx::assert_relative_eq;
     use hexlit::hex;
 

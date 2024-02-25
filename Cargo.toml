@@ -5,6 +5,7 @@ resolver = "2"
 [workspace.package]
 license = "MIT"
 edition = "2021"
+readme = "readme.md"
 
 [profile.release]
 lto = true

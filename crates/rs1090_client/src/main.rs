@@ -85,11 +85,31 @@ struct Options {
     /// Activate debug output of messages (deactivate JSON)
     #[arg(long, default_value = "false")]
     debug: bool,
+
+    /// Individual messages to decode
+    msgs: Vec<String>,
 }
 
 #[tokio::main]
 async fn main() {
     let options = Options::parse();
+
+    if options.msgs.len() > 0 {
+        for msg in options.msgs {
+            let bytes = hex::decode(&msg).unwrap();
+            let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+            if options.debug {
+                println!("{}", msg);
+            } else {
+                println!(
+                    "{}",
+                    serde_json::to_string(&msg).expect("Failed to serialize")
+                );
+            }
+        }
+        return;
+    }
+
     let server_address = format!("{}:{}", options.host, options.port);
 
     match TcpStream::connect(server_address).await {

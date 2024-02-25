@@ -197,7 +197,8 @@ impl fmt::Display for AltSource {
 mod tests {
     use super::*;
     use crate::decode::adsb::ME::BDS62;
-    use crate::decode::{Message, DF::ADSB};
+    use crate::decode::Message;
+    use crate::decode::DF::ADSB;
     use approx::assert_relative_eq;
     use hexlit::hex;
 

@@ -884,6 +884,7 @@ dependencies = [
  "clap",
  "deku",
  "futures-util",
+ "hex",
  "rs1090",
  "serde",
  "serde_json",

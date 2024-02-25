@@ -107,7 +107,8 @@ impl fmt::Display for SurfacePosition {
 mod tests {
     use super::*;
     use crate::decode::adsb::ME::BDS06;
-    use crate::decode::{Message, DF::ADSB};
+    use crate::decode::Message;
+    use crate::decode::DF::ADSB;
     use hexlit::hex;
 
     #[test]

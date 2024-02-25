@@ -189,8 +189,9 @@ impl fmt::Display for AircraftIdentification {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::decode::Message;
+    use crate::decode::DF::ADSB;
     use crate::decode::ME::BDS08;
-    use crate::decode::{Message, DF::ADSB};
     use hexlit::hex;
 
     #[test]
