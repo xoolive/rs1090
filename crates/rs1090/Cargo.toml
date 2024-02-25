@@ -1,0 +1,24 @@
+[package]
+name = "rs1090"
+version = "0.1.0"
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-stream = "0.3.5"
+deku = "0.16.0"
+futures = "0.3.30"
+futures-util = "0.3.30"
+libm = "0.2.8"
+serde = { version="1.0.197", features = ["derive"] }
+tokio = { version="1.36.0", features = ["full"] }
+
+[dev-dependencies]
+approx = "0.5.1"
+criterion = "0.5.1"
+hex = "0.4.3"
+hexlit = "0.5.5"
+
+[[bench]]
+name = "decode"
+harness = false

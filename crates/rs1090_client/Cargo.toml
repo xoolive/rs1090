@@ -1,0 +1,18 @@
+[package]
+name = "rs1090_client"
+version = "0.1.0"
+license.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "rs1090"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5.1", features = ["color", "derive", "wrap_help"] }
+deku = "0.16.0"
+futures-util = "0.3.30"
+rs1090 = { path = "../rs1090" }
+serde = { version="1.0.197", features = ["derive"] }
+serde_json = "1.0.114"
+tokio = { version="1.36.0", features = ["full"] }

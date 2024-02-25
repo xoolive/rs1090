@@ -1,5 +1,7 @@
 extern crate alloc;
+
 use alloc::fmt;
+use clap::Parser;
 use deku::DekuContainerRead;
 use futures_util::pin_mut;
 use futures_util::stream::StreamExt;
@@ -19,30 +21,30 @@ fn today() -> i64 {
 }
 
 #[derive(Serialize)]
-struct TimedMessage<'a> {
+struct TimedMessage {
     timestamp: f64,
 
     //#[serde(skip)]
-    frame: &'a String,
+    frame: String,
 
     #[serde(flatten)]
     message: Message,
 }
 
-impl fmt::Display for TimedMessage<'_> {
+impl fmt::Display for TimedMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
         writeln!(f, "{}", &self.message)
     }
 }
-impl fmt::Debug for TimedMessage<'_> {
+impl fmt::Debug for TimedMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
         writeln!(f, "{:#}", &self.message)
     }
 }
 
-fn process_radarcape(msg: &[u8]) {
+fn process_radarcape(msg: &[u8]) -> TimedMessage {
     // Copy the bytes from the slice into the array starting from index 2
     let mut array = [0u8; 8];
     array[2..8].copy_from_slice(&msg[2..8]);
@@ -53,40 +55,58 @@ fn process_radarcape(msg: &[u8]) {
     let ts = seconds as f64 + nanos as f64 * 1e-9;
     let frame = Message::from_bytes((&msg[9..], 0)).unwrap().1;
 
-    let msg = TimedMessage {
+    TimedMessage {
         timestamp: today() as f64 + ts,
-        frame: &msg[9..]
+        frame: msg[9..]
             .iter()
             .map(|&b| format!("{:02x}", b))
             .collect::<Vec<String>>()
             .join(""),
         message: frame,
-    };
+    }
+}
 
-    /*println!(
-        "{:?} {}\n{:#?}",
-        today() as f64 + ts,
-        msg.frame,
-        msg.message
-    );*/
+#[derive(Debug, Parser)]
+#[command(
+    name = "rs1090",
+    version,
+    author = "xoolive",
+    about = "Decode Mode S demodulated raw messages"
+)]
+struct Options {
+    /// Address of the demodulating server (beast feed)
+    #[arg(long, default_value = "radarcape")]
+    host: String,
 
-    println!(
-        "{}",
-        //msg
-        serde_json::to_string(&msg).expect("Failed to serialize")
-    );
+    /// Port of the demodulating server
+    #[arg(short, long, default_value = "10005")]
+    port: u16,
+
+    /// Activate debug output of messages (deactivate JSON)
+    #[arg(long, default_value = "false")]
+    debug: bool,
 }
 
 #[tokio::main]
 async fn main() {
-    let server_address = "radarcape:10005";
+    let options = Options::parse();
+    let server_address = format!("{}:{}", options.host, options.port);
 
     match TcpStream::connect(server_address).await {
         Ok(stream) => {
             let message_stream = next_beast_msg(stream).await;
             pin_mut!(message_stream); // needed for iteration
             while let Some(msg) = message_stream.next().await {
-                process_radarcape(&msg);
+                let msg = process_radarcape(&msg);
+                if options.debug {
+                    println!("{}", msg);
+                } else {
+                    println!(
+                        "{}",
+                        serde_json::to_string(&msg)
+                            .expect("Failed to serialize")
+                    );
+                }
             }
         }
         Err(e) => {
