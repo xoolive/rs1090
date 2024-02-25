@@ -1,15 +1,17 @@
+extern crate alloc;
+
 pub mod adsb;
 pub mod bds;
 pub mod commb;
 pub mod crc;
 
 use adsb::{ADSB, ME};
+use alloc::fmt;
 use bds::BDS;
 use crc::modes_checksum;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::ser::{Serialize, Serializer};
-use std::fmt;
 
 /**
 # Downlink Format Support
@@ -20,9 +22,9 @@ use std::fmt;
 | 5        | [`Surveillance Identity Reply`]     | 3.1.2.6.7   |
 | 11       | [`All Call Reply`]                  | 2.1.2.5.2.2 |
 | 16       | [`Long Air-Air Surveillance`]       | 3.1.2.8.3   |
-| 17       | [`Extended Squitter(ADS-B)`]        | 3.1.2.8.6   |
-| 18       | [`Extended Squitter(TIS-B)`]        | 3.1.2.8.7   |
-| 19       | [`Extended Squitter(Military)`]     | 3.1.2.8.8   |
+| 17       | [`Extended Squitter (ADS-B)`]       | 3.1.2.8.6   |
+| 18       | [`Extended Squitter (TIS-B)`]       | 3.1.2.8.7   |
+| 19       | [`Extended Squitter (Military)`]    | 3.1.2.8.8   |
 | 20       | [`Comm-B Altitude Reply`]           | 3.1.2.6.6   |
 | 21       | [`Comm-B Identity Reply`]           | 3.1.2.6.8   |
 | 24       | [`Comm-D`]                          | 3.1.2.7.3   |
@@ -32,6 +34,7 @@ use std::fmt;
 #[deku(type = "u8", bits = "5")]
 #[serde(tag = "DF")]
 pub enum DF {
+    /// 0: Short Air-Air Surveillance (3.1.2.8.2)
     #[deku(id = "0")]
     #[serde(rename = "DF0")]
     ShortAirAirSurveillance {
@@ -70,6 +73,8 @@ pub enum DF {
         #[serde(rename = "icao24")]
         ap: ICAO,
     },
+
+    /// 4: Surveillance Altitude Reply (3.1.2.6.5)
     #[deku(id = "4")]
     #[serde(rename = "DF4")]
     SurveillanceAltitudeReply {
@@ -89,6 +94,8 @@ pub enum DF {
         #[serde(rename = "icao24")]
         ap: ICAO,
     },
+
+    /// 5: Surveillance Identity Reply (3.1.2.6.7)
     #[deku(id = "5")]
     #[serde(rename = "DF5")]
     SurveillanceIdentityReply {
@@ -156,15 +163,15 @@ pub enum DF {
     },
 
     #[deku(id = "17")]
+    /// 17: Extended Squitter ADS-B, Download Format 17 (3.1.2.8.6)
     ADSB(ADSB),
 
-    /// 18: Extended Squitter/Supplementary, Downlink Format 18 (3.1.2.8.7)
-    ///
+    /// 18: Extended Squitter Supplementary, Downlink Format 18 (3.1.2.8.7)
     /// Non-Transponder-based ADS-B Transmitting Subsystems and TIS-B Transmitting equipment.
     /// Equipment that cannot be interrogated.
     #[deku(id = "18")]
     #[serde(skip)]
-    TisB {
+    ExtendedSquitterTisB {
         /// Enum containing message
         cf: ControlField,
         /// PI: parity/interrogator identifier
@@ -180,6 +187,7 @@ pub enum DF {
         af: u8,
     },
 
+    /// 20:	Comm-B Altitude Reply, Downlink Format 20 (3.1.2.6.6)
     #[deku(id = "20")]
     #[serde(rename = "DF20")]
     CommBAltitudeReply {
@@ -203,6 +211,7 @@ pub enum DF {
         ap: ICAO,
     },
 
+    /// 21: Comm-B Identity Reply, Downlink Format 21 (3.1.2.6.8)
     #[deku(id = "21")]
     #[serde(rename = "DF21")]
     CommBIdentityReply {
@@ -226,6 +235,7 @@ pub enum DF {
         ap: ICAO,
     },
 
+    /// 24: Comm-D, Downlink Format 24 (3.1.2.7.3)
     #[deku(id_pat = "24..=31")]
     CommDExtendedLengthMessage {
         /// Spare - 1 bit
@@ -336,7 +346,7 @@ impl fmt::Display for Message {
             DF::ADSB(msg) => {
                 write!(f, "{msg}")?;
             }
-            DF::TisB { cf, .. } => {
+            DF::ExtendedSquitterTisB { cf, .. } => {
                 // DF18
                 write!(f, "{cf}")?;
             }
