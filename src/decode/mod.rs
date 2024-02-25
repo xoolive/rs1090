@@ -3,7 +3,7 @@ pub mod bds;
 pub mod commb;
 pub mod crc;
 
-use adsb::{Typecode, ADSB};
+use adsb::{ADSB, ME};
 use bds::BDS;
 use crc::modes_checksum;
 use deku::bitvec::{BitSlice, Msb0};
@@ -30,7 +30,7 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "5")]
-#[serde(tag = "type")]
+#[serde(tag = "DF")]
 pub enum DF {
     #[deku(id = "0")]
     #[serde(rename = "DF0")]
@@ -593,7 +593,7 @@ pub struct ControlField {
     /// AA: Address, Announced
     pub aa: ICAO,
     /// ME: message, extended squitter
-    pub me: Typecode,
+    pub me: ME,
 }
 
 impl fmt::Display for ControlField {

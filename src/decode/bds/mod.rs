@@ -84,3 +84,11 @@ pub struct DataLinkCapability {
     pub reserved_acas: u8,
     pub bit_array: u16,
 }
+
+fn f64_twodecimals<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let rounded_value = (value * 100.0).round() / 100.0; // Round to two decimals
+    serializer.serialize_f64(rounded_value)
+}

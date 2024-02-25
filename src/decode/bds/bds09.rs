@@ -1,137 +1,99 @@
 extern crate alloc;
 
+use super::f64_twodecimals;
 use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 
-#[derive(Debug, PartialEq, DekuRead, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 pub struct AirborneVelocity {
     #[deku(bits = "3")]
-    pub subtype: u8,
-    #[deku(bits = "5")]
+    #[serde(skip)]
+    pub st: u8,
+
+    #[deku(bits = "1")]
+    #[serde(skip)]
+    pub intent_change: bool,
+
+    #[deku(bits = "1")]
+    #[serde(skip)]
+    pub ifr_capability: bool,
+
+    #[deku(bits = "3")]
+    #[serde(rename = "NACv")]
     pub nac_v: u8,
-    #[deku(ctx = "*subtype")]
-    pub sub_type: AirborneVelocitySubType,
+
+    #[deku(ctx = "*st")]
+    #[serde(flatten)]
+    pub velocity: AirborneVelocitySubType,
+
     pub vrate_src: VerticalRateSource,
+    #[serde(skip)]
     pub vrate_sign: Sign,
-    #[deku(endian = "big", bits = "9")]
-    pub vrate_value: u16,
-    #[deku(bits = "2")]
-    pub reverved: u8,
-    pub gnss_sign: Sign,
     #[deku(
-        bits = "7",
-        map = "|gnss_baro_diff: u16| -> Result<_, DekuError> {Ok(if gnss_baro_diff > 1 {(gnss_baro_diff - 1) * 25} else { 0 })}"
+        endian = "big",
+        bits = "9",
+        map = "|v: u16| -> Result<_, DekuError> {
+            if v == 0 { Ok(None) }
+            else {
+                Ok(Some(vrate_sign.value() * (v as i16 - 1)  * 64))
+            }
+        }"
     )]
-    pub gnss_baro_diff: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vertical_rate: Option<i16>,
+
+    #[deku(bits = "2")]
+    #[serde(skip)]
+    pub reserved: u8,
+
+    #[serde(skip)]
+    pub gnss_sign: Sign,
+
+    #[deku(reader = "read_geobaro(deku::rest, *gnss_sign)")]
+    pub geo_minus_baro: Option<i16>,
 }
 
-impl Serialize for AirborneVelocity {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("Message", 6)?;
-        state.serialize_field("NACv", &self.nac_v)?;
-        let baro_diff = match self.gnss_sign {
-            Sign::Positive => self.gnss_baro_diff as i32,
-            Sign::Negative => -1 * (self.gnss_baro_diff as i32),
-        };
-        state.serialize_field("gnss_baro_diff", &baro_diff)?;
-        match &self.sub_type {
-            AirborneVelocitySubType::GroundSpeedDecoding(_gs) => {
-                if let Some((track, gs, vrate)) = &self.calculate() {
-                    state.serialize_field("track", &track)?;
-                    state.serialize_field("groundspeed", &gs)?;
-                    state.serialize_field("vertical_rate", &vrate)?;
-                    let vrate_src = match &self.vrate_src {
-                        VerticalRateSource::GeometricAltitude => "GNSS",
-                        VerticalRateSource::BarometricPressureAltitude => {
-                            "barometric"
-                        }
-                    };
-                    state.serialize_field("vrate_src", &vrate_src)?;
-                }
-            }
-
-            AirborneVelocitySubType::AirspeedDecoding(airspeed) => {
-                match airspeed.airspeed_type {
-                    AirspeedType::IAS => {
-                        state.serialize_field("IAS", &airspeed.airspeed)?;
-                    }
-                    AirspeedType::TAS => {
-                        state.serialize_field("TAS", &airspeed.airspeed)?;
-                    }
-                }
-                if self.vrate_value > 0 {
-                    let baro_rate = {
-                        let value = ((&self.vrate_value - 1) * 64) as i32;
-                        match &self.vrate_sign {
-                            Sign::Positive => value,
-                            Sign::Negative => -1 * value,
-                        }
-                    };
-                    state.serialize_field("vertical_rate", &baro_rate)?;
-                    state.serialize_field("vrate_src", "barometric")?;
-                }
-            }
-            _ => (),
+fn read_geobaro(
+    rest: &BitSlice<u8, Msb0>,
+    gnss_sign: Sign,
+) -> Result<(&BitSlice<u8, Msb0>, Option<i16>), DekuError> {
+    let (rest, value) =
+        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(7)))?;
+    let value = if value > 1 {
+        match gnss_sign {
+            Sign::Positive => Some(25 * (value as i16 - 1)),
+            Sign::Negative => Some(-25 * (value as i16 - 1)),
         }
-
-        state.end()
-    }
-}
-
-impl AirborneVelocity {
-    /// Return effective (`track`, `ground_speed`, `vertical_rate`) for groundspeed
-    #[must_use]
-    pub fn calculate(&self) -> Option<(f32, f64, i16)> {
-        if let AirborneVelocitySubType::GroundSpeedDecoding(ground_speed) =
-            &self.sub_type
-        {
-            let v_ew = f64::from(
-                (ground_speed.ew_vel as i16 - 1) * ground_speed.ew_sign.value(),
-            );
-            let v_ns = f64::from(
-                (ground_speed.ns_vel as i16 - 1) * ground_speed.ns_sign.value(),
-            );
-            let h = libm::atan2(v_ew, v_ns)
-                * (360.0 / (2.0 * std::f64::consts::PI));
-            let track = if h < 0.0 { h + 360.0 } else { h };
-            let speed = libm::hypot(v_ew, v_ns);
-            let vrate = self
-                .vrate_value
-                .checked_sub(1)
-                .and_then(|v| v.checked_mul(64))
-                .map(|v| (v as i16) * self.vrate_sign.value());
-
-            if let Some(vrate) = vrate {
-                return Some((track as f32, speed, vrate));
-            }
-        }
+    } else {
         None
-    }
+    };
+    Ok((rest, value))
 }
 
-/// Airborne Velocity Message “Subtype” Code Field Encoding
-#[derive(Debug, PartialEq, DekuRead, Clone)]
-#[deku(ctx = "subtype: u8", id = "subtype")]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
+#[deku(ctx = "st: u8", id = "st")]
+#[serde(untagged)]
 pub enum AirborneVelocitySubType {
     #[deku(id = "0")]
+    #[serde(skip)]
     Reserved0(#[deku(bits = "22")] u32),
 
     #[deku(id_pat = "1..=2")]
     GroundSpeedDecoding(GroundSpeedDecoding),
 
-    #[deku(id_pat = "3..=4")]
-    AirspeedDecoding(AirspeedDecoding),
+    #[deku(id = "3")]
+    AirspeedSubsonic(AirspeedSubsonicDecoding),
+    #[deku(id = "4")]
+    AirspeedSupersonic(AirspeedSupersonicDecoding),
 
     #[deku(id_pat = "5..=7")]
+    #[serde(skip)]
     Reserved1(#[deku(bits = "22")] u32),
 }
 
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "1")]
 pub enum Sign {
     Positive = 0,
@@ -161,35 +123,150 @@ impl fmt::Display for Sign {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
 pub struct GroundSpeedDecoding {
+    #[serde(skip)]
     pub ew_sign: Sign,
-    #[deku(endian = "big", bits = "10")]
-    pub ew_vel: u16,
+    #[deku(
+        endian = "big",
+        bits = "10",
+        map = "|val: u16| -> Result<_, DekuError> {
+            Ok(f64::from((val as i16 - 1) * ew_sign.value()))
+        }"
+    )]
+    #[serde(skip)]
+    pub ew_vel: f64,
+    #[serde(skip)]
     pub ns_sign: Sign,
-    #[deku(endian = "big", bits = "10")]
-    pub ns_vel: u16,
+    #[serde(skip)]
+    #[deku(
+        endian = "big",
+        bits = "10",
+        map = "|val: u16| -> Result<_, DekuError> {
+        Ok(f64::from((val as i16 - 1) * ns_sign.value()))
+    }"
+    )]
+    pub ns_vel: f64,
+    #[deku(
+        bits = "0",
+        map = "|_: u8| -> Result<_, DekuError> {
+            Ok(libm::hypot(f64::abs(*ew_vel), f64::abs(*ns_vel)))
+        }"
+    )]
+    #[serde(serialize_with = "f64_twodecimals")]
+    pub groundspeed: f64,
+    #[deku(
+        bits = "0",
+        map = "|_: u8| -> Result<_, DekuError> {
+            let h = libm::atan2(*ew_vel, *ns_vel) * (360.0 / (2.0 * std::f64::consts::PI));
+            if h < 0.0 { Ok( h + 360. ) } else { Ok(h) }
+        }"
+    )]
+    #[serde(serialize_with = "f64_twodecimals")]
+    pub track: f64,
 }
 
 #[derive(Debug, PartialEq, DekuRead, Clone)]
-pub struct AirspeedDecoding {
+pub struct AirspeedSubsonicDecoding {
     #[deku(bits = "1")]
-    pub status_heading: u8,
+    pub status_heading: bool,
+
     #[deku(
         endian = "big",
         bits = "10",
-        map = "|mag_heading: u16| -> Result<_, DekuError> { Ok(mag_heading as f32 * 360. / 1024.)}"
+        map = "|val: u16| -> Result<_, DekuError> {
+            Ok(if *status_heading { Some(val as f32 * 360. / 1024.) } else { None })
+        }"
     )]
-    pub mag_heading: f32,
+    pub heading: Option<f32>,
+
     pub airspeed_type: AirspeedType,
+
     #[deku(
         endian = "big",
         bits = "10",
-        map = "|airspeed: u16| -> Result<_, DekuError> { Ok(if airspeed > 0 { airspeed - 1 } else { 0 })}"
+        map = "|value: u16| -> Result<_, DekuError> {
+            if value == 0 { return Ok(None) }
+            Ok(Some(value - 1))
+        }"
     )]
-    pub airspeed: u16,
+    pub airspeed: Option<u16>,
 }
-#[derive(Copy, Clone, Debug, PartialEq, Eq, DekuRead)]
+
+impl Serialize for AirspeedSubsonicDecoding {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Message", 2)?;
+        if let Some(heading) = &self.heading {
+            state.serialize_field("heading", heading)?;
+        }
+        if let Some(airspeed) = &self.airspeed {
+            match &self.airspeed_type {
+                AirspeedType::IAS => {
+                    state.serialize_field("IAS", &airspeed)?;
+                }
+                AirspeedType::TAS => {
+                    state.serialize_field("TAS", &airspeed)?;
+                }
+            }
+        }
+        state.end()
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, Clone)]
+pub struct AirspeedSupersonicDecoding {
+    #[deku(bits = "1")]
+    pub status_heading: bool,
+
+    #[deku(
+        endian = "big",
+        bits = "10",
+        map = "|val: u16| -> Result<_, DekuError> {
+            Ok(if *status_heading { Some(val as f32 * 360. / 1024.) } else { None })
+        }"
+    )]
+    pub heading: Option<f32>,
+
+    pub airspeed_type: AirspeedType,
+
+    #[deku(
+        endian = "big",
+        bits = "10",
+        map = "|value: u16| -> Result<_, DekuError> {
+            if value == 0 { return Ok(None) }
+            Ok(Some(4*(value - 1)))
+        }"
+    )]
+    pub airspeed: Option<u16>,
+}
+
+impl Serialize for AirspeedSupersonicDecoding {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Message", 2)?;
+        if let Some(heading) = &self.heading {
+            state.serialize_field("heading", heading)?;
+        }
+        if let Some(airspeed) = &self.airspeed {
+            match &self.airspeed_type {
+                AirspeedType::IAS => {
+                    state.serialize_field("IAS", &airspeed)?;
+                }
+                AirspeedType::TAS => {
+                    state.serialize_field("TAS", &airspeed)?;
+                }
+            }
+        }
+        state.end()
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
 #[deku(type = "u8", bits = "1")]
 pub enum AirspeedType {
     IAS = 0,
@@ -209,62 +286,27 @@ impl fmt::Display for AirspeedType {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, DekuRead)]
-#[deku(type = "u8", bits = "3")]
-pub enum AirborneVelocityType {
-    Subsonic = 1,
-    Supersonic = 3,
-}
-
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
-#[deku(ctx = "subtype: AirborneVelocityType")]
-pub struct AirborneVelocitySubFields {
-    pub dew: DirectionEW,
-    #[deku(reader = "Self::read_v(deku::rest, subtype)")]
-    pub vew: u16,
-    pub dns: DirectionNS,
-    #[deku(reader = "Self::read_v(deku::rest, subtype)")]
-    pub vns: u16,
-}
-
-impl AirborneVelocitySubFields {
-    fn read_v(
-        rest: &BitSlice<u8, Msb0>,
-        subtype: AirborneVelocityType,
-    ) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
-        match subtype {
-            AirborneVelocityType::Subsonic => u16::read(
-                rest,
-                (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
-            )
-            .map(|(rest, value)| (rest, value - 1)),
-            AirborneVelocityType::Supersonic => u16::read(
-                rest,
-                (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
-            )
-            .map(|(rest, value)| (rest, 4 * (value - 1))),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, DekuRead)]
+#[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
 #[deku(type = "u8", bits = "1")]
 pub enum DirectionEW {
     WestToEast = 0,
     EastToWest = 1,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, DekuRead)]
+#[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
 #[deku(type = "u8", bits = "1")]
 pub enum DirectionNS {
     SouthToNorth = 0,
     NorthToSouth = 1,
 }
 
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "1")]
 pub enum VerticalRateSource {
+    #[serde(rename = "barometric")]
     BarometricPressureAltitude = 0,
+
+    #[serde(rename = "GNSS")]
     GeometricAltitude = 1,
 }
 
@@ -284,7 +326,7 @@ impl fmt::Display for VerticalRateSource {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decode::Typecode::AirborneVelocity;
+    use crate::decode::ME::BDS09;
     use crate::decode::{Message, DF::ADSB};
     use approx::assert_relative_eq;
     use hexlit::hex;
@@ -294,16 +336,24 @@ mod tests {
         let bytes = hex!("8D485020994409940838175B284F");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ADSB(adsb_msg) = msg.df {
-            if let AirborneVelocity(velocity) = adsb_msg.message {
+            if let BDS09(velocity) = adsb_msg.message {
                 if let AirborneVelocitySubType::GroundSpeedDecoding(_gsd) =
-                    velocity.sub_type
+                    velocity.velocity
                 {
-                    if let Some((trk, gs, vr)) = velocity.calculate() {
-                        assert_relative_eq!(gs, 159., max_relative = 1e-2);
-                        assert_relative_eq!(trk, 182.88, max_relative = 1e-2);
-                        assert_eq!(vr, -832);
-                        assert_eq!(velocity.gnss_baro_diff, 550);
+                    assert_relative_eq!(
+                        _gsd.groundspeed,
+                        159.,
+                        max_relative = 1e-2
+                    );
+                    assert_relative_eq!(
+                        _gsd.track,
+                        182.88,
+                        max_relative = 1e-2
+                    );
+                    if let Some(vrate) = velocity.vertical_rate {
+                        assert_eq!(vrate, -832);
                     }
+                    assert_eq!(velocity.geo_minus_baro, Some(550));
                 }
                 return;
             }
@@ -316,17 +366,23 @@ mod tests {
         let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ADSB(adsb_msg) = msg.df {
-            if let AirborneVelocity(velocity) = adsb_msg.message {
-                if let AirborneVelocitySubType::AirspeedDecoding(asd) =
-                    velocity.sub_type
+            if let BDS09(velocity) = adsb_msg.message {
+                if let AirborneVelocitySubType::AirspeedSubsonic(asd) =
+                    velocity.velocity
                 {
-                    assert_eq!(asd.airspeed, 375);
-                    assert_relative_eq!(
-                        asd.mag_heading,
-                        244.,
-                        max_relative = 1e-2
-                    );
-                    //assert_eq!(velocity.vrate, -2304);
+                    if let Some(value) = asd.airspeed {
+                        assert_eq!(value, 375);
+                    } else {
+                        unreachable!()
+                    }
+                    if let Some(value) = asd.heading {
+                        assert_relative_eq!(value, 244., max_relative = 1e-2);
+                    } else {
+                        unreachable!()
+                    }
+                    if let Some(vrate) = velocity.vertical_rate {
+                        assert_eq!(vrate, -2304);
+                    }
                 }
                 return;
             }

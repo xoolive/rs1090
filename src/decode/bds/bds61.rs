@@ -38,9 +38,9 @@ pub enum EmergencyState {
     Medical = 2,
     MinimumFuel = 3,
     NoCommunication = 4,
-    UnlawfulCommunication = 5,
-    Reserved = 6,
-    Reserved2 = 7,
+    UnlawfulInterference = 5,
+    DownedAircraft = 6,
+    Reserved = 7,
 }
 
 impl fmt::Display for EmergencyState {
@@ -48,12 +48,12 @@ impl fmt::Display for EmergencyState {
         let s = match self {
             Self::None => "No emergency",
             Self::General => "General emergency",
-            Self::Medical => "Medical emergency",
+            Self::Medical => "Lifeguard/Medical emergency",
             Self::MinimumFuel => "Minimum fuel",
             Self::NoCommunication => "No communication",
-            Self::UnlawfulCommunication => "Unlawful communications",
+            Self::UnlawfulInterference => "Unlawful interference",
+            Self::DownedAircraft => "Downed aircraft",
             Self::Reserved => "reserved",
-            Self::Reserved2 => "reserved",
         };
         write!(f, "{s}")?;
         Ok(())
