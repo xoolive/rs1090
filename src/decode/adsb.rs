@@ -137,19 +137,14 @@ impl ME {
                 writeln!(f, "  Address:       {icao} {address_type}")?;
                 writeln!(f, "  Air/Ground:    {capability}")?;
             }
-            ME::BDS08(bds08::AircraftIdentification {
-                callsign,
-                wake_vortex,
-                ..
-            }) => {
+            ME::BDS05(airborne_position) => {
                 writeln!(
                     f,
-                    " DF17. Extended Squitter Aircraft identification and category"
+                    " DF17. Extended Squitter Airborne position (BDS 0,5)"
                 )?;
                 writeln!(f, "  Address:       {icao} {address_type}")?;
                 writeln!(f, "  Air/Ground:    {capability}")?;
-                writeln!(f, "  Callsign:      {callsign}")?;
-                writeln!(f, "  Category:      {wake_vortex}")?;
+                write!(f, "{airborne_position}")?;
             }
             ME::BDS06(surface_position) => {
                 writeln!(
@@ -157,111 +152,27 @@ impl ME {
                     " DF17. Extended Squitter Surface position (BDS 0,6)"
                 )?;
                 writeln!(f, "  Address:       {icao} {address_type}")?;
+                writeln!(f, "  Air/Ground:    {capability}")?;
                 write!(f, "{surface_position}")?;
             }
-            ME::BDS05(position_baro) => {
-                writeln!( // TODO
+            ME::BDS08(aircraft_identification) => {
+                writeln!(
                     f,
-                    " DF17. Extended Squitter Airborne position (barometric altitude)"
+                    " DF17. Extended Squitter Aircraft identification and category (BDS 0,8)"
                 )?;
                 writeln!(f, "  Address:       {icao} {address_type}")?;
                 writeln!(f, "  Air/Ground:    {capability}")?;
-                write!(f, "{position_baro}")?;
+                write!(f, "{aircraft_identification}")?;
             }
-            ME::BDS09(airborne_velocity) => match &airborne_velocity.velocity {
-                bds09::AirborneVelocitySubType::GroundSpeedDecoding(v) => {
-                    writeln!(
-                        f,
-                        " DF17. Extended Squitter Airborne velocity over ground, subsonic"
-                    )?;
-                    writeln!(f, "  Address:       {icao} {address_type}")?;
-                    writeln!(f, "  Air/Ground:    {capability}")?;
-                    if let Some(value) = airborne_velocity.geo_minus_baro {
-                        writeln!(f, "  GNSS delta:    {} ft", value)?;
-                    }
-
-                    writeln!(f, "  Track angle:   {}", libm::ceil(v.track))?;
-                    writeln!(
-                        f,
-                        "  Speed:         {} kt groundspeed",
-                        libm::floor(v.groundspeed)
-                    )?;
-
-                    if let Some(vr) = airborne_velocity.vertical_rate {
-                        writeln!(
-                            f,
-                            "  Vertical rate: {} ft/min {}",
-                            vr, airborne_velocity.vrate_src
-                        )?;
-                    }
-                }
-                bds09::AirborneVelocitySubType::AirspeedSubsonic(
-                    airspeed_decoding,
-                ) => {
-                    writeln!(
-                        f,
-                        " DF17. Extended Squitter Airspeed and track, subsonic",
-                    )?;
-                    writeln!(f, "  Address:       {icao} {address_type}")?;
-                    writeln!(f, "  Air/Ground:    {capability}")?;
-                    if let Some(value) = airspeed_decoding.airspeed {
-                        writeln!(
-                            f,
-                            "  {}:           {} kt",
-                            airspeed_decoding.airspeed_type, value
-                        )?;
-                    }
-                    if let Some(vr) = airborne_velocity.vertical_rate {
-                        writeln!(f, "  Baro rate:     {} ft/min", vr)?;
-                    }
-                    writeln!(
-                        f,
-                        "  NACv:          {}",
-                        airborne_velocity.nac_v
-                    )?;
-                }
-                bds09::AirborneVelocitySubType::AirspeedSupersonic(
-                    airspeed_decoding,
-                ) => {
-                    writeln!(
-                        f,
-                        " DF17. Extended Squitter Airspeed and track, subsonic",
-                    )?;
-                    writeln!(f, "  Address:       {icao} {address_type}")?;
-                    writeln!(f, "  Air/Ground:    {capability}")?;
-                    if let Some(value) = airspeed_decoding.airspeed {
-                        writeln!(
-                            f,
-                            "  {}:           {} kt",
-                            airspeed_decoding.airspeed_type, value
-                        )?;
-                    }
-                    if let Some(vr) = airborne_velocity.vertical_rate {
-                        writeln!(f, "  Baro rate:     {} ft/min", vr)?;
-                    }
-                    writeln!(
-                        f,
-                        "  NACv:          {}",
-                        airborne_velocity.nac_v
-                    )?;
-                }
-                bds09::AirborneVelocitySubType::Reserved0(_)
-                | bds09::AirborneVelocitySubType::Reserved1(_) => {
-                    writeln!(
-                        f,
-                        " DF17. Extended Squitter Airborne Velocity status (reserved)",
-                    )?;
-                    writeln!(f, "  Address:       {icao} {address_type}")?;
-                }
-            },
-            /*ME::AirbornePositionGNSSAltitude(position_gnss) => {
+            ME::BDS09(airborne_velocity) => {
                 writeln!(
                     f,
-                    " DF17. Extended Squitter Airborne position (GNSS altitude)",
+                    " DF17. Extended Squitter Airborne velocity over ground (BDS 0,9)"
                 )?;
-                writeln!(f, "  Address:      {icao} {address_type}")?;
-                write!(f, "{position_gnss}")?;
-            }*/
+                writeln!(f, "  Address:       {icao} {address_type}")?;
+                writeln!(f, "  Air/Ground:    {capability}")?;
+                write!(f, "{airborne_velocity}")?;
+            }
             ME::Reserved0(_) | ME::Reserved1(_) => {
                 writeln!(f, " DF17. Extended Squitter Unknown")?;
                 writeln!(f, "  Address:       {icao} {address_type}")?;
@@ -292,11 +203,10 @@ impl ME {
             ME::BDS62(target_info) => {
                 writeln!(
                     f,
-                    " DF17. Extended Squitter Target state and status (V2)",
+                    " DF17. Extended Squitter Target state and status (BDS 6,2)",
                 )?;
                 writeln!(f, "  Address:       {icao} {address_type}")?;
                 writeln!(f, "  Air/Ground:    {capability}")?;
-                writeln!(f, "  Target State and Status:")?;
                 write!(f, "{target_info}")?;
             }
             ME::AircraftOperationalCoordination(_) => {

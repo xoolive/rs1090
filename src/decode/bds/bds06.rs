@@ -134,6 +134,7 @@ mod tests {
             format!("{msg}"),
             r#" DF17. Extended Squitter Surface position (BDS 0,6)
   Address:       484175 (Mode S / ADS-B)
+  Air/Ground:    ground
   Groundspeed:   17 kts
   Track angle:   92.8125°
   CPR odd flag:  odd

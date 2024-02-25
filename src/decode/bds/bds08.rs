@@ -177,6 +177,14 @@ pub fn callsign_read(
     Ok((inside_rest, encoded))
 }
 
+impl fmt::Display for AircraftIdentification {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "  Callsign:      {}", &self.callsign)?;
+        writeln!(f, "  Category:      {}", &self.wake_vortex)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -203,5 +211,20 @@ mod tests {
             }
         }
         unreachable!();
+    }
+
+    #[test]
+    fn test_format() {
+        let bytes = hex!("8d406b902015a678d4d220aa4bda");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        assert_eq!(
+            format!("{msg}"),
+            r#" DF17. Extended Squitter Aircraft identification and category (BDS 0,8)
+  Address:       406b90 (Mode S / ADS-B)
+  Air/Ground:    airborne
+  Callsign:      EZY85MH
+  Category:      No category information
+"#
+        )
     }
 }

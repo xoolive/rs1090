@@ -323,6 +323,63 @@ impl fmt::Display for VerticalRateSource {
     }
 }
 
+impl fmt::Display for AirborneVelocity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.velocity {
+            AirborneVelocitySubType::GroundSpeedDecoding(v) => {
+                writeln!(f, "  Track angle:   {}°", libm::round(v.track))?;
+                writeln!(
+                    f,
+                    "  Groundspeed:   {} kt",
+                    libm::round(v.groundspeed)
+                )?;
+            }
+            AirborneVelocitySubType::AirspeedSubsonic(v) => {
+                if let Some(value) = v.airspeed {
+                    writeln!(
+                        f,
+                        "  {}:           {} kt",
+                        v.airspeed_type, value
+                    )?;
+                }
+                if let Some(value) = v.heading {
+                    writeln!(
+                        f,
+                        "  Heading:       {}°",
+                        libm::round(value as f64)
+                    )?;
+                }
+            }
+            AirborneVelocitySubType::AirspeedSupersonic(v) => {
+                if let Some(value) = v.airspeed {
+                    writeln!(
+                        f,
+                        "  {}:           {} kt",
+                        v.airspeed_type, value
+                    )?;
+                    if let Some(value) = v.heading {
+                        writeln!(
+                            f,
+                            "  Heading:       {}°",
+                            libm::round(value as f64)
+                        )?;
+                    }
+                }
+            }
+            AirborneVelocitySubType::Reserved0(_)
+            | AirborneVelocitySubType::Reserved1(_) => {}
+        }
+        if let Some(vr) = &self.vertical_rate {
+            writeln!(f, "  Vertical rate: {} ft/min {}", vr, &self.vrate_src)?;
+        }
+        writeln!(f, "  NACv:          {}", &self.nac_v)?;
+        if let Some(value) = &self.geo_minus_baro {
+            writeln!(f, "  GNSS delta:    {} ft", value)?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362,6 +419,24 @@ mod tests {
     }
 
     #[test]
+    fn test_format_groundspeed() {
+        let bytes = hex!("8D485020994409940838175B284F");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        assert_eq!(
+            format!("{msg}"),
+            r#" DF17. Extended Squitter Airborne velocity over ground (BDS 0,9)
+  Address:       485020 (Mode S / ADS-B)
+  Air/Ground:    airborne
+  Track angle:   183°
+  Groundspeed:   159 kt
+  Vertical rate: -832 ft/min barometric
+  NACv:          0
+  GNSS delta:    550 ft
+"#
+        )
+    }
+
+    #[test]
     fn test_airspeed_velocity() {
         let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
@@ -388,5 +463,22 @@ mod tests {
             }
         }
         unreachable!();
+    }
+
+    #[test]
+    fn test_format_airspeed() {
+        let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        assert_eq!(
+            format!("{msg}"),
+            r#" DF17. Extended Squitter Airborne velocity over ground (BDS 0,9)
+  Address:       a05f21 (Mode S / ADS-B)
+  Air/Ground:    airborne
+  TAS:           375 kt
+  Heading:       244°
+  Vertical rate: -2304 ft/min GNSS
+  NACv:          0
+"#
+        )
     }
 }
