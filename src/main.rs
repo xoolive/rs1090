@@ -71,7 +71,7 @@ fn process_radarcape(msg: &[u8]) {
     );*/
 
     println!(
-       "{}",
+        "{}",
         //msg
         serde_json::to_string(&msg).expect("Failed to serialize")
     );
