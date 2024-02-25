@@ -9,6 +9,7 @@ pub mod bds65;
 extern crate alloc;
 use alloc::fmt;
 use deku::prelude::*;
+use serde::ser::Serializer;
 
 #[derive(Debug, PartialEq, Eq, DekuRead, Clone)]
 #[deku(type = "u8", bits = "8")]

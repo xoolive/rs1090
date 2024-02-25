@@ -1,6 +1,5 @@
 extern crate alloc;
 
-use super::f64_twodecimals;
 use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
@@ -19,7 +18,12 @@ pub struct TargetStateAndStatusInformation {
     #[deku(
         bits = "11",// bit 9..20
         endian = "big",
-        map = "|altitude: u32| -> Result<_, DekuError> {Ok(if altitude > 1 {Some(((altitude - 1) * 32 + 16) / 100 * 100)} else {None} )}"
+        map = "|altitude: u32| -> Result<_, DekuError> {
+            Ok(
+                if altitude > 1 {Some(((altitude - 1) * 32 + 16) / 100 * 100)}
+                else {None}
+            )
+        }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_altitude: Option<u32>,
@@ -42,7 +46,10 @@ pub struct TargetStateAndStatusInformation {
     #[deku(
         bits = "9",// bit 30..39
         endian = "big",
-        map = "|heading: u16| -> Result<_, DekuError> { if *heading_status {Ok(Some(heading as f32 * 180.0 / 256.0))} else {Ok(None)} }"
+        map = "|heading: u16| -> Result<_, DekuError> {
+            if *heading_status {Ok(Some(heading as f32 * 180.0 / 256.0))} 
+            else {Ok(None)}
+        }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_heading: Option<f32>,
@@ -67,20 +74,26 @@ pub struct TargetStateAndStatusInformation {
 
     #[deku(
         bits = "1",
-        map = "|val: bool| -> Result<_, DekuError> { if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)} }"
-    )] // bit 47, TODO only valid if mode_validity
+        map = "|val: bool| -> Result<_, DekuError> {
+            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+        }"
+    )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub autopilot: Option<bool>,
     #[deku(
         bits = "1",
-        map = "|val: bool| -> Result<_, DekuError> { if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)} }"
-    )] // bit 47, TODO only valid if mode_validity
+        map = "|val: bool| -> Result<_, DekuError> {
+            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+        }"
+    )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vnav_mode: Option<bool>,
     #[deku(
         bits = "1",
-        map = "|val: bool| -> Result<_, DekuError> { if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)} }"
-    )] // bit 47, TODO only valid if mode_validity
+        map = "|val: bool| -> Result<_, DekuError> {
+            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+        }"
+    )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alt_hold: Option<bool>,
     #[deku(bits = "1")]
@@ -89,16 +102,20 @@ pub struct TargetStateAndStatusInformation {
     pub imf: bool,
     #[deku(
         bits = "1",
-        map = "|val: bool| -> Result<_, DekuError> { if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)} }"
-    )] // bit 47, TODO only valid if mode_validity
+        map = "|val: bool| -> Result<_, DekuError> {
+            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+        }"
+    )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approach_mode: Option<bool>,
     #[deku(bits = "1")] // bit 52, ALWAYS VALID!
     pub tcas_operational: bool,
     #[deku(
         bits = "1",
-        map = "|val: bool| -> Result<_, DekuError> { if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)} }"
-    )] // bit 47, TODO only valid if mode_validity
+        map = "|val: bool| -> Result<_, DekuError> {
+            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+        }"
+    )]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[deku(pad_bits_after = "2")] // reserved
     pub lnav_mode: Option<bool>,
@@ -135,7 +152,7 @@ mod tests {
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ADSB(adsb_msg) = msg.df {
             if let BDS62(state) = adsb_msg.message {
-                assert_eq!(state.selected_altitude, Some(17000)); // rounded 16992
+                assert_eq!(state.selected_altitude, Some(17000));
                 assert_eq!(state.alt_source, AltSource::MCP);
                 assert_eq!(state.barometric_setting, Some(1012.8));
                 if let Some(sel_hdg) = state.selected_heading {

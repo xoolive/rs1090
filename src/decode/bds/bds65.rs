@@ -129,9 +129,9 @@ pub struct OperationStatusSurface {
     pub operational_mode: OperationalMode,
 
     /// OM last 8 bits (diff for airborne/surface)
-    // TODO: parse:
     // http://www.anteni.net/adsb/Doc/1090-WP30-18-DRAFT_DO-260B-V42.pdf
-    // 2.2.3.2.7.2.4.7 “GPS Antenna Offset” OM Code Subfield in Aircraft Operational Status Messages
+    // 2.2.3.2.7.2.4.7 “GPS Antenna Offset”
+    // OM Code Subfield in Aircraft Operational Status Messages
     #[serde(skip)]
     pub gps_antenna_offset: u8,
 
