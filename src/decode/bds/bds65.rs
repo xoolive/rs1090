@@ -22,6 +22,17 @@ pub enum OperationStatus {
     Reserved(#[deku(bits = "5")] u8, [u8; 5]),
 }
 
+impl fmt::Display for OperationStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "  Aircraft Operation Status (BDS 6,5)")?;
+        match &self {
+            Self::Airborne(airborne) => write!(f, "{airborne}"),
+            Self::Surface(surface) => write!(f, "{surface}"),
+            _ => Ok(()),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct OperationStatusAirborne {
     /// CC (16 bits)

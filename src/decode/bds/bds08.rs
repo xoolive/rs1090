@@ -179,6 +179,7 @@ pub fn callsign_read(
 
 impl fmt::Display for AircraftIdentification {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "  Aircraft identification and category (BDS 0,8)")?;
         writeln!(f, "  Callsign:      {}", &self.callsign)?;
         writeln!(f, "  Category:      {}", &self.wake_vortex)?;
         Ok(())
@@ -219,9 +220,10 @@ mod tests {
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         assert_eq!(
             format!("{msg}"),
-            r#" DF17. Extended Squitter Aircraft identification and category (BDS 0,8)
-  Address:       406b90 (Mode S / ADS-B)
+            r#" DF17. Extended Squitter
+  Address:       406b90
   Air/Ground:    airborne
+  Aircraft identification and category (BDS 0,8)
   Callsign:      EZY85MH
   Category:      No category information
 "#

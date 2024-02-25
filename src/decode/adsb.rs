@@ -5,7 +5,6 @@ use super::{Capability, ICAO};
 use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
-use std::fmt::Write;
 
 /**
  * An ADS-B frame is 112 bits long and consists of five main parts,
@@ -22,48 +21,44 @@ pub struct ADSB {
     /// Transponder Capability
     #[serde(skip)]
     pub capability: Capability,
+
     /// ICAO aircraft address
     pub icao24: ICAO,
+
     /// ME (Typecode)
     #[serde(flatten)]
     pub message: ME,
+
     /// Parity/Interrogator ID
     #[serde(skip)]
     pub parity: ICAO,
 }
 
-impl ADSB {
-    pub(crate) fn to_string(&self) -> Result<String, fmt::Error> {
-        let mut f = String::new();
-        write!(
-            f,
-            "{}",
-            self.message.to_string(
-                self.icao24,
-                "(Mode S / ADS-B)",
-                self.capability
-            )?
-        )?;
-        Ok(f)
+impl fmt::Display for ADSB {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, " DF17. Extended Squitter")?;
+        writeln!(f, "  Address:       {}", &self.icao24)?;
+        writeln!(f, "  Air/Ground:    {}", &self.capability)?;
+        write!(f, "{}", &self.message)
     }
 }
 
 /*
-* |  `ME`               |  Name                              |
-* | ------------------- | ---------------------------------- |
-* | 0                   | [`NoPosition`]                     |
-* | 1..=4               | [`AircraftIdentification`]         |
-* | 5..=8               | [`SurfacePosition`]                |
-* | 9..=18              | [`AirbornePositionBaroAltitude`]   |
-* | 19                  | [`AirborneVelocity`]               |
-* | 20..=22             | [`AirbornePositionGNSSAltitude`]   |
-* | 23                  | [`Reserved0`]                      |
-* | 24                  | [`SurfaceSystemStatus`]            |
-* | 25..=27             | [`Reserved1`]                      |
-* | 28                  | [`AircraftStatus`]                 |
-* | 29                  | [`TargetStateAndStatusInformation`]|
-* | 30                  | [`AircraftOperationalCoordination`]|
-* | 31                  | [`AircraftOperationStatus`]        |
+* |  `ME`               |  Name                               |
+* | ------------------- | ----------------------------------- |
+* | 0                   | [`NoPosition`]                      |
+* | 1..=4               | [`AircraftIdentification`]          |
+* | 5..=8               | [`SurfacePosition`]                 |
+* | 9..=18              | [`AirbornePosition`] (barometric)   |
+* | 19                  | [`AirborneVelocity`]                |
+* | 20..=22             | [`AirbornePosition`] (GNSS)         |
+* | 23                  | [`Reserved0`]                       |
+* | 24                  | [`SurfaceSystemStatus`]             |
+* | 25..=27             | [`Reserved1`]                       |
+* | 28                  | [`AircraftStatus`]                  |
+* | 29                  | [`TargetStateAndStatusInformation`] |
+* | 30                  | [`AircraftOperationalCoordination`] |
+* | 31                  | [`AircraftOperationStatus`]         |
 */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
@@ -120,135 +115,36 @@ pub enum ME {
     BDS65(bds65::OperationStatus),
 }
 
-impl ME {
-    pub(crate) fn to_string(
-        &self,
-        icao: ICAO,
-        address_type: &str,
-        capability: Capability,
-    ) -> Result<String, fmt::Error> {
-        let mut f = String::new();
+impl fmt::Display for ME {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ME::NoPosition(_) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter No position information"
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
+            ME::NoPosition(_)
+            | ME::Reserved0(_)
+            | ME::Reserved1(_)
+            | ME::SurfaceSystemStatus(_)
+            | ME::AircraftOperationalCoordination(_) => Ok(()),
+            ME::BDS05(me) => {
+                write!(f, "{}", me)
             }
-            ME::BDS05(airborne_position) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Airborne position (BDS 0,5)"
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
-                write!(f, "{airborne_position}")?;
+            ME::BDS06(me) => {
+                write!(f, "{}", me)
             }
-            ME::BDS06(surface_position) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Surface position (BDS 0,6)"
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
-                write!(f, "{surface_position}")?;
+            ME::BDS08(me) => {
+                write!(f, "{}", me)
             }
-            ME::BDS08(aircraft_identification) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Aircraft identification and category (BDS 0,8)"
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
-                write!(f, "{aircraft_identification}")?;
+            ME::BDS09(me) => {
+                write!(f, "{}", me)
             }
-            ME::BDS09(airborne_velocity) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Airborne velocity over ground (BDS 0,9)"
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
-                write!(f, "{airborne_velocity}")?;
+            ME::BDS61(me) => {
+                write!(f, "{}", me)
             }
-            ME::Reserved0(_) | ME::Reserved1(_) => {
-                writeln!(f, " DF17. Extended Squitter Unknown")?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
+            ME::BDS62(me) => {
+                write!(f, "{}", me)
             }
-            ME::SurfaceSystemStatus(_) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Reserved for surface system status",
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
-            }
-            ME::BDS61(bds61::AircraftStatus {
-                emergency_state,
-                squawk,
-                ..
-            }) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Emergency/priority status",
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
-                writeln!(f, "  Squawk:        {squawk:x?}")?;
-                writeln!(f, "  Emergency/priority:    {emergency_state}")?;
-            }
-            ME::BDS62(target_info) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Target state and status (BDS 6,2)",
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
-                write!(f, "{target_info}")?;
-            }
-            ME::AircraftOperationalCoordination(_) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Aircraft Operational Coordination",
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-            }
-            ME::BDS65(bds65::OperationStatus::Airborne(opstatus_airborne)) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Aircraft operational status (airborne)",
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
-                write!(
-                    f,
-                    "  Aircraft Operational Status:\n{opstatus_airborne}"
-                )?;
-            }
-            ME::BDS65(bds65::OperationStatus::Surface(opstatus_surface)) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Aircraft operational status (surface)",
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
-                writeln!(f, "  Air/Ground:    {capability}")?;
-                write!(
-                    f,
-                    "  Aircraft Operational Status:\n {opstatus_surface}"
-                )?;
-            }
-            ME::BDS65(bds65::OperationStatus::Reserved(..)) => {
-                writeln!(
-                    f,
-                    " DF17. Extended Squitter Aircraft operational status (reserved)",
-                )?;
-                writeln!(f, "  Address:       {icao} {address_type}")?;
+            ME::BDS65(me) => {
+                write!(f, "{}", me)
             }
         }
-        Ok(f)
     }
 }
 

@@ -123,7 +123,54 @@ pub struct TargetStateAndStatusInformation {
 
 impl fmt::Display for TargetStateAndStatusInformation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "",)
+        writeln!(f, "  Target state and status (BDS 6,2)")?;
+        if let Some(sel_alt) = &self.selected_altitude {
+            writeln!(
+                f,
+                "  Selected alt:  {} ft {}",
+                sel_alt, &self.alt_source
+            )?;
+        }
+        if let Some(sel_hdg) = &self.selected_heading {
+            writeln!(f, "  Selected hdg:  {:.1}°", sel_hdg)?;
+        }
+        if let Some(qnh) = &self.barometric_setting {
+            writeln!(f, "  QNH:           {:.1} mbar", qnh)?;
+        }
+        if self.mcp_fcp_status {
+            write!(f, "  Mode:         ")?;
+            if let Some(value) = self.autopilot {
+                if value {
+                    write!(f, " autopilot")?;
+                }
+            }
+            if let Some(value) = self.vnav_mode {
+                if value {
+                    write!(f, " VNAV")?;
+                }
+            }
+            if let Some(value) = self.lnav_mode {
+                if value {
+                    write!(f, " LNAV")?;
+                }
+            }
+            if let Some(value) = self.alt_hold {
+                if value {
+                    write!(f, " alt_hold")?;
+                }
+            }
+            if let Some(value) = self.approach_mode {
+                if value {
+                    write!(f, " approach")?;
+                }
+            }
+            writeln!(f, "")?;
+        }
+        writeln!(
+            f,
+            "  TCAS:          {}",
+            if self.tcas_operational { "on" } else { "off" }
+        )
     }
 }
 
@@ -136,6 +183,14 @@ pub enum AltSource {
 
     #[deku(id = "1")]
     FMS,
+}
+impl fmt::Display for AltSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            Self::MCP => write!(f, "MCP/FCU"),
+            Self::FMS => write!(f, "FMS"),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -171,5 +226,24 @@ mod tests {
             return;
         }
         unreachable!();
+    }
+
+    #[test]
+    fn test_format_groundspeed() {
+        let bytes = hex!("8DA05629EA21485CBF3F8CADAEEB");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        assert_eq!(
+            format!("{msg}"),
+            r#" DF17. Extended Squitter
+  Address:       a05629
+  Air/Ground:    airborne
+  Target state and status (BDS 6,2)
+  Selected alt:  17000 ft MCP/FCU
+  Selected hdg:  66.8°
+  QNH:           1012.8 mbar
+  Mode:          autopilot VNAV LNAV
+  TCAS:          on
+"#
+        )
     }
 }

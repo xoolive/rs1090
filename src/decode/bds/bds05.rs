@@ -103,6 +103,7 @@ fn read_source(
 
 impl fmt::Display for PositionAltitude {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "  AirbornePosition (BDS 0,5)")?;
         let altitude = self.alt.map_or_else(
             || "None".to_string(),
             |altitude| format!("{altitude} ft"),

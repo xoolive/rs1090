@@ -327,14 +327,14 @@ impl fmt::Display for Message {
                 // TODO the airborne? should't be static
                 if ac.0 > 0 {
                     let altitude = ac.0;
-                    writeln!(f, "  Air/Ground:    airborne?")?;
+                    writeln!(f, "  Air/Ground:    airborne")?;
                     writeln!(f, "  Baro altitude: {altitude} ft")?;
                 } else {
                     writeln!(f, "  Air/Ground:    ground")?;
                 }
             }
-            DF::ADSB(adsb_msg) => {
-                write!(f, "{}", adsb_msg.to_string()?)?;
+            DF::ADSB(msg) => {
+                write!(f, "{msg}")?;
             }
             DF::TisB { cf, .. } => {
                 // DF18
@@ -344,20 +344,20 @@ impl fmt::Display for Message {
             DF::ExtendedSquitterMilitaryApplication { .. } => {} // DF19
             DF::CommBAltitudeReply { bds, ac, .. } => {
                 writeln!(f, " DF20. Comm-B, Altitude Reply")?;
-                writeln!(f, "  ICAO Address:  {crc:x?} (Mode S / ADS-B)")?;
+                writeln!(f, "  ICAO Address:  {crc:x?}")?;
                 let altitude = ac.0;
                 writeln!(f, "  Altitude:      {altitude} ft")?;
                 write!(f, "  {bds}")?;
             }
             DF::CommBIdentityReply { bds, id, .. } => {
                 writeln!(f, " DF21. Comm-B, Identity Reply")?;
-                writeln!(f, "    ICAO Address:  {crc:x?} (Mode S / ADS-B)")?;
-                writeln!(f, "    Squawk:        {id:x?}")?;
+                writeln!(f, "  ICAO Address:  {crc:x?}")?;
+                writeln!(f, "  Squawk:        {id:x?}")?;
                 write!(f, "    {bds}")?;
             }
             DF::CommDExtendedLengthMessage { .. } => {
                 writeln!(f, " DF24..=31 Comm-D Extended Length Message")?;
-                writeln!(f, "    ICAO Address:     {crc:x?} (Mode S / ADS-B)")?;
+                writeln!(f, "  ICAO Address:     {crc:x?}")?;
             }
         }
         Ok(())
@@ -543,10 +543,10 @@ impl fmt::Display for FlightStatus {
             f,
             "{}",
             match self {
-                Self::NoAlertNoSpiAirborne
-                | Self::AlertSpiAirborneGround
-                | Self::NoAlertSpiAirborneGround => "airborne?",
-                Self::NoAlertNoSpiOnGround => "ground?",
+                Self::NoAlertNoSpiAirborne => "airborne",
+                Self::AlertSpiAirborneGround
+                | Self::NoAlertSpiAirborneGround => "airborne/ground",
+                Self::NoAlertNoSpiOnGround => "ground",
                 Self::AlertNoSpiAirborne => "airborne",
                 Self::AlertNoSpiOnGround => "ground",
                 _ => "reserved",
@@ -597,16 +597,8 @@ pub struct ControlField {
 }
 
 impl fmt::Display for ControlField {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.me.to_string(
-                self.aa,
-                &format!("{}", self.t),
-                Capability::AG_DR0
-            )?
-        )
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
     }
 }
 

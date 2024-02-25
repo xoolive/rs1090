@@ -87,6 +87,7 @@ pub enum StatusForGroundTrack {
 
 impl fmt::Display for SurfacePosition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "  Surface position (BDS 0,6)")?;
         let groundspeed = self
             .groundspeed
             .map_or_else(|| "None".to_string(), |gs| format!("{gs} kts"));
@@ -132,9 +133,10 @@ mod tests {
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         assert_eq!(
             format!("{msg}"),
-            r#" DF17. Extended Squitter Surface position (BDS 0,6)
-  Address:       484175 (Mode S / ADS-B)
+            r#" DF17. Extended Squitter
+  Address:       484175
   Air/Ground:    ground
+  Surface position (BDS 0,6)
   Groundspeed:   17 kts
   Track angle:   92.8125°
   CPR odd flag:  odd

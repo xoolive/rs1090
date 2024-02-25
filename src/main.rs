@@ -1,3 +1,5 @@
+extern crate alloc;
+use alloc::fmt;
 use deku::DekuContainerRead;
 use futures_util::pin_mut;
 use futures_util::stream::StreamExt;
@@ -25,6 +27,19 @@ struct TimedMessage<'a> {
 
     #[serde(flatten)]
     message: Message,
+}
+
+impl fmt::Display for TimedMessage<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
+        writeln!(f, "{}", &self.message)
+    }
+}
+impl fmt::Debug for TimedMessage<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
+        writeln!(f, "{:#}", &self.message)
+    }
 }
 
 fn process_radarcape(msg: &[u8]) {
@@ -56,7 +71,8 @@ fn process_radarcape(msg: &[u8]) {
     );*/
 
     println!(
-        "{}",
+       "{}",
+        //msg
         serde_json::to_string(&msg).expect("Failed to serialize")
     );
 }

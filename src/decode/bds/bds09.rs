@@ -325,6 +325,7 @@ impl fmt::Display for VerticalRateSource {
 
 impl fmt::Display for AirborneVelocity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "  Airborne velocity over ground (BDS 0,9)")?;
         match &self.velocity {
             AirborneVelocitySubType::GroundSpeedDecoding(v) => {
                 writeln!(f, "  Track angle:   {}°", libm::round(v.track))?;
@@ -424,9 +425,10 @@ mod tests {
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         assert_eq!(
             format!("{msg}"),
-            r#" DF17. Extended Squitter Airborne velocity over ground (BDS 0,9)
-  Address:       485020 (Mode S / ADS-B)
+            r#" DF17. Extended Squitter
+  Address:       485020
   Air/Ground:    airborne
+  Airborne velocity over ground (BDS 0,9)
   Track angle:   183°
   Groundspeed:   159 kt
   Vertical rate: -832 ft/min barometric
@@ -471,9 +473,10 @@ mod tests {
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         assert_eq!(
             format!("{msg}"),
-            r#" DF17. Extended Squitter Airborne velocity over ground (BDS 0,9)
-  Address:       a05f21 (Mode S / ADS-B)
+            r#" DF17. Extended Squitter
+  Address:       a05f21
   Air/Ground:    airborne
+  Airborne velocity over ground (BDS 0,9)
   TAS:           375 kt
   Heading:       244°
   Vertical rate: -2304 ft/min GNSS

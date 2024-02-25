@@ -13,6 +13,15 @@ pub struct AircraftStatus {
     pub squawk: IdentityCode,
 }
 
+impl fmt::Display for AircraftStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "  Aircraft Status (BDS 6,1)")?;
+        writeln!(f, "  Squawk:        {:x?}", &self.squawk)?;
+        writeln!(f, "  Emergency/priority:    {}", &self.emergency_state)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[serde(rename_all = "snake_case")]
