@@ -7,30 +7,41 @@ use deku::prelude::*;
 use serde::Serialize;
 
 /**
- * +----+----+-----+-----+---+---+---------+---------+
+ * Airborne Position (BDS 0,5) with barometric (TC=9..=18) or geometric
+ * (TC=20..=22) altitude value.
+ *
  * | TC | SS | SAF | ALT | T | F | LAT-CPR | LON-CPR |
- * +----+----+-----+-----+---+---+---------+---------+
+ * | -- | -- | --- | --- | - | - | ------- | ------- |
  * | 5  | 2  |  1  | 12  | 1 | 1 |   17    |   17    |
- * +----+----+-----+-----+---+---+---------+---------+
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-pub struct PositionAltitude {
+pub struct AirbornePosition {
     #[deku(bits = "5")]
     #[serde(skip)]
-    pub tc: u8, // NUCp = 18 - tc
+    /// The typecode value (between 9 and 18 or between 20 and 22)
+    pub tc: u8,
 
     #[deku(
         bits = "0",
-        map = "|_val: u8| -> Result<_, DekuError> {Ok(18 - *tc)}"
+        map = "|_val: u8| -> Result<_, DekuError> {
+            let nucp = match *tc {
+                n if n < 19 => 18 - *tc,
+                20 | 21 => 29 - *tc,
+                _ => 0
+            };
+            Ok(nucp)
+        }"
     )]
     #[serde(rename = "NUCp")]
+    /// The Navigation Uncertainty Category Position (NUCp)
+    /// (directly based on the typecode)
     pub nuc_p: u8,
 
     #[serde(skip)]
+    /// Decode the surveillance status
     pub ss: SurveillanceStatus,
 
-    // TODO SAF in v0 and v1, NICb in v2
     #[deku(
         bits = "1",
         map = "|v| -> Result<_, DekuError> {
@@ -38,30 +49,39 @@ pub struct PositionAltitude {
         }"
     )]
     #[serde(rename = "NICb", skip_serializing_if = "Option::is_none")]
+    /// Single Antenna Flag in ADSB v0 or v1,
+    /// Navigation Integrity Category Supplement-b (NICb) in ADSB v2
     pub saf_or_nicb: Option<u8>,
 
     #[deku(reader = "decode_ac12(deku::rest)")]
     #[serde(rename = "altitude")]
+    /// Decode the altitude in feet, encoded on 12 bits.
+    /// None if invalid.
     pub alt: Option<u16>,
 
     #[deku(reader = "read_source(deku::rest, *tc)")]
+    /// Decode the altitude source (GNSS or barometric),
+    /// most commonly equal to barometric
     pub source: Source,
 
-    /// UTC sync or not
     #[deku(bits = "1")]
     #[serde(skip)]
+    /// UTC sync or not
     pub t: bool,
 
     /// Odd or even
     pub odd_flag: CPRFormat,
 
     #[deku(bits = "17", endian = "big")]
+    /// The CPR value encoding the latitude
     pub lat_cpr: u32,
 
     #[deku(bits = "17", endian = "big")]
+    /// The CPR value encoding the longitude
     pub lon_cpr: u32,
 }
 
+/// Decode altitude value encoded on 12 bits
 fn decode_ac12(
     rest: &BitSlice<u8, Msb0>,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
@@ -101,7 +121,7 @@ fn read_source(
     Ok((rest, source))
 }
 
-impl fmt::Display for PositionAltitude {
+impl fmt::Display for AirbornePosition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "  AirbornePosition (BDS 0,5)")?;
         let altitude = self.alt.map_or_else(

@@ -190,7 +190,7 @@ impl fmt::Display for AircraftIdentification {
 mod tests {
     use super::*;
     use crate::decode::Message;
-    use crate::decode::DF::ADSB;
+    use crate::decode::DF::ExtendedSquitterADSB;
     use crate::decode::ME::BDS08;
     use hexlit::hex;
 
@@ -198,7 +198,7 @@ mod tests {
     fn test_callsign() {
         let bytes = hex!("8d406b902015a678d4d220aa4bda");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
-        if let ADSB(adsb_msg) = msg.df {
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let BDS08(AircraftIdentification {
                 tc,
                 ca,

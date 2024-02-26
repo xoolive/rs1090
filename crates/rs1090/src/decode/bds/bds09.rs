@@ -385,7 +385,7 @@ impl fmt::Display for AirborneVelocity {
 mod tests {
     use super::*;
     use crate::decode::Message;
-    use crate::decode::DF::ADSB;
+    use crate::decode::DF::ExtendedSquitterADSB;
     use crate::decode::ME::BDS09;
     use approx::assert_relative_eq;
     use hexlit::hex;
@@ -394,7 +394,7 @@ mod tests {
     fn test_groundspeed_velocity() {
         let bytes = hex!("8D485020994409940838175B284F");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
-        if let ADSB(adsb_msg) = msg.df {
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let BDS09(velocity) = adsb_msg.message {
                 if let AirborneVelocitySubType::GroundSpeedDecoding(_gsd) =
                     velocity.velocity
@@ -443,7 +443,7 @@ mod tests {
     fn test_airspeed_velocity() {
         let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
-        if let ADSB(adsb_msg) = msg.df {
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let BDS09(velocity) = adsb_msg.message {
                 if let AirborneVelocitySubType::AirspeedSubsonic(asd) =
                     velocity.velocity

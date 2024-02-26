@@ -1,11 +1,11 @@
 [package]
-name = "rs1090_client"
-version = "0.1.0"
+name = "decode1090"
+version.workspace = true
 license.workspace = true
 edition.workspace = true
 
 [[bin]]
-name = "rs1090"
+name = "decode1090"
 path = "src/main.rs"
 
 [dependencies]

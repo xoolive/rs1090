@@ -10,22 +10,22 @@ use serde::Serialize;
  * An ADS-B frame is 112 bits long and consists of five main parts,
  * shown as follows:
  *
- * +----------+----------+-------------+------------------------+-----------+
- * |  DF (5)  |  CA (3)  |  ICAO (24)  |         ME (56)        |  PI (24)  |
- * +----------+----------+-------------+------------------------+-----------+
+ * | DF  | CA  | ICAO | ME  | PI  |
+ * | --- | --- | ---- | --- | --- |
+ * | 5   | 3   | 24   | 56  | 24  |
  *
  */
 
 #[derive(Debug, PartialEq, DekuRead, Clone, Serialize)]
 pub struct ADSB {
-    /// Transponder Capability
+    /// The transponder capability
     #[serde(skip)]
     pub capability: Capability,
 
-    /// ICAO aircraft address
+    /// The ICAO aircraft address
     pub icao24: ICAO,
 
-    /// ME (Typecode)
+    /// The message, prefixed by a typecode on 5 bytes
     #[serde(flatten)]
     pub message: ME,
 
@@ -43,23 +43,26 @@ impl fmt::Display for ADSB {
     }
 }
 
-/*
-* |  `ME`               |  Name                               |
-* | ------------------- | ----------------------------------- |
-* | 0                   | [`NoPosition`]                      |
-* | 1..=4               | [`AircraftIdentification`]          |
-* | 5..=8               | [`SurfacePosition`]                 |
-* | 9..=18              | [`AirbornePosition`] (barometric)   |
-* | 19                  | [`AirborneVelocity`]                |
-* | 20..=22             | [`AirbornePosition`] (GNSS)         |
-* | 23                  | [`Reserved0`]                       |
-* | 24                  | [`SurfaceSystemStatus`]             |
-* | 25..=27             | [`Reserved1`]                       |
-* | 28                  | [`AircraftStatus`]                  |
-* | 29                  | [`TargetStateAndStatusInformation`] |
-* | 30                  | [`AircraftOperationalCoordination`] |
-* | 31                  | [`AircraftOperationStatus`]         |
-*/
+/**
+ * The first 5 bytes of the Message Field [`ME`] encode the typecode which is
+ * used to identify which kind of data is encode in the following bytes.
+ *
+ * | Typecode | Name                                       |
+ * | -------- | ------------------------------------------ |
+ * | 0        | [`ME::NoPosition`]                         |
+ * | 1..=4    | [`bds08::AircraftIdentification`]          |
+ * | 5..=8    | [`bds06::SurfacePosition`]                 |
+ * | 9..=18   | [`bds05::AirbornePosition`] (barometric)   |
+ * | 19       | [`bds09::AirborneVelocity`]                |
+ * | 20..=22  | [`bds05::AirbornePosition`] (GNSS)         |
+ * | 23       | [`ME::Reserved0`]                          |
+ * | 24       | [`ME::SurfaceSystemStatus`]                |
+ * | 25..=27  | [`ME::Reserved1`]                          |
+ * | 28       | [`bds61::AircraftStatus`]                  |
+ * | 29       | [`bds62::TargetStateAndStatusInformation`] |
+ * | 30       | [`ME::AircraftOperationalCoordination`]    |
+ * | 31       | [`bds65::AircraftOperationStatus`]         |
+ */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "5")]
@@ -80,7 +83,7 @@ pub enum ME {
 
     #[deku(id_pat = "9..=18 | 20..=22")]
     #[serde(rename = "0,5")]
-    BDS05(bds05::PositionAltitude),
+    BDS05(bds05::AirbornePosition),
 
     #[deku(id = "19")]
     #[serde(rename = "0,9")]
@@ -112,7 +115,7 @@ pub enum ME {
 
     #[deku(id = "31")]
     #[serde(rename = "6,5")]
-    BDS65(bds65::OperationStatus),
+    BDS65(bds65::AircraftOperationStatus),
 }
 
 impl fmt::Display for ME {
@@ -158,7 +161,7 @@ mod tests {
     fn test_icao24() {
         let bytes = hex!("8D406B902015A678D4D220AA4BDA");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
-        if let DF::ADSB(msg) = msg.df {
+        if let DF::ExtendedSquitterADSB(msg) = msg.df {
             assert_eq!(format!("{}", msg.icao24), "406b90");
             return;
         }

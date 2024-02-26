@@ -363,6 +363,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "decode1090"
+version = "0.1.1"
+dependencies = [
+ "clap",
+ "deku",
+ "futures-util",
+ "hex",
+ "rs1090",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "deku"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -862,7 +876,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
 name = "rs1090"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "approx",
  "async-stream",
@@ -874,20 +888,6 @@ dependencies = [
  "hexlit",
  "libm",
  "serde",
- "tokio",
-]
-
-[[package]]
-name = "rs1090_client"
-version = "0.1.0"
-dependencies = [
- "clap",
- "deku",
- "futures-util",
- "hex",
- "rs1090",
- "serde",
- "serde_json",
  "tokio",
 ]
 

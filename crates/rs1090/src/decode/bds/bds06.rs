@@ -108,14 +108,14 @@ mod tests {
     use super::*;
     use crate::decode::adsb::ME::BDS06;
     use crate::decode::Message;
-    use crate::decode::DF::ADSB;
+    use crate::decode::DF::ExtendedSquitterADSB;
     use hexlit::hex;
 
     #[test]
     fn test_surface_position() {
         let bytes = hex!("8c4841753a9a153237aef0f275be");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
-        if let ADSB(adsb_msg) = msg.df {
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let BDS06(SurfacePosition {
                 track, groundspeed, ..
             }) = adsb_msg.message

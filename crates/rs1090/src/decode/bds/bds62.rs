@@ -4,15 +4,19 @@ use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
 
-/// Target State and Status (§2.2.3.2.7.1)
+/// Target State and Status Information (BDS6,2, TC=29)
 #[derive(Copy, Clone, Debug, Serialize, PartialEq, DekuRead)]
 pub struct TargetStateAndStatusInformation {
     #[deku(bits = "2")] // bits 5..=6
     #[serde(skip)]
-    pub subtype: u8, // must be equal to 1
+    /// The subtype bits must be equal to 1.
+    /// There seems to be a specification for a subtype 0 but I have seen no
+    /// such message to this date.
+    pub subtype: u8,
 
     #[deku(pad_bits_before = "1")] // bit 7
     #[serde(rename = "source")]
+    /// The source for the selected altitude (FMS or MCP/FCU)
     pub alt_source: AltSource, // bit 8
 
     #[deku(
@@ -26,6 +30,8 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// The selected altitude in the FMS or MCP/FCU, in feet
+    /// (encoded as a multiple of 32 + 16, but rounded to the closest 100 ft)
     pub selected_altitude: Option<u32>,
 
     #[deku(
@@ -37,10 +43,12 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// The barometric pressure setting (in millibars)
     pub barometric_setting: Option<f32>,
 
     #[deku(bits = "1")] // bit 29
     #[serde(skip)]
+    /// This flag encodes whether the [`Self::selected_heading`] is valid
     pub heading_status: bool,
 
     #[deku(
@@ -51,73 +59,95 @@ pub struct TargetStateAndStatusInformation {
             else {Ok(None)}
         }"
     )]
+    /// The selected heading (w.r.t magnetic North).
+    /// None if [`Self::heading_status`] is false.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_heading: Option<f32>,
 
     #[deku(bits = "4")]
     #[serde(rename = "NACp")]
-    pub nacp: u8,
+    /// Navigation Accuracy Category, Position (NACp)
+    pub nac_p: u8,
 
     #[deku(bits = "1")]
-    /// Barometric Altitude Integrity Code (NIC baro)
-    // is the baroaltitude crosschecked with another source of pressure?
+    /// Barometric Altitude Integrity Code (NIC baro), reflects whether the
+    /// baroaltitude is crosschecked with another source of pressure
     #[serde(skip)]
-    pub nicbaro: bool,
+    pub nic_baro: bool,
 
     #[deku(bits = "2")]
     #[serde(skip)] // per sample
+    /// The Surveillance Integrity Level (SIL), per sample
     pub sil: u8,
 
     #[deku(bits = "1")]
     #[serde(skip)]
-    pub mcp_fcp_status: bool,
+    /// This flag encodes whether the following flags are valid.
+    pub mode_status: bool,
 
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
-            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+            if *mode_status {Ok(Some(val))} else {Ok(None)}
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Decode the autopilot engagement
+    /// None if [`Self::mode_status`] is false.
     pub autopilot: Option<bool>,
+
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
-            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+            if *mode_status {Ok(Some(val))} else {Ok(None)}
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Decode the VNAV mode
+    /// None if [`Self::mode_status`] is false.
     pub vnav_mode: Option<bool>,
+
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
-            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+            if *mode_status {Ok(Some(val))} else {Ok(None)}
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Decode the altitude hold mode
+    /// None if [`Self::mode_status`] is false.
     pub alt_hold: Option<bool>,
+
     #[deku(bits = "1")]
     #[serde(skip)]
     // Not so sure what this is...
     pub imf: bool,
+
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
-            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+            if *mode_status {Ok(Some(val))} else {Ok(None)}
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Decode the approach mode
+    /// None if [`Self::mode_status`] is false.
     pub approach_mode: Option<bool>,
-    #[deku(bits = "1")] // bit 52, ALWAYS VALID!
+
+    #[deku(bits = "1")] // bit 52, ALWAYS
+    /// Decode whether TCAS/ACAS is operational. This flag is **always** valid.
     pub tcas_operational: bool,
+
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
-            if *mcp_fcp_status {Ok(Some(val))} else {Ok(None)}
+            if *mode_status {Ok(Some(val))} else {Ok(None)}
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[deku(pad_bits_after = "2")] // reserved
+    /// Decode LNAV mode
+    /// None if [`Self::mode_status`] is false.
     pub lnav_mode: Option<bool>,
 }
 
@@ -137,7 +167,7 @@ impl fmt::Display for TargetStateAndStatusInformation {
         if let Some(qnh) = &self.barometric_setting {
             writeln!(f, "  QNH:           {:.1} mbar", qnh)?;
         }
-        if self.mcp_fcp_status {
+        if self.mode_status {
             write!(f, "  Mode:         ")?;
             if let Some(value) = self.autopilot {
                 if value {
@@ -176,12 +206,15 @@ impl fmt::Display for TargetStateAndStatusInformation {
 
 #[derive(Copy, Clone, Debug, Serialize, PartialEq, DekuRead)]
 #[deku(type = "u8", bits = "1")]
+/// Encode the source of information for selected altitude
 pub enum AltSource {
     #[deku(id = "0")]
     #[serde(rename = "MCP/FCU")]
+    /// Mode Control Panel/Flight Control Unit
     MCP,
 
     #[deku(id = "1")]
+    /// Flight Management System
     FMS,
 }
 impl fmt::Display for AltSource {
@@ -198,7 +231,7 @@ mod tests {
     use super::*;
     use crate::decode::adsb::ME::BDS62;
     use crate::decode::Message;
-    use crate::decode::DF::ADSB;
+    use crate::decode::DF::ExtendedSquitterADSB;
     use approx::assert_relative_eq;
     use hexlit::hex;
 
@@ -206,7 +239,7 @@ mod tests {
     fn test_surface_position() {
         let bytes = hex!("8DA05629EA21485CBF3F8CADAEEB");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
-        if let ADSB(adsb_msg) = msg.df {
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let BDS62(state) = adsb_msg.message {
                 assert_eq!(state.selected_altitude, Some(17000));
                 assert_eq!(state.alt_source, AltSource::MCP);
@@ -216,7 +249,7 @@ mod tests {
                 } else {
                     unreachable!()
                 }
-                assert_eq!(state.mcp_fcp_status, true);
+                assert_eq!(state.mode_status, true);
                 assert_eq!(state.autopilot, Some(true));
                 assert_eq!(state.vnav_mode, Some(true));
                 assert_eq!(state.lnav_mode, Some(true));

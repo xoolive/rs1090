@@ -4,7 +4,7 @@ rs1090 is a Rust library to decode Mode S and ADS-B messages.
 
 It takes its inspiration from the Python [pyModeS](https://github.com/junzis/pyModeS) library, and uses [deku](https://github.com/sharksforarms/deku) in order to decode binary data in a clean declarative way.
 
-The project started as a fork of a very similar project [adsb-deku](https://github.com/rsadsb/adsb_deku), where modules have been redesigned to match [pyModeS](https://github.com/junzis/pyModeS), implementations extensively reviewed, corrected, and completed.
+The project started as a fork of a very similar project called [adsb-deku](https://github.com/rsadsb/adsb_deku), but modules have been refactored to match [pyModeS](https://github.com/junzis/pyModeS) design, implementations extensively reviewed, simplified, corrected, and completed.
 
 The direction ambitioned by rs1090 boil down to:
 
@@ -36,7 +36,7 @@ If you just want to decode ADS-B messages from your Raspberry and visualize the 
 
   ```sh
   # decode the Beast output from your radarcape
-  > cargo run --bin rs1090 -- --host radarcape --port 10005
+  > cargo run --bin decode1090 -- --host radarcape --port 10005
   {"timestamp":1708901277.8567717,"frame":"8d4d224260595215b81666e59d7a","DF":"ADSB","icao24":"4d2242","BDS":"0,5","NUCp":6,"NICb":0,"altitude":16725,"source":"barometric","odd_flag":"even","lat_cpr":68316,"lon_cpr":5734}
   {"timestamp":1708901277.858925,"frame":"2000179f86b805","DF":"DF4","altitude":36975,"icao24":"86b805"}
   {"timestamp":1708901277.8650618,"frame":"8f400f02990c5c32f80c94b9ad6f","DF":"ADSB","icao24":"400f02","BDS":"0,9","NACv":1,"groundspeed":416.07,"track":347.37,"vrate_src":"GNSS","vertical_rate":-128,"geo_minus_baro":-475}
@@ -45,7 +45,7 @@ If you just want to decode ADS-B messages from your Raspberry and visualize the 
 
   ```sh
   # decode individual message
-  > cargo run --bin rs1090 -- 5d3c66e6c6ad01 8d3c66e699086a919838884331c7 8d3c66e6580fb120964f56c5c8ef 8d3c66e6ea07e7d0013c083f1ab0 | jq .
+  > cargo run --bin decode1090 -- 5d3c66e6c6ad01 8d3c66e699086a919838884331c7 8d3c66e6580fb120964f56c5c8ef 8d3c66e6ea07e7d0013c083f1ab0 | jq .
   {
     "DF": "DF11",
     "capability": "airborne",

@@ -10,7 +10,7 @@ use serde::Serialize;
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[serde(untagged)]
-pub enum OperationStatus {
+pub enum AircraftOperationStatus {
     #[deku(id = "0")]
     Airborne(OperationStatusAirborne),
 
@@ -22,7 +22,7 @@ pub enum OperationStatus {
     Reserved(#[deku(bits = "5")] u8, [u8; 5]),
 }
 
-impl fmt::Display for OperationStatus {
+impl fmt::Display for AircraftOperationStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "  Aircraft Operation Status (BDS 6,5)")?;
         match &self {

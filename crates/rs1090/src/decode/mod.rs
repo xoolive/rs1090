@@ -14,20 +14,22 @@ use deku::prelude::*;
 use serde::ser::{Serialize, Serializer};
 
 /**
-# Downlink Format Support
-|  [`DF`]  |  Name                               |  Section    |
-| -------- | ----------------------------------- | ----------- |
-| 0        | [`Short Air-Air Surveillance`]      | 3.1.2.8.2   |
-| 4        | [`Surveillance Altitude Reply`]     | 3.1.2.6.5   |
-| 5        | [`Surveillance Identity Reply`]     | 3.1.2.6.7   |
-| 11       | [`All Call Reply`]                  | 2.1.2.5.2.2 |
-| 16       | [`Long Air-Air Surveillance`]       | 3.1.2.8.3   |
-| 17       | [`Extended Squitter (ADS-B)`]       | 3.1.2.8.6   |
-| 18       | [`Extended Squitter (TIS-B)`]       | 3.1.2.8.7   |
-| 19       | [`Extended Squitter (Military)`]    | 3.1.2.8.8   |
-| 20       | [`Comm-B Altitude Reply`]           | 3.1.2.6.6   |
-| 21       | [`Comm-B Identity Reply`]           | 3.1.2.6.8   |
-| 24       | [`Comm-D`]                          | 3.1.2.7.3   |
+ * Downlink Format. A number between 0 and 24 encoding the type of the
+ * message, and whether it is short (56 bits) or long (112 bits).
+ *
+ * |  [`DF`]  |  Name                               |  Section    |
+ * | -------- | ----------------------------------- | ----------- |
+ * | 0        | [`DF::ShortAirAirSurveillance`]     | 3.1.2.8.2   |
+ * | 4        | [`DF::SurveillanceAltitudeReply`]   | 3.1.2.6.5   |
+ * | 5        | [`DF::SurveillanceIdentityReply`]   | 3.1.2.6.7   |
+ * | 11       | [`DF::AllCallReply`]                | 2.1.2.5.2.2 |
+ * | 16       | [`DF::LongAirAirSurveillance`]      | 3.1.2.8.3   |
+ * | 17       | [`DF::ExtendedSquitterADSB`]        | 3.1.2.8.6   |
+ * | 18       | [`DF::ExtendedSquitterTisB`]        | 3.1.2.8.7   |
+ * | 19       | [`DF::ExtendedSquitterMilitary`]    | 3.1.2.8.8   |
+ * | 20       | [`DF::CommBAltitudeReply`]          | 3.1.2.6.6   |
+ * | 21       | [`DF::CommBIdentityReply`]          | 3.1.2.6.8   |
+ * | 24       | [`DF::CommDExtended`]               | 3.1.2.7.3   |
  */
 
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
@@ -38,7 +40,7 @@ pub enum DF {
     #[deku(id = "0")]
     #[serde(rename = "DF0")]
     ShortAirAirSurveillance {
-        /// VS: Vertical Status
+        /// Vertical Status
         #[deku(bits = "1")]
         #[serde(skip)]
         vs: u8,
@@ -46,11 +48,11 @@ pub enum DF {
         #[deku(bits = "1")]
         #[serde(skip)]
         cc: u8,
-        /// Spare
+        /// unused
         #[deku(bits = "1")]
         #[serde(skip)]
         unused: u8,
-        /// SL: Sensitivity level, ACAS
+        /// Sensitivity level, ACAS
         #[deku(bits = "3")]
         #[serde(skip)]
         sl: u8,
@@ -58,18 +60,18 @@ pub enum DF {
         #[deku(bits = "2")]
         #[serde(skip)]
         unused1: u8,
-        /// RI: Reply Information
+        /// Reply Information
         #[deku(bits = "4")]
         #[serde(skip)]
         ri: u8,
-        /// Spare
+        /// unused
         #[deku(bits = "2")]
         #[serde(skip)]
         unused2: u8,
-        /// AC: altitude code
+        /// Altitude code on 13 bits
         #[serde(rename = "altitude")]
         ac: AC13Field,
-        /// AP: address, parity
+        /// ICAO address, parity
         #[serde(rename = "icao24")]
         ap: ICAO,
     },
@@ -131,7 +133,7 @@ pub enum DF {
 
     #[deku(id = "16")]
     #[serde(rename = "DF16")]
-    LongAirAir {
+    LongAirAirSurveillance {
         #[deku(bits = "1")]
         #[serde(skip)]
         vs: u8,
@@ -164,7 +166,7 @@ pub enum DF {
 
     #[deku(id = "17")]
     /// 17: Extended Squitter ADS-B, Download Format 17 (3.1.2.8.6)
-    ADSB(ADSB),
+    ExtendedSquitterADSB(ADSB),
 
     /// 18: Extended Squitter Supplementary, Downlink Format 18 (3.1.2.8.7)
     /// Non-Transponder-based ADS-B Transmitting Subsystems and TIS-B Transmitting equipment.
@@ -181,7 +183,7 @@ pub enum DF {
     /// 19: Extended Squitter Military Application, Downlink Format 19 (3.1.2.8.8)
     #[deku(id = "19")]
     #[serde(skip)]
-    ExtendedSquitterMilitaryApplication {
+    ExtendedSquitterMilitary {
         /// Reserved
         #[deku(bits = "3")]
         af: u8,
@@ -235,9 +237,9 @@ pub enum DF {
         ap: ICAO,
     },
 
-    /// 24: Comm-D, Downlink Format 24 (3.1.2.7.3)
+    /// 24: Comm-D Extended, Downlink Format 24 (3.1.2.7.3)
     #[deku(id_pat = "24..=31")]
-    CommDExtendedLengthMessage {
+    CommDExtended {
         /// Spare - 1 bit
         #[deku(bits = "1")]
         spare: u8,
@@ -331,7 +333,7 @@ impl fmt::Display for Message {
                 writeln!(f, "  ICAO Address:  {icao} (Mode S / ADS-B)")?;
                 writeln!(f, "  Air/Ground:    {capability}")?;
             }
-            DF::LongAirAir { ac, .. } => {
+            DF::LongAirAirSurveillance { ac, .. } => {
                 writeln!(f, " DF16. Long Air-Air ACAS")?;
                 writeln!(f, "  ICAO Address:  {crc:06x} (Mode S / ADS-B)")?;
                 // TODO the airborne? should't be static
@@ -343,7 +345,7 @@ impl fmt::Display for Message {
                     writeln!(f, "  Air/Ground:    ground")?;
                 }
             }
-            DF::ADSB(msg) => {
+            DF::ExtendedSquitterADSB(msg) => {
                 write!(f, "{msg}")?;
             }
             DF::ExtendedSquitterTisB { cf, .. } => {
@@ -351,7 +353,7 @@ impl fmt::Display for Message {
                 write!(f, "{cf}")?;
             }
             // TODO
-            DF::ExtendedSquitterMilitaryApplication { .. } => {} // DF19
+            DF::ExtendedSquitterMilitary { .. } => {} // DF19
             DF::CommBAltitudeReply { bds, ac, .. } => {
                 writeln!(f, " DF20. Comm-B, Altitude Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:x?}")?;
@@ -365,7 +367,7 @@ impl fmt::Display for Message {
                 writeln!(f, "  Squawk:        {id:x?}")?;
                 write!(f, "    {bds}")?;
             }
-            DF::CommDExtendedLengthMessage { .. } => {
+            DF::CommDExtended { .. } => {
                 writeln!(f, " DF24..=31 Comm-D Extended Length Message")?;
                 writeln!(f, "  ICAO Address:     {crc:x?}")?;
             }
@@ -594,9 +596,6 @@ pub enum UtilityMessageType {
     CommD = 0b11,
 }
 
-/// Control Field (B.3) for [`crate::DF::TisB`]
-///
-/// reference: ICAO 9871
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 pub struct ControlField {
     t: ControlFieldType,

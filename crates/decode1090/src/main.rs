@@ -44,7 +44,7 @@ impl fmt::Debug for TimedMessage {
     }
 }
 
-fn process_radarcape(msg: &[u8]) -> TimedMessage {
+fn process_radarcape(msg: &[u8]) -> Option<TimedMessage> {
     // Copy the bytes from the slice into the array starting from index 2
     let mut array = [0u8; 8];
     array[2..8].copy_from_slice(&msg[2..8]);
@@ -53,22 +53,25 @@ fn process_radarcape(msg: &[u8]) -> TimedMessage {
     let seconds = ts >> 30;
     let nanos = ts & 0x00003FFFFFFF;
     let ts = seconds as f64 + nanos as f64 * 1e-9;
-    let frame = Message::from_bytes((&msg[9..], 0)).unwrap().1;
-
-    TimedMessage {
-        timestamp: today() as f64 + ts,
-        frame: msg[9..]
-            .iter()
-            .map(|&b| format!("{:02x}", b))
-            .collect::<Vec<String>>()
-            .join(""),
-        message: frame,
+    let frame = msg[9..]
+        .iter()
+        .map(|&b| format!("{:02x}", b))
+        .collect::<Vec<String>>()
+        .join("");
+    if let Ok((_, msg)) = Message::from_bytes((&msg[9..], 0)) {
+        Some(TimedMessage {
+            timestamp: today() as f64 + ts,
+            frame: frame,
+            message: msg,
+        })
+    } else {
+        None
     }
 }
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "rs1090",
+    name = "decode1090",
     version,
     author = "xoolive",
     about = "Decode Mode S demodulated raw messages"
@@ -114,18 +117,19 @@ async fn main() {
 
     match TcpStream::connect(server_address).await {
         Ok(stream) => {
-            let message_stream = next_beast_msg(stream).await;
-            pin_mut!(message_stream); // needed for iteration
-            while let Some(msg) = message_stream.next().await {
-                let msg = process_radarcape(&msg);
-                if options.debug {
-                    println!("{}", msg);
-                } else {
-                    println!(
-                        "{}",
-                        serde_json::to_string(&msg)
-                            .expect("Failed to serialize")
-                    );
+            let msg_stream = next_beast_msg(stream).await;
+            pin_mut!(msg_stream); // needed for iteration
+            while let Some(msg) = msg_stream.next().await {
+                if let Some(msg) = process_radarcape(&msg) {
+                    if options.debug {
+                        println!("{}", msg);
+                    } else {
+                        println!(
+                            "{}",
+                            serde_json::to_string(&msg)
+                                .expect("Failed to serialize")
+                        );
+                    }
                 }
             }
         }
