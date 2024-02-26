@@ -1,3 +1,5 @@
+#![doc = include_str!("../readme.md")]
+
 extern crate alloc;
 
 use alloc::fmt;

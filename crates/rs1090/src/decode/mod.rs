@@ -165,6 +165,7 @@ pub enum DF {
     },
 
     #[deku(id = "17")]
+    #[serde(rename = "ADSB")]
     /// 17: Extended Squitter ADS-B, Download Format 17 (3.1.2.8.6)
     ExtendedSquitterADSB(ADSB),
 
