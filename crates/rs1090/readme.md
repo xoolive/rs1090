@@ -19,8 +19,16 @@ The rs1090 library comes with a companion application [decode1090](https://crate
 
 ## Installation
 
+Run the following Cargo command in your project directory:
+
 ```sh
 cargo add rs1090
+```
+
+Or add the following line to your `Cargo.toml`:
+
+```toml
+rs1090 = "0.2.0"  # check for the latest version
 ```
 
 ## Usage
