@@ -1,10 +1,8 @@
 #![allow(clippy::suspicious_else_formatting)]
 
-extern crate alloc;
-
-use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
+use std::fmt;
 
 /**
  * ## Target State and Status Information (BDS 6,2)
@@ -233,9 +231,7 @@ impl fmt::Display for AltSource {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decode::adsb::ME::BDS62;
-    use crate::decode::Message;
-    use crate::decode::DF::ExtendedSquitterADSB;
+    use crate::prelude::*;
     use approx::assert_relative_eq;
     use hexlit::hex;
 

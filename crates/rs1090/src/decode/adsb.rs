@@ -1,10 +1,8 @@
-extern crate alloc;
-
 use super::bds::{bds05, bds06, bds08, bds09, bds61, bds62, bds65};
 use super::{Capability, ICAO};
-use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
+use std::fmt;
 
 /**
  * An ADS-B frame is 112 bits long.
@@ -155,15 +153,14 @@ impl fmt::Display for ME {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::decode::{Message, DF};
+    use crate::prelude::*;
     use hexlit::hex;
 
     #[test]
     fn test_icao24() {
         let bytes = hex!("8D406B902015A678D4D220AA4BDA");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
-        if let DF::ExtendedSquitterADSB(msg) = msg.df {
+        if let ExtendedSquitterADSB(msg) = msg.df {
             assert_eq!(format!("{}", msg.icao24), "406b90");
             return;
         }

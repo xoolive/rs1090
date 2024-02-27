@@ -1,11 +1,9 @@
-extern crate alloc;
-
 use crate::decode::cpr::CPRFormat;
 use crate::decode::{decode_id13, gray2alt};
-use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
+use std::fmt;
 
 /**
  * ## Airborne Position (BDS 0,5)
@@ -121,7 +119,7 @@ fn read_source(
 }
 
 impl fmt::Display for AirbornePosition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "  AirbornePosition (BDS 0,5)")?;
         let altitude = self.alt.map_or_else(
             || "None".to_string(),

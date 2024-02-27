@@ -1,12 +1,10 @@
 #![allow(clippy::suspicious_else_formatting)]
 
-extern crate alloc;
-
 use super::super::cpr::CPRFormat;
-use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
+use std::fmt;
 
 /**
  * ## Surface Position (BDS 0,6)
@@ -107,7 +105,7 @@ pub enum StatusForGroundTrack {
 }
 
 impl fmt::Display for SurfacePosition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "  Surface position (BDS 0,6)")?;
         let groundspeed = self
             .groundspeed
@@ -126,10 +124,7 @@ impl fmt::Display for SurfacePosition {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::decode::adsb::ME::BDS06;
-    use crate::decode::Message;
-    use crate::decode::DF::ExtendedSquitterADSB;
+    use crate::prelude::*;
     use hexlit::hex;
 
     #[test]

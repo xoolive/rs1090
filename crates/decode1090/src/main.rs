@@ -1,13 +1,11 @@
 #![doc = include_str!("../readme.md")]
 
-extern crate alloc;
-
-use alloc::fmt;
 use clap::Parser;
 use deku::DekuContainerRead;
 use futures_util::pin_mut;
 use rs1090::prelude::*;
 use serde::Serialize;
+use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::net::TcpStream;
 

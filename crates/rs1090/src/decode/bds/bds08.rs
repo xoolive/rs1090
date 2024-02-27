@@ -1,9 +1,7 @@
-extern crate alloc;
-
-use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
+use std::fmt;
 
 /**
  * ## Aircraft Identification and Category (BDS 0,8)
@@ -118,7 +116,7 @@ pub enum WakeVortex {
 }
 
 impl fmt::Display for WakeVortex {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match &self {
             Self::Reserved => "Reserved",
             Self::NoInformation => "No category information",
@@ -211,10 +209,7 @@ impl fmt::Display for AircraftIdentification {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::decode::Message;
-    use crate::decode::DF::ExtendedSquitterADSB;
-    use crate::decode::ME::BDS08;
+    use crate::prelude::*;
     use hexlit::hex;
 
     #[test]

@@ -1,5 +1,3 @@
-extern crate alloc;
-
 pub mod adsb;
 pub mod bds;
 pub mod commb;
@@ -7,12 +5,12 @@ pub mod cpr;
 pub mod crc;
 
 use adsb::{ADSB, ME};
-use alloc::fmt;
 use bds::BDS;
 use crc::modes_checksum;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::ser::{Serialize, Serializer};
+use std::fmt;
 
 /**
  * DF stands for Downlink Format.

@@ -1,9 +1,7 @@
-extern crate alloc;
-
 use crate::decode::IdentityCode;
-use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
+use std::fmt;
 
 /**
  * ## Aircraft Status (BDS 6,1)

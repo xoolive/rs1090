@@ -1,8 +1,6 @@
-extern crate alloc;
-
-use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
+use std::fmt;
 
 /**
  * ## Aircraft operation status (BDS 6,5)

@@ -1,12 +1,10 @@
 #![allow(clippy::suspicious_else_formatting)]
 
-extern crate alloc;
-
 use super::f64_twodecimals;
-use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
+use std::fmt;
 
 /**
  * ## Airborne Velocity (BDS 0,9)
@@ -419,9 +417,7 @@ impl fmt::Display for AirborneVelocity {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decode::Message;
-    use crate::decode::DF::ExtendedSquitterADSB;
-    use crate::decode::ME::BDS09;
+    use crate::prelude::*;
     use approx::assert_relative_eq;
     use hexlit::hex;
 
