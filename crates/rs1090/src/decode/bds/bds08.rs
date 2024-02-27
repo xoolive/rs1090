@@ -6,24 +6,30 @@ use deku::prelude::*;
 use serde::Serialize;
 
 /**
- * +------+------+------+------+------+------+------+------+------+------+
- * | TC,5 | CA,3 | C1,6 | C2,6 | C3,6 | C4,6 | C5,6 | C6,6 | C7,6 | C8,6 |
- * +------+------+------+------+------+------+------+------+------+------+
+ * ## Aircraft Identification and Category (BDS 0,8)
  *
- * TC: Type code
- * CA: Aircraft category
- * C*: A character
+ * Designed to broadcast the identification (also known as the "callsign"), and
+ * the wake vortex category of the aircraft.
+ *
+ * | TC  | CA  | C1  | C2  | C3  | C4  | C5  | C6  | C7  | C8  |
+ * | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+ * | 5   | 3   | 6   | 6   | 6   | 6   | 6   | 6   | 6   | 6   |
+ *
+ * TC: Type code CA: Aircraft category C*: A character
  */
 
 #[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
 pub struct AircraftIdentification {
+    /// The typecode of the aircraft (one of A, B, C, D)
     #[serde(skip)]
-    pub tc: TypeCoding,
+    pub tc: Typecode,
 
+    /// The category of the aircraft
     #[deku(bits = "3")]
     #[serde(skip)]
     pub ca: u8,
 
+    /// Both typecode and category define a wake wortex category.
     #[deku(reader = "wake_vortex(deku::rest, *tc, *ca)")]
     pub wake_vortex: WakeVortex,
 
@@ -34,14 +40,18 @@ pub struct AircraftIdentification {
 
 #[derive(Debug, PartialEq, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "5")]
-pub enum TypeCoding {
+pub enum Typecode {
+    /// Reserved
     D = 1,
+    /// Ground vehicles
     C = 2,
+    /// Without an engine (glider, hangglider, etc.)
     B = 3,
+    /// Aircraft
     A = 4,
 }
 
-impl fmt::Display for TypeCoding {
+impl fmt::Display for Typecode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -56,6 +66,19 @@ impl fmt::Display for TypeCoding {
     }
 }
 
+/**
+* The CA value in combination with TC value defines the wake vortex category of
+* the aircraft.
+*
+* It is worth noting that ADS-B has its own definition of wake categories,
+* which is different from the ICAO wake turbulence category definition commonly
+* used in aviation. The relationships of ICAO wake turbulence category (WTC)
+* and ADS-B wake vortex category are:
+*
+* - ICAO WTC L (Light) is equivalent to ADS-B (TC=4, CA=1).
+* - ICAO WTC M (Medium) is equivalent to ADS-B (TC=4, CA=2 or CA=3).
+* - ICAO WTC H (Heavy) or J (Super) is equivalent to ADS-B (TC=4, CA=5).
+*/
 #[derive(Debug, PartialEq, Serialize, Copy, Clone)]
 pub enum WakeVortex {
     Reserved,
@@ -125,29 +148,29 @@ impl fmt::Display for WakeVortex {
 
 pub fn wake_vortex(
     rest: &BitSlice<u8, Msb0>,
-    tc: TypeCoding,
+    tc: Typecode,
     ca: u8,
 ) -> Result<(&BitSlice<u8, Msb0>, WakeVortex), DekuError> {
     let wake_vortex = match (tc, ca) {
-        (TypeCoding::D, _) => WakeVortex::Reserved,
+        (Typecode::D, _) => WakeVortex::Reserved,
         (_, 0) => WakeVortex::NoInformation,
-        (TypeCoding::C, 1) => WakeVortex::EmergencyVehicle,
-        (TypeCoding::C, 3) => WakeVortex::ServiceVehicle,
-        (TypeCoding::C, _) => WakeVortex::Obstruction,
-        (TypeCoding::B, 1) => WakeVortex::Glider,
-        (TypeCoding::B, 2) => WakeVortex::Lighter,
-        (TypeCoding::B, 3) => WakeVortex::Parachutist,
-        (TypeCoding::B, 4) => WakeVortex::Ultralight,
-        (TypeCoding::B, 5) => WakeVortex::Reserved,
-        (TypeCoding::B, 6) => WakeVortex::Unmanned,
-        (TypeCoding::B, 7) => WakeVortex::Space,
-        (TypeCoding::A, 1) => WakeVortex::Light,
-        (TypeCoding::A, 2) => WakeVortex::Medium1,
-        (TypeCoding::A, 3) => WakeVortex::Medium2,
-        (TypeCoding::A, 4) => WakeVortex::HighVortex,
-        (TypeCoding::A, 5) => WakeVortex::Heavy,
-        (TypeCoding::A, 6) => WakeVortex::HighPerformance,
-        (TypeCoding::A, 7) => WakeVortex::Rotorcraft,
+        (Typecode::C, 1) => WakeVortex::EmergencyVehicle,
+        (Typecode::C, 3) => WakeVortex::ServiceVehicle,
+        (Typecode::C, _) => WakeVortex::Obstruction,
+        (Typecode::B, 1) => WakeVortex::Glider,
+        (Typecode::B, 2) => WakeVortex::Lighter,
+        (Typecode::B, 3) => WakeVortex::Parachutist,
+        (Typecode::B, 4) => WakeVortex::Ultralight,
+        (Typecode::B, 5) => WakeVortex::Reserved,
+        (Typecode::B, 6) => WakeVortex::Unmanned,
+        (Typecode::B, 7) => WakeVortex::Space,
+        (Typecode::A, 1) => WakeVortex::Light,
+        (Typecode::A, 2) => WakeVortex::Medium1,
+        (Typecode::A, 3) => WakeVortex::Medium2,
+        (Typecode::A, 4) => WakeVortex::HighVortex,
+        (Typecode::A, 5) => WakeVortex::Heavy,
+        (Typecode::A, 6) => WakeVortex::HighPerformance,
+        (Typecode::A, 7) => WakeVortex::Rotorcraft,
         _ => WakeVortex::Reserved, // only 3 bits anyway
     };
     Ok((rest, wake_vortex))

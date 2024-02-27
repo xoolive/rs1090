@@ -7,8 +7,9 @@ use deku::prelude::*;
 use serde::Serialize;
 
 /**
- * An ADS-B frame is 112 bits long and consists of five main parts,
- * shown as follows:
+ * An ADS-B frame is 112 bits long.
+ *
+ * It consists of five main parts, shown as follows:
  *
  * | DF  | CA  | ICAO | ME  | PI  |
  * | --- | --- | ---- | --- | --- |
@@ -22,7 +23,7 @@ pub struct ADSB {
     #[serde(skip)]
     pub capability: Capability,
 
-    /// The ICAO aircraft address
+    /// The ICAO aircraft address on 24 bytes
     pub icao24: ICAO,
 
     /// The message, prefixed by a typecode on 5 bytes
@@ -44,25 +45,26 @@ impl fmt::Display for ADSB {
 }
 
 /**
- * The first 5 bytes of the Message Field [`ME`] encode the typecode which is
- * used to identify which kind of data is encode in the following bytes.
- *
- * | Typecode | Name                                       |
- * | -------- | ------------------------------------------ |
- * | 0        | [`ME::NoPosition`]                         |
- * | 1..=4    | [`bds08::AircraftIdentification`]          |
- * | 5..=8    | [`bds06::SurfacePosition`]                 |
- * | 9..=18   | [`bds05::AirbornePosition`] (barometric)   |
- * | 19       | [`bds09::AirborneVelocity`]                |
- * | 20..=22  | [`bds05::AirbornePosition`] (GNSS)         |
- * | 23       | [`ME::Reserved0`]                          |
- * | 24       | [`ME::SurfaceSystemStatus`]                |
- * | 25..=27  | [`ME::Reserved1`]                          |
- * | 28       | [`bds61::AircraftStatus`]                  |
- * | 29       | [`bds62::TargetStateAndStatusInformation`] |
- * | 30       | [`ME::AircraftOperationalCoordination`]    |
- * | 31       | [`bds65::AircraftOperationStatus`]         |
- */
+* The first 5 bytes of the Message Field [`ME`] encode the typecode.
+*
+* It is used to identify which kind of data is encode in the following bytes.
+*
+* | Typecode | Name                                              |
+* | -------- | ------------------------------------------------- |
+* | 0        | [`ME::NoPosition`]                                |
+* | 1..=4    | [`bds08::AircraftIdentification`]                 |
+* | 5..=8    | [`bds06::SurfacePosition`]                        |
+* | 9..=18   | [`bds05::AirbornePosition`] (barometric altitude) |
+* | 19       | [`bds09::AirborneVelocity`]                       |
+* | 20..=22  | [`bds05::AirbornePosition`] (GNSS height)         |
+* | 23       | [`ME::Reserved0`]                                 |
+* | 24       | [`ME::SurfaceSystemStatus`]                       |
+* | 25..=27  | [`ME::Reserved1`]                                 |
+* | 28       | [`bds61::AircraftStatus`]                         |
+* | 29       | [`bds62::TargetStateAndStatusInformation`]        |
+* | 30       | [`ME::AircraftOperationalCoordination`]           |
+* | 31       | [`bds65::AircraftOperationStatus`]                |
+*/
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "5")]

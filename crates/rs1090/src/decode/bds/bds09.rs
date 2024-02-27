@@ -1,3 +1,5 @@
+#![allow(clippy::suspicious_else_formatting)]
+
 extern crate alloc;
 
 use super::f64_twodecimals;
@@ -6,30 +8,60 @@ use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 
+/**
+ * ## Airborne Velocity (BDS 0,9)
+ *
+ * Airborne velocities are all transmitted with Type Code 19. Four different
+ * subtypes are defined in bits 6-8 of the ME field. All sub-types share a
+ * similar overall message structure.
+ *
+ * Subtypes 1 and 2 are used to report ground speeds of aircraft. Subtypes 3 and
+ * 4 are used to report aircraft true airspeed or indicated airspeed. Reporting
+ * of airspeed in ADS-B only occurs when aircraft position cannot be determined
+ * based on the GNSS system. In the real world, subtype 3 messages are very
+ * rare.
+ *
+ * Subtypes 2 and 4 are designed for supersonic aircraft. Their message
+ * structures are identical to subtypes 1 and 3, but with the speed resolution
+ * of 4 kt instead of 1 kt. However, since there are no operational supersonic
+ * airliners currently, there is no ADS-B airborne velocity message with
+ * subtypes 2 and 4 at this moment.
+ *
+ */
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 pub struct AirborneVelocity {
     #[deku(bits = "3")]
     #[serde(skip)]
-    pub st: u8,
+    /// The subtype value
+    pub subtype: u8,
 
     #[deku(bits = "1")]
     #[serde(skip)]
+    /// The intent change flag
     pub intent_change: bool,
 
     #[deku(bits = "1")]
     #[serde(skip)]
+    /// The IFR capability flag
     pub ifr_capability: bool,
 
     #[deku(bits = "3")]
     #[serde(rename = "NACv")]
+    /// The Navigation Accuracy Category, velocity (NACv)
+    ///
+    /// It is a NUCv if ADS-B version is 0.
     pub nac_v: u8,
 
-    #[deku(ctx = "*st")]
+    #[deku(ctx = "*subtype")]
     #[serde(flatten)]
+    /// Contains a ground or an air speed depending on the subtype
     pub velocity: AirborneVelocitySubType,
 
+    /// The source for the vertical rate measurement
     pub vrate_src: VerticalRateSource,
+
     #[serde(skip)]
+    /// The sign of the vertical rate value
     pub vrate_sign: Sign,
     #[deku(
         endian = "big",
@@ -42,6 +74,7 @@ pub struct AirborneVelocity {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// The vertical rate value in ft/mn, None if unavailable
     pub vertical_rate: Option<i16>,
 
     #[deku(bits = "2")]
@@ -49,9 +82,11 @@ pub struct AirborneVelocity {
     pub reserved: u8,
 
     #[serde(skip)]
+    /// The sign of the difference between the GNSS height and the barometric altitude
     pub gnss_sign: Sign,
 
     #[deku(reader = "read_geobaro(deku::rest, *gnss_sign)")]
+    /// The signed difference between the GNSS height and the barometric altitude
     pub geo_minus_baro: Option<i16>,
 }
 
@@ -73,7 +108,7 @@ fn read_geobaro(
 }
 
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
-#[deku(ctx = "st: u8", id = "st")]
+#[deku(ctx = "subtype: u8", id = "subtype")]
 #[serde(untagged)]
 pub enum AirborneVelocitySubType {
     #[deku(id = "0")]

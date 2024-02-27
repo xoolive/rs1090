@@ -3,6 +3,7 @@ extern crate alloc;
 pub mod adsb;
 pub mod bds;
 pub mod commb;
+pub mod cpr;
 pub mod crc;
 
 use adsb::{ADSB, ME};
@@ -14,8 +15,10 @@ use deku::prelude::*;
 use serde::ser::{Serialize, Serializer};
 
 /**
- * Downlink Format. A number between 0 and 24 encoding the type of the
- * message, and whether it is short (56 bits) or long (112 bits).
+ * DF stands for Downlink Format.
+ *
+ * A number between 0 and 24 encoding the type of the message, and whether it is
+ * short (56 bits) or long (112 bits).
  *
  * |  [`DF`]  |  Name                               |  Section    |
  * | -------- | ----------------------------------- | ----------- |
@@ -36,11 +39,11 @@ use serde::ser::{Serialize, Serializer};
 #[deku(type = "u8", bits = "5")]
 #[serde(tag = "DF")]
 pub enum DF {
-    /// 0: Short Air-Air Surveillance (3.1.2.8.2)
+    /// DF=0: Short Air-Air Surveillance (3.1.2.8.2)
     #[deku(id = "0")]
     #[serde(rename = "DF0")]
     ShortAirAirSurveillance {
-        /// Vertical Status
+        /// Vertical status
         #[deku(bits = "1")]
         #[serde(skip)]
         vs: u8,
@@ -60,7 +63,7 @@ pub enum DF {
         #[deku(bits = "2")]
         #[serde(skip)]
         unused1: u8,
-        /// Reply Information
+        /// Reply information
         #[deku(bits = "4")]
         #[serde(skip)]
         ri: u8,
@@ -76,63 +79,64 @@ pub enum DF {
         ap: ICAO,
     },
 
-    /// 4: Surveillance Altitude Reply (3.1.2.6.5)
+    /// DF=4: Surveillance Altitude Reply (3.1.2.6.5)
     #[deku(id = "4")]
     #[serde(rename = "DF4")]
     SurveillanceAltitudeReply {
-        /// FS: Flight Status
+        /// Flight Status
         #[serde(skip)]
         fs: FlightStatus,
-        /// DR: DownlinkRequest
+        /// DownlinkRequest
         #[serde(skip)]
         dr: DownlinkRequest,
-        /// UM: Utility Message
+        /// Utility Message
         #[serde(skip)]
         um: UtilityMessage,
-        /// AC: AltitudeCode
+        /// Altitude code on 13 bits
         #[serde(rename = "altitude")]
         ac: AC13Field,
-        /// AP: Address/Parity
+        /// Address/Parity
         #[serde(rename = "icao24")]
         ap: ICAO,
     },
 
-    /// 5: Surveillance Identity Reply (3.1.2.6.7)
+    /// DF=5: Surveillance Identity Reply (3.1.2.6.7)
     #[deku(id = "5")]
     #[serde(rename = "DF5")]
     SurveillanceIdentityReply {
-        /// FS: Flight Status
+        /// Flight Status
         fs: FlightStatus,
-        /// DR: Downlink Request
+        /// Downlink Request
         #[serde(skip)]
         dr: DownlinkRequest,
-        /// UM: UtilityMessage
+        /// UtilityMessage
         #[serde(skip)]
         um: UtilityMessage,
-        /// ID: Identity
+        /// Identity code (squawk)
         #[serde(rename = "squawk")]
         id: IdentityCode,
-        /// AP: Address/Parity
+        /// Address/Parity
         #[serde(rename = "icao24")]
         ap: ICAO,
     },
 
-    /// 11: (Mode S) All-call reply, Downlink format 11 (2.1.2.5.2.2)
+    /// DF=11: (Mode S) All-call reply, Downlink format 11 (2.1.2.5.2.2)
     #[deku(id = "11")]
     #[serde(rename = "DF11")]
     AllCallReply {
-        /// CA: Capability
+        /// Capability
         capability: Capability,
-        /// AA: Address Announced
+        /// Address Announced
         #[serde(rename = "icao24")]
         icao: ICAO,
-        /// PI: Parity/Interrogator identifier
+        /// Parity/Interrogator identifier
         #[serde(skip)]
         p_icao: ICAO,
     },
 
     #[deku(id = "16")]
     #[serde(rename = "DF16")]
+    /// Long Air-Air Surveillance, Downlink Format 16 (3.1.2.8.3)
     LongAirAirSurveillance {
         #[deku(bits = "1")]
         #[serde(skip)]
@@ -152,24 +156,25 @@ pub enum DF {
         #[deku(bits = "2")]
         #[serde(skip)]
         spare3: u8,
-        /// AC: altitude code
+        /// Altitude code on 13 bits
         #[serde(rename = "altitude")]
         ac: AC13Field,
-        /// MV: message, acas
+        /// Message, ACAS
         #[deku(count = "7")]
         #[serde(skip)]
         mv: Vec<u8>,
-        /// AP: address, parity
+        /// Address/Parity
         #[serde(rename = "icao24")]
         ap: ICAO,
     },
 
     #[deku(id = "17")]
     #[serde(rename = "ADSB")]
-    /// 17: Extended Squitter ADS-B, Download Format 17 (3.1.2.8.6)
+    /// Extended Squitter ADS-B, Downlink Format 17 (3.1.2.8.6)
     ExtendedSquitterADSB(ADSB),
 
-    /// 18: Extended Squitter Supplementary, Downlink Format 18 (3.1.2.8.7)
+    /// Extended Squitter Supplementary, Downlink Format 18 (3.1.2.8.7)
+    ///
     /// Non-Transponder-based ADS-B Transmitting Subsystems and TIS-B Transmitting equipment.
     /// Equipment that cannot be interrogated.
     #[deku(id = "18")]
@@ -177,11 +182,11 @@ pub enum DF {
     ExtendedSquitterTisB {
         /// Enum containing message
         cf: ControlField,
-        /// PI: parity/interrogator identifier
+        /// Parity/interrogator identifier
         pi: ICAO,
     },
 
-    /// 19: Extended Squitter Military Application, Downlink Format 19 (3.1.2.8.8)
+    /// DF=19: Extended Squitter Military Application, Downlink Format 19 (3.1.2.8.8)
     #[deku(id = "19")]
     #[serde(skip)]
     ExtendedSquitterMilitary {
@@ -190,50 +195,50 @@ pub enum DF {
         af: u8,
     },
 
-    /// 20:	Comm-B Altitude Reply, Downlink Format 20 (3.1.2.6.6)
+    /// Comm-B Altitude Reply, Downlink Format 20 (3.1.2.6.6)
     #[deku(id = "20")]
     #[serde(rename = "DF20")]
     CommBAltitudeReply {
-        /// FS: Flight Status
+        /// Flight Status
         #[serde(skip)]
         fs: FlightStatus,
-        /// DR: Downlink Request
+        /// Downlink Request
         #[serde(skip)]
         dr: DownlinkRequest,
-        /// UM: Utility Message
+        /// Utility Message
         #[serde(skip)]
         um: UtilityMessage,
-        /// AC: Altitude Code
+        /// Altitude code on 13 bits
         #[serde(rename = "altitude")]
         ac: AC13Field,
-        /// MB Message, Comm-B
+        /// BDS Message, Comm-B
         #[serde(skip)]
         bds: BDS,
-        /// AP: address/parity
+        /// address/parity
         #[serde(skip)]
         ap: ICAO,
     },
 
-    /// 21: Comm-B Identity Reply, Downlink Format 21 (3.1.2.6.8)
+    /// Comm-B Identity Reply, Downlink Format 21 (3.1.2.6.8)
     #[deku(id = "21")]
     #[serde(rename = "DF21")]
     CommBIdentityReply {
-        /// FS: Flight Status
+        /// Flight Status
         #[serde(skip)]
         fs: FlightStatus,
-        /// DR: Downlink Request
+        /// Downlink Request
         #[serde(skip)]
         dr: DownlinkRequest,
-        /// UM: Utility Message
+        /// Utility Message
         #[serde(skip)]
         um: UtilityMessage,
-        /// ID: Identity
+        /// Identity code (squawk)
         #[serde(rename = "squawk")]
         id: IdentityCode,
-        /// MB Message, Comm-B
+        /// BDS Message, Comm-B
         #[serde(skip)]
         bds: BDS,
-        /// AP address/parity
+        /// Address/Parity
         #[serde(rename = "icao24")]
         ap: ICAO,
     },
@@ -241,31 +246,33 @@ pub enum DF {
     /// 24: Comm-D Extended, Downlink Format 24 (3.1.2.7.3)
     #[deku(id_pat = "24..=31")]
     CommDExtended {
-        /// Spare - 1 bit
+        /// Reserved
         #[deku(bits = "1")]
         spare: u8,
-        /// KE: control, ELM
+        /// Control, ELM
         #[serde(skip)]
         ke: KE,
-        /// ND: number of D-segment
+        /// Number of D-segment
         #[deku(bits = "4")]
         nd: u8,
-        /// MD: message, Comm-D, 80 bits
+        /// Message, Comm-D, 80 bits
         #[deku(count = "10")]
         md: Vec<u8>,
-        /// AP: address/parity
+        /// Address/Parity
         parity: ICAO,
     },
 }
 
-/// Downlink ADS-B Packet
+/// The entry point to Mode S and ADS-B decoding
+///
+/// Use as `Message::from_bytes()` in mostly all applications
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 pub struct Message {
-    /// Starting with 5 bit identifier, decode packet
+    /// The Downlink Format encoded in 5 bits
     #[serde(flatten)]
     pub df: DF,
 
-    // Calculated from all bits, used as ICAO for Response packets
+    /// Calculated from all bits, should be 0 for ADS-B (raises a DekuError), icao24 otherwise
     #[deku(reader = "Self::read_crc(df, deku::input_bits)")]
     #[serde(skip)]
     pub crc: u32,
@@ -293,7 +300,14 @@ impl Message {
 
         let (_, remaining_bytes, _) = rest.domain().region().unwrap();
         let crc = modes_checksum(remaining_bytes, bit_len)?;
-        Ok((rest, crc))
+        match (df, crc) {
+            (DF::ExtendedSquitterADSB(_), c) if c > 0 => {
+                Err(DekuError::Assertion(format!(
+                    "Invalid CRC in ADS-B message: {c}"
+                )))
+            }
+            _ => Ok((rest, crc)),
+        }
     }
 }
 
@@ -337,7 +351,6 @@ impl fmt::Display for Message {
             DF::LongAirAirSurveillance { ac, .. } => {
                 writeln!(f, " DF16. Long Air-Air ACAS")?;
                 writeln!(f, "  ICAO Address:  {crc:06x} (Mode S / ADS-B)")?;
-                // TODO the airborne? should't be static
                 if ac.0 > 0 {
                     let altitude = ac.0;
                     writeln!(f, "  Air/Ground:    airborne")?;
@@ -377,7 +390,8 @@ impl fmt::Display for Message {
     }
 }
 
-/// ICAO Address; Mode S transponder code
+/// ICAO 24-bit address, commonly use to reference airframes, i.e. tail numbers
+/// of aircraft
 #[derive(PartialEq, Eq, PartialOrd, DekuRead, Hash, Copy, Clone, Ord)]
 pub struct ICAO(pub [u8; 3]);
 
@@ -420,7 +434,7 @@ impl core::str::FromStr for ICAO {
     }
 }
 
-/// 13 bit identity code
+/// 13 bit identity code (squawk code), a 4-octal digit identifier
 #[derive(PartialEq, DekuRead, Copy, Clone)]
 pub struct IdentityCode(#[deku(reader = "Self::read(deku::rest)")] pub u16);
 
@@ -481,7 +495,7 @@ impl AC13Field {
             let n = ((ac13field & 0x1f80) >> 2)
                 | ((ac13field & 0x0020) >> 1)
                 | (ac13field & 0x000f);
-            Ok((rest, (n * 25 - 1000) as u16)) // 25 ft interval
+            Ok((rest, n * 25 - 1000)) // 25 ft interval
         } else {
             // 11 bit Gillham coded altitude
             if let Ok(n) = gray2alt(decode_id13(ac13field)) {
@@ -535,7 +549,7 @@ impl fmt::Display for Capability {
     }
 }
 
-/// Airborne / Ground and Spi
+/// Airborne or Ground and SPI (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[serde(rename_all = "snake_case")]
@@ -568,7 +582,7 @@ impl fmt::Display for FlightStatus {
     }
 }
 
-/// Type of `DownlinkRequest`
+/// The downlink request (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "5")]
 pub enum DownlinkRequest {
@@ -580,6 +594,7 @@ pub enum DownlinkRequest {
     Unknown,
 }
 
+/// The utility message (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
 pub struct UtilityMessage {
     #[deku(bits = "4")]
@@ -587,7 +602,7 @@ pub struct UtilityMessage {
     pub ids: UtilityMessageType,
 }
 
-/// Message Type
+/// The utility message type (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "2")]
 pub enum UtilityMessageType {
@@ -597,6 +612,7 @@ pub enum UtilityMessageType {
     CommD = 0b11,
 }
 
+/// The control field in TIS-B messages (DF=18)
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 pub struct ControlField {
     t: ControlFieldType,
@@ -612,6 +628,7 @@ impl fmt::Display for ControlField {
     }
 }
 
+/// The control field type in TIS-B messages (DF=18)
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[allow(non_camel_case_types)]
@@ -665,7 +682,7 @@ impl fmt::Display for ControlFieldType {
     }
 }
 
-/// Uplink / Downlink
+/// Uplink / Downlink (DF=24)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "1")]
 pub enum KE {
@@ -673,20 +690,18 @@ pub enum KE {
     UplinkELMAck = 1,
 }
 
-//=========================================================================
-//
-// In the squawk (identity) field bits are interleaved as follows in
-// (message bit 20 to bit 32):
-//
-// C1-A1-C2-A2-C4-A4-ZERO-B1-D1-B2-D2-B4-D4
-//
-// So every group of three bits A, B, C, D represent an integer from 0 to 7.
-//
-// The actual meaning is just 4 octal numbers, but we convert it into a hex
-// number tha happens to represent the four octal numbers.
-//
-// For more info: http://en.wikipedia.org/wiki/Gillham_code
-//
+/// Decode a [Gillham code](https://en.wikipedia.org/wiki/Gillham_code)
+/// 
+/// In the squawk (identity) field bits are interleaved as follows in
+/// (message bit 20 to bit 32):
+///
+/// C1-A1-C2-A2-C4-A4-ZERO-B1-D1-B2-D2-B4-D4
+///
+/// So every group of three bits A, B, C, D represent an integer from 0 to 7.
+///
+/// The actual meaning is just 4 octal numbers, but we convert it into a hex
+/// number that happens to represent the four octal numbers.
+///
 
 #[rustfmt::skip]
 pub fn decode_id13(id13_field: u16) -> u16 {
@@ -709,6 +724,8 @@ pub fn decode_id13(id13_field: u16) -> u16 {
     hex_gillham
 }
 
+/// Convert a [Gillham code](https://en.wikipedia.org/wiki/Gillham_code) to
+/// an altitude in feet.
 #[rustfmt::skip]
 pub fn gray2alt(gray: u16) -> Result<i32, &'static str> {
     let mut five_hundreds: u32 = 0;
@@ -767,6 +784,20 @@ mod tests {
                 assert_eq!(ac.0, 32300);
             }
             _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_invalid_crc() {
+        let bytes = hex!("8d4ca251204994b1c36e60a5343d");
+        let msg = Message::from_bytes((&bytes, 0));
+        if let Err(e) = msg {
+            match e {
+                DekuError::Assertion(_msg) => (),
+                _ => unreachable!(),
+            }
+        } else {
+            unreachable!()
         }
     }
 }

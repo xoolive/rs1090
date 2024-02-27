@@ -5,11 +5,16 @@ use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
 
-/// Table: A-2-97
+/**
+ * ## Aircraft Status (BDS 6,1)
+ */
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct AircraftStatus {
-    pub sub_type: AircraftStatusType,
+    /// The subtype can be "emergency/priority" or "ACAS RA"
+    pub subtype: AircraftStatusType,
+    /// The reason for the emergency
     pub emergency_state: EmergencyState,
+    /// The 13-bit identity code (squawk)
     pub squawk: IdentityCode,
 }
 

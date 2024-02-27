@@ -1,5 +1,6 @@
 use deku::prelude::*;
 
+/// For performance concerns, the CRC_TABLE is statically computed
 #[rustfmt::skip]
 pub const CRC_TABLE: [u32; 256] = [
     0x0000_0000, 0x00ff_f409, 0x0000_1c1b, 0x00ff_e812, 0x0000_3836, 0x00ff_cc3f,
@@ -47,6 +48,9 @@ pub const CRC_TABLE: [u32; 256] = [
     0x0005_ec92, 0x00fa_189b, 0x0005_f089, 0x00fa_0480,
 ];
 
+/// Compute the checksum of the given message
+///
+/// This should be equal to 0 for ADS-B messages.
 pub fn modes_checksum(message: &[u8], bits: usize) -> Result<u32, DekuError> {
     let mut rem: u32 = 0;
     let n = bits / 8;

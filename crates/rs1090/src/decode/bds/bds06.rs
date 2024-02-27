@@ -1,23 +1,34 @@
+#![allow(clippy::suspicious_else_formatting)]
+
 extern crate alloc;
 
-use super::bds05::CPRFormat;
+use super::super::cpr::CPRFormat;
 use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 
-/*
- * +----+-----+---+-----+---+---+---------+---------+
- * | TC | MOV | S | TRK | T | F | LAT-CPR | LON-CPR |
- * +----+-----+---+-----+---+---+---------+---------+
- * | 5  |  7  | 1 |  7  | 1 | 1 |   17    |   17    |
- * +----+-----+---+-----+---+---+---------+---------+
- *  */
+/**
+ * ## Surface Position (BDS 0,6)
+ *
+ * When an aircraft is on the ground, a different type of message is used to
+ * broadcast its position information. Unlike the airborne position message, the
+ * surface position message also includes the speed of the aircraft. Since no
+ * altitude information needs to be transmitted, this provides some extra bits
+ * for more information, such as speed and track angle.
+ *
+ *
+ * | TC  | MOV | S   | TRK | T   | F   | LAT-CPR | LON-CPR |
+ * | --- | --- | --- | --- | --- | --- | ------- | ------- |
+ * | 5   | 7   | 1   | 7   | 1   | 1   | 17      | 17      |
+ *
+ */
 
 #[derive(Debug, PartialEq, DekuRead, Serialize, Copy, Clone)]
 pub struct SurfacePosition {
     #[deku(bits = "5")]
     #[serde(skip)]
+    /// The typecode value (between 5 and 8)
     pub tc: u8,
 
     #[deku(
@@ -25,13 +36,16 @@ pub struct SurfacePosition {
         map = "|_val: u8| -> Result<_, DekuError> {Ok(14 - *tc)}"
     )]
     #[serde(rename = "NUCp")]
+    /// Navigation Uncertainty Category (position), based on the typecode
     pub nuc_p: u8,
 
     #[deku(reader = "read_groundspeed(deku::rest)")]
+    /// The groundspeed in kts, None if not available
     pub groundspeed: Option<f64>,
 
     #[deku(bits = "1")] // bit 29
     #[serde(skip)]
+    /// A flag stating whether the ground track is available
     pub track_status: bool,
 
     #[deku(
@@ -42,9 +56,10 @@ pub struct SurfacePosition {
             } else { Ok(None) }
         }"
     )]
+    /// The track angle in degrees, relative to the true North, None if not available
     pub track: Option<f64>,
 
-    /// UTC sync or not
+    // UTC sync or not
     #[deku(bits = "1")]
     #[serde(skip)]
     pub t: bool,
@@ -58,6 +73,12 @@ pub struct SurfacePosition {
     pub lon_cpr: u32,
 }
 
+/**
+ * The movement field encodes the aircraft ground speed. The ground speed of the
+ * aircraft is encoded non-linearly and with different quantizations. This is to
+ * ensure that a lower speed can be encoded with a improved precision than a
+ * higher speed.
+ */
 fn read_groundspeed(
     rest: &BitSlice<u8, Msb0>,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {

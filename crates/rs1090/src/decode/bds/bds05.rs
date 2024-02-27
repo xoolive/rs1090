@@ -1,5 +1,6 @@
 extern crate alloc;
 
+use crate::decode::cpr::CPRFormat;
 use crate::decode::{decode_id13, gray2alt};
 use alloc::fmt;
 use deku::bitvec::{BitSlice, Msb0};
@@ -7,8 +8,9 @@ use deku::prelude::*;
 use serde::Serialize;
 
 /**
- * Airborne Position (BDS 0,5) with barometric (TC=9..=18) or geometric
- * (TC=20..=22) altitude value.
+ * ## Airborne Position (BDS 0,5)
+ *
+ * with barometric altitude (TC=9..=18) or geometric height (TC=20..=22)
  *
  * | TC | SS | SAF | ALT | T | F | LAT-CPR | LON-CPR |
  * | -- | -- | --- | --- | - | - | ------- | ------- |
@@ -56,7 +58,7 @@ pub struct AirbornePosition {
     #[deku(reader = "decode_ac12(deku::rest)")]
     #[serde(rename = "altitude")]
     /// Decode the altitude in feet, encoded on 12 bits.
-    /// None if invalid.
+    /// None if not available.
     pub alt: Option<u16>,
 
     #[deku(reader = "read_source(deku::rest, *tc)")]
@@ -66,18 +68,15 @@ pub struct AirbornePosition {
 
     #[deku(bits = "1")]
     #[serde(skip)]
-    /// UTC sync or not
+    // UTC sync or not
     pub t: bool,
 
-    /// Odd or even
     pub odd_flag: CPRFormat,
 
     #[deku(bits = "17", endian = "big")]
-    /// The CPR value encoding the latitude
     pub lat_cpr: u32,
 
     #[deku(bits = "17", endian = "big")]
-    /// The CPR value encoding the longitude
     pub lon_cpr: u32,
 }
 
@@ -94,7 +93,7 @@ fn decode_ac12(
         let n = ((num & 0x0fe0) >> 1) | (num & 0x000f);
         let n = n * 25;
         if n > 1000 {
-            Ok((rest, u16::try_from(n - 1000).ok()))
+            Ok((rest, Some(n - 1000)))
         } else {
             Ok((rest, None))
         }
@@ -137,7 +136,6 @@ impl fmt::Display for AirbornePosition {
     }
 }
 
-/// SPI Condition
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "2")]
 pub enum SurveillanceStatus {
@@ -147,34 +145,12 @@ pub enum SurveillanceStatus {
     SPICondition = 3,
 }
 
-/// Even / Odd
-#[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "1")]
-#[serde(rename_all = "snake_case")]
-pub enum CPRFormat {
-    Even = 0,
-    Odd = 1,
-}
-
 #[derive(Debug, PartialEq, Eq, Serialize, Copy, Clone)]
 pub enum Source {
     #[serde(rename = "barometric")]
     Barometric = 0,
     #[serde(rename = "GNSS")]
     Gnss = 1,
-}
-
-impl fmt::Display for CPRFormat {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Even => "even",
-                Self::Odd => "odd",
-            }
-        )
-    }
 }
 
 impl fmt::Display for Source {

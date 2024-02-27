@@ -5,25 +5,20 @@ use tokio::net::TcpStream;
 
 use std::collections::HashSet;
 
-pub async fn next_beast_msg(
-    mut stream: TcpStream,
-) -> impl Stream<Item = Vec<u8>> {
-    /*
-    *  Iterate in Beast binary feed.
-    * <esc> "1" : 6 byte MLAT timestamp, 1 byte signal level,
-    *     2 byte Mode-AC
-    * <esc> "2" : 6 byte MLAT timestamp, 1 byte signal level,
-    *     7 byte Mode-S short frame
-    * <esc> "3" : 6 byte MLAT timestamp, 1 byte signal level,
-    *     14 byte Mode-S long frame
-    * <esc> "4" : 6 byte MLAT timestamp, status data, DIP switch
-    *     configuration settings (not on Mode-S Beast classic)
-    * <esc><esc>: true 0x1a
-    * <esc> is 0x1a, and "1", "2" and "3" are 0x31, 0x32 and 0x33
+/// Iterate a Beast binary feed.
+///
+///  - esc "1" : 6 byte MLAT timestamp, 1 byte signal level, 2 byte Mode-AC
+///  - esc "2" : 6 byte MLAT timestamp, 1 byte signal level, 7 byte Mode-S short frame
+///  - esc "3" : 6 byte MLAT timestamp, 1 byte signal level, 14 byte Mode-S long frame
+///  - esc "4" : 6 byte MLAT timestamp, status data, DIP switch configuration settings (not on Mode-S Beast classic)
+///
+/// esc esc: true 0x1a
+/// esc is 0x1a, and "1", "2" and "3" are 0x31, 0x32 and 0x33
+///
+/// Decoding the timestamp:
+/// <https://wiki.modesbeast.com/Radarcape:Firmware_Versions#The_GPS_timestamp>
 
-    * timestamp:
-    * wiki.modesbeast.com/Radarcape:Firmware_Versions#The_GPS_timestamp
-    */
+pub async fn next_msg(mut stream: TcpStream) -> impl Stream<Item = Vec<u8>> {
     // Initialize a HashSet to check for valid message types
     let valid_msg_types: HashSet<u8> =
         vec![0x31, 0x32, 0x33, 0x34].into_iter().collect();
@@ -34,7 +29,7 @@ pub async fn next_beast_msg(
             // Read from the stream into the buffer
             let mut buffer = [0u8; 1024];
             let bytes_read = match stream.read(&mut buffer).await {
-                Ok(n) if n == 0 => break, // Connection closed by peer
+                Ok(0) => break, // Connection closed by peer
                 Ok(n) => n,
                 Err(e) => {
                     println!("Error reading from socket: {}", e);

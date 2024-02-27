@@ -6,9 +6,7 @@ use alloc::fmt;
 use clap::Parser;
 use deku::DekuContainerRead;
 use futures_util::pin_mut;
-use futures_util::stream::StreamExt;
-use rs1090::decode::Message;
-use rs1090::source::beast::next_beast_msg;
+use rs1090::prelude::*;
 use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::net::TcpStream;
@@ -63,7 +61,7 @@ fn process_radarcape(msg: &[u8]) -> Option<TimedMessage> {
     if let Ok((_, msg)) = Message::from_bytes((&msg[9..], 0)) {
         Some(TimedMessage {
             timestamp: today() as f64 + ts,
-            frame: frame,
+            frame,
             message: msg,
         })
     } else {
@@ -99,7 +97,7 @@ struct Options {
 async fn main() {
     let options = Options::parse();
 
-    if options.msgs.len() > 0 {
+    if !options.msgs.is_empty() {
         for msg in options.msgs {
             let bytes = hex::decode(&msg).unwrap();
             let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
@@ -119,7 +117,7 @@ async fn main() {
 
     match TcpStream::connect(server_address).await {
         Ok(stream) => {
-            let msg_stream = next_beast_msg(stream).await;
+            let msg_stream = beast::next_msg(stream).await;
             pin_mut!(msg_stream); // needed for iteration
             while let Some(msg) = msg_stream.next().await {
                 if let Some(msg) = process_radarcape(&msg) {

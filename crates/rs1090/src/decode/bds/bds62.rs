@@ -1,10 +1,14 @@
+#![allow(clippy::suspicious_else_formatting)]
+
 extern crate alloc;
 
 use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
 
-/// Target State and Status Information (BDS6,2, TC=29)
+/**
+ * ## Target State and Status Information (BDS 6,2)
+ */
 #[derive(Copy, Clone, Debug, Serialize, PartialEq, DekuRead)]
 pub struct TargetStateAndStatusInformation {
     #[deku(bits = "2")] // bits 5..=6
@@ -39,7 +43,7 @@ pub struct TargetStateAndStatusInformation {
         endian = "big",
         map = "|qnh: u32| -> Result<_, DekuError> {
             if qnh == 0 { Ok(None) }
-            else { Ok(Some(800.0 + ((qnh - 1) as f32) * 0.8))}
+            else { Ok(Some(800.0 + ((qnh - 1) as f32) * 0.8)) }
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -48,7 +52,7 @@ pub struct TargetStateAndStatusInformation {
 
     #[deku(bits = "1")] // bit 29
     #[serde(skip)]
-    /// This flag encodes whether the [`Self::selected_heading`] is valid
+    /// This flag encodes whether the selected heading is valid
     pub heading_status: bool,
 
     #[deku(
@@ -60,7 +64,7 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     /// The selected heading (w.r.t magnetic North).
-    /// None if [`Self::heading_status`] is false.
+    /// None if not available.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_heading: Option<f32>,
 
@@ -82,7 +86,7 @@ pub struct TargetStateAndStatusInformation {
 
     #[deku(bits = "1")]
     #[serde(skip)]
-    /// This flag encodes whether the following flags are valid.
+    /// This flag encodes whether the following flags are valid
     pub mode_status: bool,
 
     #[deku(
@@ -92,8 +96,8 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Decode the autopilot engagement
-    /// None if [`Self::mode_status`] is false.
+    /// Decode the autopilot engagement.
+    /// None if not available
     pub autopilot: Option<bool>,
 
     #[deku(
@@ -103,8 +107,8 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Decode the VNAV mode
-    /// None if [`Self::mode_status`] is false.
+    /// Decode the VNAV mode.
+    /// None if not available
     pub vnav_mode: Option<bool>,
 
     #[deku(
@@ -114,8 +118,8 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Decode the altitude hold mode
-    /// None if [`Self::mode_status`] is false.
+    /// Decode the altitude hold mode.
+    /// None if not available
     pub alt_hold: Option<bool>,
 
     #[deku(bits = "1")]
@@ -130,8 +134,8 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Decode the approach mode
-    /// None if [`Self::mode_status`] is false.
+    /// Decode the approach mode.
+    /// None if not available
     pub approach_mode: Option<bool>,
 
     #[deku(bits = "1")] // bit 52, ALWAYS
@@ -145,9 +149,9 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[deku(pad_bits_after = "2")] // reserved
-    /// Decode LNAV mode
-    /// None if [`Self::mode_status`] is false.
+    #[deku(pad_bits_after = "2")]
+    /// Decode LNAV mode.
+    /// None if not available
     pub lnav_mode: Option<bool>,
 }
 
@@ -194,7 +198,7 @@ impl fmt::Display for TargetStateAndStatusInformation {
                     write!(f, " approach")?;
                 }
             }
-            writeln!(f, "")?;
+            writeln!(f)?;
         }
         writeln!(
             f,
@@ -249,13 +253,13 @@ mod tests {
                 } else {
                     unreachable!()
                 }
-                assert_eq!(state.mode_status, true);
+                assert!(state.mode_status);
                 assert_eq!(state.autopilot, Some(true));
                 assert_eq!(state.vnav_mode, Some(true));
                 assert_eq!(state.lnav_mode, Some(true));
                 assert_eq!(state.alt_hold, Some(false));
                 assert_eq!(state.approach_mode, Some(false));
-                assert_eq!(state.tcas_operational, true);
+                assert!(state.tcas_operational);
             }
             return;
         }

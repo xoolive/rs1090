@@ -4,9 +4,17 @@ use alloc::fmt;
 use deku::prelude::*;
 use serde::Serialize;
 
-/// Structure is different according to ADS-B Version
-/// Version 0 never send these messages
-/// Version 1 and 2 have a different structure
+/**
+ * ## Aircraft operation status (BDS 6,5)
+ *
+ * The structures of this message type differ significantly over different ADS-B
+ * versions. The message has been defined in all ADS-B versions. But in
+ * practice, it is not implemented in ADS-B version 0. From version 1 onward,
+ * the operational status includes more information, such as ADS-B version,
+ * accuracy, and integrity indicators.
+ *
+ */
+
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[serde(untagged)]
@@ -35,18 +43,16 @@ impl fmt::Display for AircraftOperationStatus {
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct OperationStatusAirborne {
-    /// CC (16 bits)
-    //#[serde(flatten)]
-    #[serde(skip)] // TODO optional
+    /// The capacity class
+    #[serde(skip)]
     pub capability_class: CapabilityClassAirborne,
 
-    /// OM
+    /// The operational mode
     #[serde(skip)]
     pub operational_mode: OperationalMode,
 
     #[deku(pad_bytes_before = "1")]
     #[serde(flatten)]
-    // reserved: OM last 8 bits (diff for airborne/surface)
     pub version: ADSBVersionAirborne,
 }
 
@@ -70,7 +76,6 @@ pub struct CapabilityClassAirborne {
     #[serde(rename = "ACAS")]
     pub acas: bool,
 
-    /// 1090ES IN
     /// Cockpit Display of Traffic Information
     #[deku(bits = "1")]
     #[serde(rename = "CDTI")]
@@ -94,10 +99,10 @@ pub struct CapabilityClassAirborne {
     #[deku(pad_bits_after = "6")] //reserved
     #[serde(rename = "TC")]
     /// Target Trajectory Change Report Capability
-    /// 0: No capability for Trajectory Change Reports
-    /// 1: Support for TC+0 reports only
-    /// 2: Support for multiple TC reports
-    /// 3: Reserved
+    /// - 0: No capability for Trajectory Change Reports
+    /// - 1: Support for TC+0 reports only
+    /// - 2: Support for multiple TC reports
+    /// - 3: Reserved
     pub tc: u8,
 }
 
@@ -125,24 +130,21 @@ impl fmt::Display for CapabilityClassAirborne {
 /// Version 2 support only
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct OperationStatusSurface {
-    /// CC (14 bits)
-    //#[serde(flatten)]
+    /// The capacity class
     #[serde(skip)]
     pub capability_class: CapabilityClassSurface,
 
-    /// CC L/W codes
+    /// The capacity class L/W codes
     #[deku(bits = "4")]
     #[serde(skip)]
     pub lw_codes: u8,
 
-    /// OM
+    /// The operational mode
     #[serde(skip)]
     pub operational_mode: OperationalMode,
 
-    /// OM last 8 bits (diff for airborne/surface)
-    // http://www.anteni.net/adsb/Doc/1090-WP30-18-DRAFT_DO-260B-V42.pdf
-    // 2.2.3.2.7.2.4.7 “GPS Antenna Offset”
-    // OM Code Subfield in Aircraft Operational Status Messages
+    /// The GPS antenna offset (2.2.3.2.7.2.4.7).
+    /// Reference: <http://www.anteni.net/adsb/Doc/1090-WP30-18-DRAFT_DO-260B-V42.pdf>
     #[serde(skip)]
     pub gps_antenna_offset: u8,
 
@@ -161,7 +163,6 @@ impl fmt::Display for OperationStatusSurface {
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct CapabilityClassSurface {
-    /// 0, 0 in current version, reserved as id for later versions
     #[deku(bits = "2", assert_eq = "0")]
     #[serde(skip)]
     pub reserved0: u8,
@@ -186,12 +187,12 @@ pub struct CapabilityClassSurface {
     #[serde(rename = "UATin")]
     pub uat_in: bool,
 
-    /// Navigation Accuracy Category for Velocity, version 1,2
+    /// Navigation Accuracy Category for Velocity (NACv), only for version 1 and 2
     #[deku(bits = "3")] // ME 11-13
     #[serde(rename = "NACv")]
     pub nac_v: u8,
 
-    /// NIC Supplement used on the Surface
+    /// NIC Supplement (NICc) used on the Surface
     #[deku(bits = "1")]
     #[serde(rename = "NICc")]
     pub nic_c: u8,
@@ -205,14 +206,13 @@ impl fmt::Display for CapabilityClassSurface {
     }
 }
 
-/// `OperationMode` field not including the last 8 bits that are different for Surface/Airborne
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct OperationalMode {
-    /// (0, 0) in Version 2, reserved for other values
     #[deku(bits = "2", assert_eq = "0")]
     #[serde(skip)]
     reserved: u8,
 
+    /// TCAS RA active
     #[deku(bits = "1")]
     tcas_ra_active: bool,
 
@@ -250,21 +250,28 @@ impl fmt::Display for OperationalMode {
     }
 }
 
-/// ADS-B Defined from different ICAO documents
+/// ADS-B version as defined from different ICAO documents.
+/// Reference: ICAO 9871 (5.3.2.3)
 ///
-/// reference: ICAO 9871 (5.3.2.3)
+/// There are three ADS-B versions implemented so far, starting from version 0
+/// (specification defined in RTCA document DO-260). Version 1 was introduced
+/// around 2008 (DO-260A), and version 2 around 2012 (DO-260B). Version 3 is
+/// currently being developed.
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[serde(tag = "version")]
 pub enum ADSBVersionAirborne {
     #[deku(id = "0")]
     #[serde(skip)] // useless, never happens
+    /// ADS-B version 0 (BDS 6,5 undefined, so these messages should not happen)
     DOC9871AppendixA(Empty),
     #[deku(id = "1")]
     #[serde(rename = "1")]
+    /// ADS-B version 1 (2008)
     DOC9871AppendixB(AirborneV1),
     #[deku(id = "2")]
     #[serde(rename = "2")]
+    /// ADS-B version 2 (2012)
     DOC9871AppendixC(AirborneV2),
     #[deku(id_pat = "3..=7")]
     #[serde(skip)]
@@ -278,22 +285,24 @@ pub struct AirborneV1 {
     /// NIC Supplement bit (NICs)
     pub nic_s: u8,
 
-    #[deku(bits = "4")] // ME 45-48
+    #[deku(bits = "4")]
     #[serde(rename = "NACp")]
-    /// Navigation Accuracy Category for position
+    /// Navigation Accuracy Category for position (NACp)
     pub nac_p: u8,
 
     #[deku(bits = "2")]
     #[serde(rename = "BAQ")]
+    /// Barometric Altitude Quality (BAQ)
     pub barometric_altitude_quality: u8,
 
-    #[deku(bits = "2")] // ME 51-52
+    #[deku(bits = "2")]
     #[serde(rename = "SIL")]
     /// Surveillance Integrity Level (SIL)
     pub sil: u8,
 
     #[deku(bits = "1")]
     #[serde(rename = "BAI")]
+    /// Barometric Altitude Integrity (BAI)
     pub barometric_altitude_integrity: u8,
 
     #[deku(bits = "1")]
@@ -310,13 +319,14 @@ pub struct AirborneV2 {
     /// NIC supplement A (NICs)
     pub nic_a: u8,
 
-    #[deku(bits = "4")] // ME 45-48
+    #[deku(bits = "4")]
     #[serde(rename = "NACp")]
-    /// Navigation Accuracy Category for position
+    /// Navigation Accuracy Category for position (NACp)
     pub nac_p: u8,
 
     #[deku(bits = "2")]
     #[serde(rename = "GVA")]
+    /// Geometry Vertical Accuracy (GVA)
     pub geometry_vertical_accuracy: u8,
 
     #[deku(bits = "2")] // ME 51-52
@@ -326,6 +336,7 @@ pub struct AirborneV2 {
 
     #[deku(bits = "1")]
     #[serde(rename = "BAI")]
+    /// Barometric Altitude Integrity (BAI)
     pub barometric_altitude_integrity: u8,
 
     #[deku(bits = "1")]
@@ -333,30 +344,37 @@ pub struct AirborneV2 {
     // 1 for magnetic, 0 for true north
     pub horizontal_reference_direction: u8,
 
-    #[deku(bits = "1")] // ME 55, Version 2
-    #[deku(pad_bits_after = "1")] // reserved
+    #[deku(bits = "1")]
+    #[deku(pad_bits_after = "1")]
     #[serde(rename = "SILs")]
-    /// SIL supplement bit
-    /// 0 per hour
-    /// 1 per sample
+    /// SIL supplement bit, only in version 2:
+    /// 0 means per hour,
+    /// 1 means per sample.
     pub sil_s: u8,
 }
 
-/// ADS-B Defined from different ICAO documents
+/// ADS-B version as defined from different ICAO documents.
+/// Reference: ICAO 9871 (5.3.2.3)
 ///
-/// reference: ICAO 9871 (5.3.2.3)
+/// There are three ADS-B versions implemented so far, starting from version 0
+/// (specification defined in RTCA document DO-260). Version 1 was introduced
+/// around 2008 (DO-260A), and version 2 around 2012 (DO-260B). Version 3 is
+/// currently being developed.
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[serde(tag = "version")]
 pub enum ADSBVersionSurface {
     #[deku(id = "0")]
-    #[serde(skip)] // useless, never happens
+    #[serde(skip)]
+    /// ADS-B version 0 (BDS 6,5 undefined, so these messages should not happen)
     DOC9871AppendixA(Empty),
     #[deku(id = "1")]
     #[serde(rename = "1")]
+    /// ADS-B version 1 (2008)
     DOC9871AppendixB(SurfaceV1),
     #[deku(id = "2")]
     #[serde(rename = "2")]
+    /// ADS-B version 2 (2012)
     DOC9871AppendixC(SurfaceV2),
     #[deku(id_pat = "3..=7")]
     #[serde(skip)]
@@ -365,18 +383,18 @@ pub enum ADSBVersionSurface {
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct SurfaceV1 {
-    #[deku(bits = "1")] // ME 44
+    #[deku(bits = "1")]
     #[serde(rename = "NICs")]
-    /// NIC supplement bit
+    /// NIC supplement bit (NICs)
     pub nic_s: u8,
 
-    #[deku(bits = "4")] // ME 45-48
+    #[deku(bits = "4")]
     #[deku(pad_bits_after = "2")] // reserved
     #[serde(rename = "NACp")]
     /// Navigation Accuracy Category for position, version 1,2
     pub nac_p: u8,
 
-    #[deku(bits = "2")] // ME 51-52
+    #[deku(bits = "2")]
     #[serde(rename = "SIL")]
     /// Surveillance Integrity Level (SIL)
     pub sil: u8,
@@ -386,7 +404,7 @@ pub struct SurfaceV1 {
     pub track_angle_or_heading: u8,
 
     #[deku(bits = "1")]
-    #[deku(pad_bits_after = "2")] // reserved
+    #[deku(pad_bits_after = "2")]
     #[serde(rename = "HRD")]
     // 1 for magnetic, 0 for true north
     pub horizontal_reference_direction: u8,
@@ -394,18 +412,18 @@ pub struct SurfaceV1 {
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct SurfaceV2 {
-    #[deku(bits = "1")] // ME 44
+    #[deku(bits = "1")]
     #[serde(rename = "NICa")]
-    /// NIC suppelement A
+    /// NIC suppelement A (NICa)
     pub nic_a: u8,
 
-    #[deku(bits = "4")] // ME 45-48
-    #[deku(pad_bits_after = "2")] // reserved
+    #[deku(bits = "4")]
+    #[deku(pad_bits_after = "2")]
     #[serde(rename = "NACp")]
-    /// Navigation Accuracy Category for position
+    /// Navigation Accuracy Category for position (NACp)
     pub nac_p: u8,
 
-    #[deku(bits = "2")] // ME 51-52
+    #[deku(bits = "2")]
     #[serde(rename = "SIL")]
     /// Surveillance Integrity Level (SIL)
     pub sil: u8,
@@ -422,9 +440,9 @@ pub struct SurfaceV2 {
     #[deku(bits = "1")] // ME 55
     #[deku(pad_bits_after = "1")] // reserved
     #[serde(rename = "SILs")]
-    /// SIL suppelement bit, only version 2
-    /// 0 per hour
-    /// 1 per sample
+    /// SIL supplement bit, only in version 2:
+    /// 0 means per hour,
+    /// 1 means per sample.
     pub sil_supplement: u8,
 }
 
