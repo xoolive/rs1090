@@ -1,4 +1,4 @@
-name: cargo test
+name: rust
 
 on:
   push:
@@ -36,47 +36,3 @@ jobs:
       env:
         RUSTDOCFLAGS: "-D rustdoc::all -A rustdoc::private-doc-tests"
       run: cargo doc --all-features --no-deps
-
-
-  build-binary:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        build: [linux64, macos-x86, macos-aarch64, win-msvc, win32-msvc]
-        include:
-          - build: linux64
-            os: ubuntu-latest
-            rust: stable
-            target: x86_64-unknown-linux-musl
-          - build: macos-x86
-            os: macos-latest
-            rust: stable
-            target: x86_64-apple-darwin
-          - build: macos-aarch64
-            os: macos-latest
-            rust: stable
-            target: aarch64-apple-darwin
-          - build: win-msvc
-            os: windows-latest
-            rust: nightly
-            target: x86_64-pc-windows-msvc
-          - build: win32-msvc
-            os: windows-latest
-            rust: nightly
-            target: i686-pc-windows-msvc
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 1
-
-    - name: Install target
-      run: rustup target add ${{ matrix.target }}
-
-    - name: Build binary
-      run: cargo build --verbose --release --target ${{ matrix.target }}
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: decode1090-${{ matrix.target }}
-        path: target/${{ matrix.target }}/release/decode1090
