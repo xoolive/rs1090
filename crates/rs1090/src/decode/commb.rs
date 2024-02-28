@@ -1,6 +1,7 @@
 use super::bds::bds10::DataLinkCapability;
 use super::bds::bds17::GICBCapabilityReport;
 use super::bds::bds20::AircraftIdentification;
+use super::bds::bds30::ACASResolutionAdvisory;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
@@ -26,6 +27,10 @@ pub struct DataSelector {
     #[deku(reader = "read_bds20(deku::input_bits)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds20: Option<AircraftIdentification>,
+
+    #[deku(reader = "read_bds30(deku::input_bits)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds30: Option<ACASResolutionAdvisory>,
 }
 
 fn read_bds10(
@@ -59,6 +64,18 @@ fn read_bds20(
 
     if let Ok((_, bds20)) = AircraftIdentification::from_bytes((bytes, 0)) {
         Ok((input, Some(bds20)))
+    } else {
+        Ok((input, None))
+    }
+}
+
+fn read_bds30(
+    input: &BitSlice<u8, Msb0>,
+) -> Result<(&BitSlice<u8, Msb0>, Option<ACASResolutionAdvisory>), DekuError> {
+    let (_, bytes, _) = input.domain().region().unwrap();
+
+    if let Ok((_, bds30)) = ACASResolutionAdvisory::from_bytes((bytes, 0)) {
+        Ok((input, Some(bds30)))
     } else {
         Ok((input, None))
     }
