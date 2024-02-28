@@ -26,7 +26,7 @@ hex = "0.4.3"
 hexlit = "0.5.5"
 
 [[bench]]
-name = "decode"
+name = "long_flight"
 harness = false
 
 [[example]]
