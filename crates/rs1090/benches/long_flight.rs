@@ -1,8 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use deku::DekuContainerRead;
-use rs1090::decode::Message;
+use rs1090::prelude::*;
 
-const FLIGHT_CSV: &str = include_str!("flight.csv");
+const FLIGHT_CSV: &str = include_str!("long_flight.csv");
 
 fn long_flight() {
     for line in FLIGHT_CSV.lines() {
@@ -12,7 +11,7 @@ fn long_flight() {
         let msg = parts.next().unwrap();
         let hex = &mut msg.to_string()[18..].to_string();
         let bytes = hex::decode(&hex).unwrap();
-        let _frame = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, _msg) = Message::from_bytes((&bytes, 0)).unwrap();
     }
 }
 
