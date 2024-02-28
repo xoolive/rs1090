@@ -145,21 +145,21 @@ pub fn airborne_position(
     let (even_frame, odd_frame) = match (oldest, latest) {
         (
             even @ AirbornePosition {
-                odd_flag: CPRFormat::Even,
+                parity: CPRFormat::Even,
                 ..
             },
             odd @ AirbornePosition {
-                odd_flag: CPRFormat::Odd,
+                parity: CPRFormat::Odd,
                 ..
             },
         )
         | (
             odd @ AirbornePosition {
-                odd_flag: CPRFormat::Odd,
+                parity: CPRFormat::Odd,
                 ..
             },
             even @ AirbornePosition {
-                odd_flag: CPRFormat::Even,
+                parity: CPRFormat::Even,
                 ..
             },
         ) => (even, odd),
@@ -189,7 +189,7 @@ pub fn airborne_position(
     } else {
         lat_odd
     };
-    let cpr_format = &latest.odd_flag;
+    let cpr_format = &latest.parity;
 
     let (p, c) = if cpr_format == &CPRFormat::Even {
         (0, cpr_lon_even)
@@ -231,7 +231,7 @@ pub fn airborne_position_with_reference(
     let cpr_lat = f64::from(msg.lat_cpr) / CPR_MAX;
     let cpr_lon = f64::from(msg.lon_cpr) / CPR_MAX;
 
-    let d_lat = if msg.odd_flag == CPRFormat::Even {
+    let d_lat = if msg.parity == CPRFormat::Even {
         360. / 60.
     } else {
         360. / 59.
@@ -241,7 +241,7 @@ pub fn airborne_position_with_reference(
         + libm::floor(0.5 + (latitude_ref % d_lat) / d_lat - cpr_lat);
 
     let lat = d_lat * (j + cpr_lat);
-    let ni = if msg.odd_flag == CPRFormat::Even {
+    let ni = if msg.parity == CPRFormat::Even {
         nl(lat)
     } else {
         nl(lat) - 1
@@ -272,7 +272,7 @@ pub fn surface_position_with_reference(
     let cpr_lat = f64::from(msg.lat_cpr) / CPR_MAX;
     let cpr_lon = f64::from(msg.lon_cpr) / CPR_MAX;
 
-    let d_lat = if msg.odd_flag == CPRFormat::Even {
+    let d_lat = if msg.parity == CPRFormat::Even {
         90. / 60.
     } else {
         90. / 59.
@@ -282,7 +282,7 @@ pub fn surface_position_with_reference(
         + libm::floor(0.5 + (latitude_ref % d_lat) / d_lat - cpr_lat);
 
     let lat = d_lat * (j + cpr_lat);
-    let ni = if msg.odd_flag == CPRFormat::Even {
+    let ni = if msg.parity == CPRFormat::Even {
         nl(lat)
     } else {
         nl(lat) - 1
@@ -301,8 +301,6 @@ pub fn surface_position_with_reference(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decode::adsb::ME::BDS05;
-    use crate::decode::DF::ExtendedSquitterADSB;
     use crate::prelude::*;
     use approx::assert_relative_eq;
     use hexlit::hex;

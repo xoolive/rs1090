@@ -62,13 +62,21 @@ pub struct SurfacePosition {
     #[serde(skip)]
     pub t: bool,
 
-    pub odd_flag: CPRFormat,
+    pub parity: CPRFormat,
 
     #[deku(bits = "17", endian = "big")]
     pub lat_cpr: u32,
 
     #[deku(bits = "17", endian = "big")]
     pub lon_cpr: u32,
+
+    #[deku(bits = "0", map = "|_v: u8| -> Result<_, DekuError> { Ok(None) }")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latitude: Option<f64>,
+
+    #[deku(bits = "0", map = "|_v: u8| -> Result<_, DekuError> { Ok(None) }")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub longitude: Option<f64>,
 }
 
 /**
@@ -115,7 +123,7 @@ impl fmt::Display for SurfacePosition {
             .map_or_else(|| "None".to_string(), |track| format!("{track}°"));
         writeln!(f, "  Groundspeed:   {}", groundspeed)?;
         writeln!(f, "  Track angle:   {}", track)?;
-        writeln!(f, "  CPR odd flag:  {}", self.odd_flag)?;
+        writeln!(f, "  CPR parity:    {}", self.parity)?;
         writeln!(f, "  CPR latitude:  ({})", self.lat_cpr)?;
         writeln!(f, "  CPR longitude: ({})", self.lon_cpr)?;
         Ok(())
@@ -156,7 +164,7 @@ mod tests {
   Surface position (BDS 0,6)
   Groundspeed:   17 kts
   Track angle:   92.8125°
-  CPR odd flag:  odd
+  CPR parity:    odd
   CPR latitude:  (39195)
   CPR longitude: (110320)
 "#

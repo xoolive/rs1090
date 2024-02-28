@@ -5,7 +5,7 @@ pub mod cpr;
 pub mod crc;
 
 use adsb::{ADSB, ME};
-use bds::BDS;
+use commb::DataSelector;
 use crc::modes_checksum;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
@@ -210,10 +210,9 @@ pub enum DF {
         #[serde(rename = "altitude")]
         ac: AC13Field,
         /// BDS Message, Comm-B
-        #[serde(skip)]
-        bds: BDS,
+        bds: DataSelector,
         /// address/parity
-        #[serde(skip)]
+        #[serde(rename = "icao24")]
         ap: ICAO,
     },
 
@@ -234,8 +233,8 @@ pub enum DF {
         #[serde(rename = "squawk")]
         id: IdentityCode,
         /// BDS Message, Comm-B
-        #[serde(skip)]
-        bds: BDS,
+        #[serde(flatten)]
+        bds: DataSelector,
         /// Address/Parity
         #[serde(rename = "icao24")]
         ap: ICAO,
@@ -366,18 +365,18 @@ impl fmt::Display for Message {
             }
             // TODO
             DF::ExtendedSquitterMilitary { .. } => {} // DF19
-            DF::CommBAltitudeReply { bds, ac, .. } => {
+            DF::CommBAltitudeReply { ac, .. } => {
                 writeln!(f, " DF20. Comm-B, Altitude Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:x?}")?;
                 let altitude = ac.0;
                 writeln!(f, "  Altitude:      {altitude} ft")?;
-                write!(f, "  {bds}")?;
+                //write!(f, "  {bds}")?;
             }
-            DF::CommBIdentityReply { bds, id, .. } => {
+            DF::CommBIdentityReply { id, .. } => {
                 writeln!(f, " DF21. Comm-B, Identity Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:x?}")?;
                 writeln!(f, "  Squawk:        {id:x?}")?;
-                write!(f, "    {bds}")?;
+                //write!(f, "    {bds}")?;
             }
             DF::CommDExtended { .. } => {
                 writeln!(f, " DF24..=31 Comm-D Extended Length Message")?;

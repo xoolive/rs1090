@@ -69,13 +69,21 @@ pub struct AirbornePosition {
     // UTC sync or not
     pub t: bool,
 
-    pub odd_flag: CPRFormat,
+    pub parity: CPRFormat,
 
     #[deku(bits = "17", endian = "big")]
     pub lat_cpr: u32,
 
     #[deku(bits = "17", endian = "big")]
     pub lon_cpr: u32,
+
+    #[deku(bits = "0", map = "|_v: u8| -> Result<_, DekuError> { Ok(None) }")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latitude: Option<f64>,
+
+    #[deku(bits = "0", map = "|_v: u8| -> Result<_, DekuError> { Ok(None) }")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub longitude: Option<f64>,
 }
 
 /// Decode altitude value encoded on 12 bits
@@ -127,7 +135,7 @@ impl fmt::Display for AirbornePosition {
         );
         writeln!(f, "  Altitude:      {} {}", altitude, self.source)?;
         writeln!(f, "  CPR type:      Airborne")?;
-        writeln!(f, "  CPR odd flag:  {}", self.odd_flag)?;
+        writeln!(f, "  CPR parity:    {}", self.parity)?;
         writeln!(f, "  CPR latitude:  ({})", self.lat_cpr)?;
         writeln!(f, "  CPR longitude: ({})", self.lon_cpr)?;
         Ok(())
