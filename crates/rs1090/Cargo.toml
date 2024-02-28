@@ -4,6 +4,7 @@ description = "Rust library to decode Mode S and ADS-B signals"
 repository = "https://github.com/xoolive/rs1090"
 keywords = ["aircraft", "ADS-B", "Mode-S", "decoding"]
 readme = "readme.md"
+authors.workspace = true
 version.workspace = true
 license.workspace = true
 edition.workspace = true
