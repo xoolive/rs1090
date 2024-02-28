@@ -42,7 +42,7 @@ fn main() {
     // ADS-B decoding
     if let Ok((_, msg)) = Message::from_bytes((&bytes, 0)) {
         // JSON output
-        let json = serde_json::to_string(&msg).expect("Failed to serialize");
+        let json = serde_json::to_string(&msg).expect("JSON error");
         println!("{}", json);
     }
 }

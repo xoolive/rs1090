@@ -98,7 +98,7 @@ async fn main() {
     if !options.msgs.is_empty() {
         for msg in options.msgs {
             let bytes = hex::decode(&msg).unwrap();
-            let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+            let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
             if options.debug {
                 println!("{}", msg);
             } else {
