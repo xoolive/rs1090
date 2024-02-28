@@ -15,6 +15,7 @@ use serde::Serialize;
 pub struct DataLinkCapability {
     #[deku(bits = "8", map = "fail_if_not10")]
     #[serde(skip)]
+    /// The first eight bits indicate the BDS code 1000 0000 (1,0 in hexadecimal).
     pub bds: u8,
 
     #[deku(bits = "1")]
