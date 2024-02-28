@@ -16,15 +16,15 @@ use serde::Serialize;
 #[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
 pub struct DataSelector {
     #[deku(reader = "read_bds10(deku::input_bits)")]
-    #[serde(rename = "1,0", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds10: Option<DataLinkCapability>,
 
     #[deku(reader = "read_bds17(deku::input_bits)")]
-    #[serde(rename = "1,7", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds17: Option<GICBCapabilityReport>,
 
     #[deku(reader = "read_bds20(deku::input_bits)")]
-    #[serde(rename = "2,0", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds20: Option<AircraftIdentification>,
 }
 

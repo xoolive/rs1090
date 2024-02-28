@@ -4,82 +4,135 @@ use serde::Serialize;
 
 /**
  * ## Common usage GICB capability report (BDS 1,7)
+ *
+ * A bit when the corresponding register has a valid input that has been updated
+ * at the required rate. This means that the same aircraft would respond with
+ * different GICB reports due to the availability of the relevant data.
+ *
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct GICBCapabilityReport {
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Extended squitter airborne position
     pub bds05: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Extended squitter surface position
     pub bds06: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Extended squitter status
     pub bds07: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Extended squitter identification and category
     pub bds08: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Extended squitter airborne velocity information
     pub bds09: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Extended squitter event-driven information
     pub bds0a: bool,
+
     #[deku(bits = "1", map = "fail_if_false")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Aircraft identification
     pub bds20: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Aircraft registration number
     pub bds21: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Selected vertical intention
     pub bds40: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Next waypoint identifier
     pub bds41: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Next waypoint position
     pub bds42: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Next waypoint information
     pub bds43: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Meteorological routine report
     pub bds44: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Meteorological hazard report
     pub bds45: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// VHF channel report
     pub bds48: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Track and turn report
     pub bds50: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Position coarse
     pub bds51: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Position fine
     pub bds52: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Air-referenced state vector
     pub bds53: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Waypoint 1
     pub bds54: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Waypoint 2
     pub bds55: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Waypoint 3
     pub bds56: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Quasi-static parameter monitoring
     pub bds5f: bool,
+
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
+    /// Heading and speed report
     pub bds60: bool,
+
     #[deku(reader = "check_zeros(deku::rest)")]
     #[serde(skip)]
     pub check_flag: bool,

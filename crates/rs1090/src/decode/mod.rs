@@ -210,6 +210,7 @@ pub enum DF {
         #[serde(rename = "altitude")]
         ac: AC13Field,
         /// BDS Message, Comm-B
+        #[serde(flatten)]
         bds: DataSelector,
         /// address/parity
         #[serde(rename = "icao24")]
