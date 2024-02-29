@@ -34,7 +34,7 @@ use std::fmt;
  */
 
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
-#[deku(type = "u8", bits = "5")]
+#[deku(type = "u8", bits = "5", ctx = "crc: u32")]
 #[serde(tag = "DF")]
 pub enum DF {
     /// DF=0: Short Air-Air Surveillance (3.1.2.8.2)
@@ -74,7 +74,8 @@ pub enum DF {
         ac: AC13Field,
         /// ICAO address, parity
         #[serde(rename = "icao24")]
-        ap: ICAO,
+        #[deku(ctx = "crc")]
+        ap: IcaoParity,
     },
 
     /// DF=4: Surveillance Altitude Reply (3.1.2.6.5)
@@ -95,7 +96,8 @@ pub enum DF {
         ac: AC13Field,
         /// Address/Parity
         #[serde(rename = "icao24")]
-        ap: ICAO,
+        #[deku(ctx = "crc")]
+        ap: IcaoParity,
     },
 
     /// DF=5: Surveillance Identity Reply (3.1.2.6.7)
@@ -115,7 +117,8 @@ pub enum DF {
         id: IdentityCode,
         /// Address/Parity
         #[serde(rename = "icao24")]
-        ap: ICAO,
+        #[deku(ctx = "crc")]
+        ap: IcaoParity,
     },
 
     /// DF=11: (Mode S) All-call reply, Downlink format 11 (2.1.2.5.2.2)
@@ -137,33 +140,39 @@ pub enum DF {
     /// Long Air-Air Surveillance, Downlink Format 16 (3.1.2.8.3)
     LongAirAirSurveillance {
         #[deku(bits = "1")]
-        #[serde(skip)]
+        /// Vertical Status (airborne: 0, onground: 1)
         vs: u8,
         #[deku(bits = "2")]
         #[serde(skip)]
-        spare1: u8,
+        reserved1: u8,
         #[deku(bits = "3")]
-        #[serde(skip)]
+        /// Sensitivity Level (inoperative: 0)
         sl: u8,
         #[deku(bits = "2")]
         #[serde(skip)]
-        spare2: u8,
+        reserved2: u8,
         #[deku(bits = "4")]
-        #[serde(skip)]
+        /// Reply information
+        ///
+        /// - 0000: No operating ACAS
+        /// - 0010: ACAS with resolution capability inhibited
+        /// - 0011: ACAS with vertical-only resolution capability
+        /// - 0111: ACAS with vertical and horizontal resolution capability
         ri: u8,
         #[deku(bits = "2")]
         #[serde(skip)]
-        spare3: u8,
+        reserved3: u8,
         /// Altitude code on 13 bits
         #[serde(rename = "altitude")]
         ac: AC13Field,
-        /// Message, ACAS
+        /// Message, ACAS (56 bits, a BDS of a type requested in UF=0)
         #[deku(count = "7")]
         #[serde(skip)]
         mv: Vec<u8>,
         /// Address/Parity
         #[serde(rename = "icao24")]
-        ap: ICAO,
+        #[deku(ctx = "crc")]
+        ap: IcaoParity,
     },
 
     #[deku(id = "17")]
@@ -210,11 +219,11 @@ pub enum DF {
         #[serde(rename = "altitude")]
         ac: AC13Field,
         /// BDS Message, Comm-B
-        #[serde(flatten)]
         bds: DataSelector,
         /// address/parity
         #[serde(rename = "icao24")]
-        ap: ICAO,
+        #[deku(ctx = "crc")]
+        ap: IcaoParity,
     },
 
     /// Comm-B Identity Reply, Downlink Format 21 (3.1.2.6.8)
@@ -238,7 +247,8 @@ pub enum DF {
         bds: DataSelector,
         /// Address/Parity
         #[serde(rename = "icao24")]
-        ap: ICAO,
+        #[deku(ctx = "crc")]
+        ap: IcaoParity,
     },
 
     /// 24: Comm-D Extended, Downlink Format 24 (3.1.2.7.3)
@@ -266,44 +276,43 @@ pub enum DF {
 /// Use as `Message::from_bytes()` in mostly all applications
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 pub struct Message {
-    /// The Downlink Format encoded in 5 bits
-    #[serde(flatten)]
-    pub df: DF,
-
-    /// Calculated from all bits, should be 0 for ADS-B (raises a DekuError), icao24 otherwise
-    #[deku(reader = "Self::read_crc(df, deku::input_bits)")]
+    /// Calculated from all bits, should be 0 for ADS-B (raises a DekuError),
+    /// icao24 otherwise
+    #[deku(reader = "Self::read_crc(deku::input_bits)")]
     #[serde(skip)]
     pub crc: u32,
+
+    /// The Downlink Format encoded in 5 bits
+    #[serde(flatten)]
+    #[deku(ctx = "*crc")]
+    pub df: DF,
 }
 
 impl Message {
     /// Read rest as CRC bits
-    fn read_crc<'b>(
-        df: &DF,
-        rest: &'b BitSlice<u8, Msb0>,
-    ) -> Result<(&'b BitSlice<u8, Msb0>, u32), DekuError> {
+    fn read_crc(
+        rest: &BitSlice<u8, Msb0>,
+    ) -> Result<(&BitSlice<u8, Msb0>, u32), DekuError> {
         const MODES_LONG_MSG_BYTES: usize = 14;
         const MODES_SHORT_MSG_BYTES: usize = 7;
 
-        let bit_len = if let Ok(id) = df.deku_id() {
-            if id & 0x10 != 0 {
-                MODES_LONG_MSG_BYTES * 8
-            } else {
-                MODES_SHORT_MSG_BYTES * 8
-            }
-        } else {
-            // In this case, it's the DF::CommD, which has multiple ids
+        let (_, remaining_bytes, _) = rest.domain().region().unwrap();
+
+        // Decode the DF quickly to determine the length of the message
+        let df = remaining_bytes[0] >> 3;
+
+        let bit_len = if df & 0x10 != 0 {
             MODES_LONG_MSG_BYTES * 8
+        } else {
+            MODES_SHORT_MSG_BYTES * 8
         };
 
-        let (_, remaining_bytes, _) = rest.domain().region().unwrap();
         let crc = modes_checksum(remaining_bytes, bit_len)?;
+        // Also the CRC must be 0 for ADS-B (DF=17) messages
         match (df, crc) {
-            (DF::ExtendedSquitterADSB(_), c) if c > 0 => {
-                Err(DekuError::Assertion(format!(
-                    "Invalid CRC in ADS-B message: {c}"
-                )))
-            }
+            (17, c) if c > 0 => Err(DekuError::Assertion(format!(
+                "Invalid CRC in ADS-B message: {c}"
+            ))),
             _ => Ok((rest, crc)),
         }
     }
@@ -391,22 +400,62 @@ impl fmt::Display for Message {
 /// ICAO 24-bit address, commonly use to reference airframes, i.e. tail numbers
 /// of aircraft
 #[derive(PartialEq, Eq, PartialOrd, DekuRead, Hash, Copy, Clone, Ord)]
-pub struct ICAO(pub [u8; 3]);
+#[deku(ctx = "crc: u32")]
+pub struct IcaoParity(
+    // Ok it looks convoluted, actually the final bits are already read when
+    // we compute the crc so we don't need to read this again (hence 1 bit)
+    #[deku(bits = 1, map = "|_v: u32| -> Result<_, DekuError> { Ok(crc) }")]
+    pub u32,
+);
+
+impl fmt::Debug for IcaoParity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:06x}", self.0)?;
+        Ok(())
+    }
+}
+
+impl fmt::Display for IcaoParity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:06x}", self.0)?;
+        Ok(())
+    }
+}
+
+impl Serialize for IcaoParity {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let icao = format!("{:06x}", &self.0);
+        serializer.serialize_str(&icao)
+    }
+}
+
+impl core::str::FromStr for IcaoParity {
+    type Err = core::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let num = u32::from_str_radix(s, 16)?;
+        Ok(Self(num))
+    }
+}
+
+/// ICAO 24-bit address, commonly use to reference airframes, i.e. tail numbers
+/// of aircraft
+#[derive(PartialEq, Eq, PartialOrd, DekuRead, Hash, Copy, Clone, Ord)]
+pub struct ICAO(#[deku(bits = 24, endian = "big")] pub u32);
 
 impl fmt::Debug for ICAO {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:02x}", self.0[0])?;
-        write!(f, "{:02x}", self.0[1])?;
-        write!(f, "{:02x}", self.0[2])?;
+        write!(f, "{:06x}", self.0)?;
         Ok(())
     }
 }
 
 impl fmt::Display for ICAO {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:02x}", self.0[0])?;
-        write!(f, "{:02x}", self.0[1])?;
-        write!(f, "{:02x}", self.0[2])?;
+        write!(f, "{:06x}", self.0)?;
         Ok(())
     }
 }
@@ -416,7 +465,7 @@ impl Serialize for ICAO {
     where
         S: Serializer,
     {
-        let icao = format!("{}", &self);
+        let icao = format!("{:06x}", &self.0);
         serializer.serialize_str(&icao)
     }
 }
@@ -426,12 +475,9 @@ impl core::str::FromStr for ICAO {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let num = u32::from_str_radix(s, 16)?;
-        let bytes = num.to_be_bytes();
-        let num = [bytes[1], bytes[2], bytes[3]];
         Ok(Self(num))
     }
 }
-
 /// 13 bit identity code (squawk code), a 4-octal digit identifier
 #[derive(PartialEq, DekuRead, Copy, Clone)]
 pub struct IdentityCode(#[deku(reader = "Self::read(deku::rest)")] pub u16);
@@ -493,7 +539,12 @@ impl AC13Field {
             let n = ((ac13field & 0x1f80) >> 2)
                 | ((ac13field & 0x0020) >> 1)
                 | (ac13field & 0x000f);
-            Ok((rest, n * 25 - 1000)) // 25 ft interval
+            if n > 40 {
+                Ok((rest, n * 25 - 1000)) // 25 ft interval
+            } else {
+                // TODO error?
+                Ok((rest, 0))
+            }
         } else {
             // 11 bit Gillham coded altitude
             if let Ok(n) = gray2alt(decode_id13(ac13field)) {
