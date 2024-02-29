@@ -22,58 +22,117 @@ pub struct ACASResolutionAdvisory {
     /// False if no RA or multiple thread/different directions.
     pub issued_ra: bool,
 
-    // TODO only if issued_ra = true
-    #[deku(bits = "1")]
-    /// Active resolution advisories:
-    pub corrective: bool,
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Active resolution advisories: corrective/preventive
+    pub corrective: Option<bool>,
 
-    #[deku(bits = "1")]
-    /// Active resolution advisories:
-    pub downward_sense: bool,
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Active resolution advisories: downward/upward
+    pub downward_sense: Option<bool>,
 
-    #[deku(bits = "1")]
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Active resolution advisories:
-    pub increased_rate: bool,
+    pub increased_rate: Option<bool>,
 
-    #[deku(bits = "1")]
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Active resolution advisories:
-    pub sense_reversal: bool,
+    pub sense_reversal: Option<bool>,
 
-    #[deku(bits = "1")]
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Active resolution advisories:
-    pub altitude_crossing: bool,
+    pub altitude_crossing: Option<bool>,
 
-    #[deku(bits = "1")]
-    /// Active resolution advisories:
-    pub positive: bool,
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Active resolution advisories: positive/vertical speed limit
+    pub positive: Option<bool>,
 
     #[deku(bits = "7")]
     #[serde(skip)]
-    /// Active resolution advisories:
+    /// Active resolution advisories: reserved for ACAS III
     pub reserved_acas3: u16,
 
-    #[deku(bits = "1")]
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Resolution advisory complements record: do not pass below
-    pub no_below: bool,
+    pub no_below: Option<bool>,
 
-    #[deku(bits = "1")]
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Resolution advisory complements record: do not pass above
-    pub no_above: bool,
+    pub no_above: Option<bool>,
 
-    #[deku(bits = "1")]
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Resolution advisory complements record: do not turn left
-    pub no_left: bool,
+    pub no_left: Option<bool>,
 
-    #[deku(bits = "1")]
+    #[deku(
+        bits = "1",
+        map = "|v: bool| -> Result<_, DekuError> {
+            if *issued_ra { Ok(Some(v)) } else { Ok(None) }
+        }"
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Resolution advisory complements record: do not turn right
-    pub no_right: bool,
+    pub no_right: Option<bool>,
 
     #[deku(bits = "1")]
     /// RA terminated
     pub terminated: bool,
 
     #[deku(bits = "1")]
-    /// Multiple threat encounter
+    /// Multiple threat encounter (not supported)
     pub multiple: bool,
 
     /// Threat type indicator

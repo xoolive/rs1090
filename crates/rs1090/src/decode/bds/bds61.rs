@@ -59,13 +59,13 @@ impl fmt::Display for EmergencyState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             Self::None => "No emergency",
-            Self::General => "General emergency",
+            Self::General => "General emergency (7700)",
             Self::Medical => "Lifeguard/Medical emergency",
             Self::MinimumFuel => "Minimum fuel",
-            Self::NoCommunication => "No communication",
-            Self::UnlawfulInterference => "Unlawful interference",
+            Self::NoCommunication => "No communication (7600)",
+            Self::UnlawfulInterference => "Unlawful interference (7500)",
             Self::DownedAircraft => "Downed aircraft",
-            Self::Reserved => "reserved",
+            Self::Reserved => "Reserved",
         };
         write!(f, "{s}")?;
         Ok(())
