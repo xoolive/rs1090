@@ -479,19 +479,13 @@ mod tests {
                 if let AirborneVelocitySubType::AirspeedSubsonic(asd) =
                     velocity.velocity
                 {
-                    if let Some(value) = asd.airspeed {
-                        assert_eq!(value, 375);
-                    } else {
-                        unreachable!()
-                    }
-                    if let Some(value) = asd.heading {
-                        assert_relative_eq!(value, 244., max_relative = 1e-2);
-                    } else {
-                        unreachable!()
-                    }
-                    if let Some(vrate) = velocity.vertical_rate {
-                        assert_eq!(vrate, -2304);
-                    }
+                    assert_eq!(asd.airspeed.unwrap(), 375);
+                    assert_relative_eq!(
+                        asd.heading.unwrap(),
+                        244.,
+                        max_relative = 1e-2
+                    );
+                    assert_eq!(velocity.vertical_rate.unwrap(), -2304);
                 }
                 return;
             }

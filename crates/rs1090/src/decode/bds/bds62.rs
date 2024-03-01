@@ -240,22 +240,36 @@ mod tests {
         let bytes = hex!("8DA05629EA21485CBF3F8CADAEEB");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
-            if let BDS62(state) = adsb_msg.message {
-                assert_eq!(state.selected_altitude, Some(17000));
-                assert_eq!(state.alt_source, AltSource::MCP);
-                assert_eq!(state.barometric_setting, Some(1012.8));
-                if let Some(sel_hdg) = state.selected_heading {
-                    assert_relative_eq!(sel_hdg, 66.8, max_relative = 1e-2);
-                } else {
-                    unreachable!()
-                }
-                assert!(state.mode_status);
-                assert_eq!(state.autopilot, Some(true));
-                assert_eq!(state.vnav_mode, Some(true));
-                assert_eq!(state.lnav_mode, Some(true));
-                assert_eq!(state.alt_hold, Some(false));
-                assert_eq!(state.approach_mode, Some(false));
-                assert!(state.tcas_operational);
+            if let BDS62(TargetStateAndStatusInformation {
+                selected_altitude,
+                alt_source,
+                barometric_setting,
+                selected_heading,
+                mode_status,
+                autopilot,
+                vnav_mode,
+                lnav_mode,
+                alt_hold,
+                approach_mode,
+                tcas_operational,
+                ..
+            }) = adsb_msg.message
+            {
+                assert_eq!(selected_altitude, Some(17000));
+                assert_eq!(alt_source, AltSource::MCP);
+                assert_eq!(barometric_setting, Some(1012.8));
+                assert_relative_eq!(
+                    selected_heading.unwrap(),
+                    66.8,
+                    max_relative = 1e-2
+                );
+                assert!(mode_status);
+                assert_eq!(autopilot, Some(true));
+                assert_eq!(vnav_mode, Some(true));
+                assert_eq!(lnav_mode, Some(true));
+                assert_eq!(alt_hold, Some(false));
+                assert_eq!(approach_mode, Some(false));
+                assert!(tcas_operational);
             }
             return;
         }
