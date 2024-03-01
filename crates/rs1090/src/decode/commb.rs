@@ -2,6 +2,7 @@ use super::bds::bds10::DataLinkCapability;
 use super::bds::bds17::GICBCapabilityReport;
 use super::bds::bds20::AircraftIdentification;
 use super::bds::bds30::ACASResolutionAdvisory;
+use super::bds::bds40::SelectedVerticalIntention;
 use super::bds::bds50::TrackAndTurnReport;
 use super::bds::bds60::HeadingAndSpeedReport;
 use deku::bitvec::{BitSlice, Msb0};
@@ -34,6 +35,10 @@ pub struct DataSelector {
     #[deku(reader = "read_bds30(deku::input_bits)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds30: Option<ACASResolutionAdvisory>,
+
+    #[deku(reader = "read_bds40(deku::input_bits)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds40: Option<SelectedVerticalIntention>,
 
     #[deku(reader = "read_bds50(deku::input_bits)")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -98,6 +103,17 @@ fn read_bds30(
     }
 }
 
+fn read_bds40(
+    input: &BitSlice<u8, Msb0>,
+) -> Result<(&BitSlice<u8, Msb0>, Option<SelectedVerticalIntention>), DekuError>
+{
+    let (_, bytes, _) = input.domain().region().unwrap();
+    if let Ok((_, bds40)) = SelectedVerticalIntention::from_bytes((bytes, 0)) {
+        Ok((input, Some(bds40)))
+    } else {
+        Ok((input, None))
+    }
+}
 fn read_bds50(
     input: &BitSlice<u8, Msb0>,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<TrackAndTurnReport>), DekuError> {

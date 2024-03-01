@@ -1,4 +1,4 @@
-use super::f64_threedecimals;
+use super::op_f64_threedecimals;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
@@ -9,40 +9,46 @@ use serde::Serialize;
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct TrackAndTurnReport {
     #[deku(reader = "read_roll(deku::rest)")] // 11 bits
-    #[serde(rename = "roll", serialize_with = "f64_threedecimals")]
+    #[serde(rename = "roll", serialize_with = "op_f64_threedecimals")]
     // Roll angle (negative sign means left wing down)
-    pub roll_angle: f64,
+    pub roll_angle: Option<f64>,
 
     #[deku(reader = "read_track(deku::rest)")] // 12 bits
-    #[serde(rename = "track", serialize_with = "f64_threedecimals")]
-    pub track_angle: f64,
+    #[serde(rename = "track", serialize_with = "op_f64_threedecimals")]
+    pub track_angle: Option<f64>,
 
     #[deku(reader = "read_groundspeed(deku::rest)")] // 11 bits
     /// Groundspeed in kts
-    pub groundspeed: u16,
+    pub groundspeed: Option<u16>,
 
     #[deku(reader = "read_rate(deku::rest, *roll_angle)")] // 11 bits
-    #[serde(serialize_with = "f64_threedecimals")]
-    pub track_rate: f64,
+    #[serde(serialize_with = "op_f64_threedecimals")]
+    pub track_rate: Option<f64>,
 
     #[deku(reader = "read_tas(deku::rest, *groundspeed)")] // 11 bits
     #[serde(rename = "TAS")]
     /// True Airspeed (TAS) in kts, IAS is in BDS 0,6
-    pub true_airspeed: u16,
+    pub true_airspeed: Option<u16>,
 }
 
 fn read_roll(
     rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, f64), DekuError> {
+) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
     let (rest, status) =
         bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    if !status {
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
-    }
     let (rest, sign) =
         u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
     let (rest, value) =
         u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(9)))?;
+
+    if !status {
+        if (sign != 0) | (value != 0) {
+            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        } else {
+            return Ok((rest, None));
+        }
+    }
+
     let roll = if sign > 0 {
         (value as f64 - 512.) * 45. / 256.
     } else {
@@ -51,21 +57,26 @@ fn read_roll(
     if roll.abs() > 50. {
         return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
     }
-    Ok((rest, roll))
+    Ok((rest, Some(roll)))
 }
 
 fn read_track(
     rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, f64), DekuError> {
+) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
     let (rest, status) =
         bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    if !status {
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
-    }
     let (rest, sign) =
         u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
     let (rest, value) =
         u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
+
+    if !status {
+        if (sign != 0) | (value != 0) {
+            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        } else {
+            return Ok((rest, None));
+        }
+    }
 
     let value = if sign == 1 {
         value as i16 - 1024
@@ -77,43 +88,53 @@ fn read_track(
         track += 360.
     }
 
-    Ok((rest, track))
+    Ok((rest, Some(track)))
 }
 
 fn read_groundspeed(
     rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
+) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
     let (rest, status) =
         bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    if !status {
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
-    }
     let (rest, value) =
         u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
+
+    if !status {
+        if value != 0 {
+            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        } else {
+            return Ok((rest, None));
+        }
+    }
 
     let gs = value * 2;
     if gs > 600 {
         return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
     }
-    Ok((rest, gs))
+    Ok((rest, Some(gs)))
 }
 
 fn read_rate(
     rest: &BitSlice<u8, Msb0>,
-    roll: f64,
-) -> Result<(&BitSlice<u8, Msb0>, f64), DekuError> {
+    roll: Option<f64>,
+) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
     let (rest, status) =
         bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    if !status {
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
-    }
     let (rest, sign) =
         u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
     let (rest, value) =
         u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(9)))?;
 
+    if !status {
+        if (sign != 0) | (value != 0) {
+            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        } else {
+            return Ok((rest, None));
+        }
+    }
+
     if value == 0b111111111 {
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        return Ok((rest, None));
     }
 
     let value = if sign == 1 {
@@ -123,32 +144,41 @@ fn read_rate(
     };
     let rate = value as f64 * 8. / 256.;
 
-    if roll * rate < 0. {
-        // signs must agree: left wing down = turn left
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+    if let Some(roll) = roll {
+        if roll * rate < 0. {
+            // signs must agree: left wing down = turn left
+            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        }
     }
 
-    Ok((rest, rate))
+    Ok((rest, Some(rate)))
 }
 
 fn read_tas(
     rest: &BitSlice<u8, Msb0>,
-    gs: u16,
-) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
+    gs: Option<u16>,
+) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
     let (rest, status) =
         bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    if !status {
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
-    }
     let (rest, value) =
         u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
 
+    if !status {
+        if value != 0 {
+            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        } else {
+            return Ok((rest, None));
+        }
+    }
+
     let tas = value * 2;
 
-    if !(80..=500).contains(&tas) | ((gs as i16 - tas as i16).abs() > 200) {
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+    if let Some(gs) = gs {
+        if !(80..=500).contains(&tas) | ((gs as i16 - tas as i16).abs() > 200) {
+            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        }
     }
-    Ok((rest, tas))
+    Ok((rest, Some(tas)))
 }
 
 #[cfg(test)]
@@ -170,11 +200,19 @@ mod tests {
                 groundspeed,
                 track_rate,
             } = bds.bds50.unwrap();
-            assert_relative_eq!(roll_angle, 2.1, max_relative = 1e-2);
-            assert_relative_eq!(track_angle, 114.258, max_relative = 1e-3);
-            assert_eq!(groundspeed, 438);
-            assert_eq!(true_airspeed, 424);
-            assert_relative_eq!(track_rate, 0.125, max_relative = 1e-3);
+            assert_relative_eq!(roll_angle.unwrap(), 2.1, max_relative = 1e-2);
+            assert_relative_eq!(
+                track_angle.unwrap(),
+                114.258,
+                max_relative = 1e-3
+            );
+            assert_eq!(groundspeed.unwrap(), 438);
+            assert_eq!(true_airspeed.unwrap(), 424);
+            assert_relative_eq!(
+                track_rate.unwrap(),
+                0.125,
+                max_relative = 1e-3
+            );
         } else {
             unreachable!();
         }

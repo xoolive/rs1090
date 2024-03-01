@@ -23,10 +23,17 @@ where
     serializer.serialize_f64(rounded_value)
 }
 
-fn f64_threedecimals<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
+fn op_f64_threedecimals<S>(
+    value: &Option<f64>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    let rounded_value = (value * 1000.0).round() / 1000.0; // Round to three decimals
-    serializer.serialize_f64(rounded_value)
+    if let Some(value) = value {
+        let rounded_value = (value * 1000.0).round() / 1000.0; // Round to three decimals
+        serializer.serialize_f64(rounded_value)
+    } else {
+        serializer.serialize_none()
+    }
 }
