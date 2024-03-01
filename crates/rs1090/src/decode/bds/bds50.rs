@@ -150,3 +150,43 @@ fn read_tas(
     }
     Ok((rest, tas))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::*;
+    use approx::assert_relative_eq;
+    use hexlit::hex;
+
+    #[test]
+    fn test_valid_bds50() {
+        let bytes = hex!("a000139381951536e024d4ccf6b5");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        if let CommBAltitudeReply { bds, .. } = msg.df {
+            let TrackAndTurnReport {
+                roll_angle,
+                track_angle,
+                true_airspeed,
+                groundspeed,
+                track_rate,
+            } = bds.bds50.unwrap();
+            assert_relative_eq!(roll_angle, 2.1, max_relative = 1e-2);
+            assert_relative_eq!(track_angle, 114.258, max_relative = 1e-3);
+            assert_eq!(groundspeed, 438);
+            assert_eq!(true_airspeed, 424);
+            assert_relative_eq!(track_rate, 0.125, max_relative = 1e-3);
+        } else {
+            unreachable!();
+        }
+    }
+    #[test]
+    fn test_invalid_bds50() {
+        let bytes = hex!("a0000638fa81c10000000081a92f");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        if let CommBAltitudeReply { bds, .. } = msg.df {
+            assert_eq!(bds.bds50, None);
+        } else {
+            unreachable!();
+        }
+    }
+}
