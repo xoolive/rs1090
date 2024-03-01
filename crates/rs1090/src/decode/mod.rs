@@ -219,6 +219,7 @@ pub enum DF {
         #[serde(rename = "altitude")]
         ac: AC13Field,
         /// BDS Message, Comm-B
+        #[serde(flatten)]
         bds: DataSelector,
         /// address/parity
         #[serde(rename = "icao24")]
@@ -373,20 +374,19 @@ impl fmt::Display for Message {
                 // DF18
                 write!(f, "{cf}")?;
             }
-            // TODO
             DF::ExtendedSquitterMilitary { .. } => {} // DF19
-            DF::CommBAltitudeReply { ac, .. } => {
+            DF::CommBAltitudeReply { ac, bds, .. } => {
                 writeln!(f, " DF20. Comm-B, Altitude Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:x?}")?;
                 let altitude = ac.0;
                 writeln!(f, "  Altitude:      {altitude} ft")?;
-                //write!(f, "  {bds}")?;
+                write!(f, "  {bds}")?;
             }
-            DF::CommBIdentityReply { id, .. } => {
+            DF::CommBIdentityReply { id, bds, .. } => {
                 writeln!(f, " DF21. Comm-B, Identity Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:x?}")?;
                 writeln!(f, "  Squawk:        {id:x?}")?;
-                //write!(f, "    {bds}")?;
+                write!(f, "    {bds}")?;
             }
             DF::CommDExtended { .. } => {
                 writeln!(f, " DF24..=31 Comm-D Extended Length Message")?;
@@ -403,8 +403,8 @@ impl fmt::Display for Message {
 #[deku(ctx = "crc: u32")]
 pub struct IcaoParity(
     // Ok it looks convoluted, actually the final bits are already read when
-    // we compute the crc so we don't need to read this again (hence 1 bit)
-    #[deku(bits = 1, map = "|_v: u32| -> Result<_, DekuError> { Ok(crc) }")]
+    // we compute the crc so we don't need to read this again
+    #[deku(bits = 24, map = "|_v: u32| -> Result<_, DekuError> { Ok(crc) }")]
     pub u32,
 );
 
