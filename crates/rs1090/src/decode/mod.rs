@@ -826,11 +826,11 @@ mod tests {
 
     #[test]
     fn test_ac13field() {
-        let bytes = hex!("A02014B400000000000000F9D514");
+        let bytes = hex!("a0001910cc300030aa0000eae004");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         match msg.df {
             DF::CommBAltitudeReply { ac, .. } => {
-                assert_eq!(ac.0, 32300);
+                assert_eq!(ac.0, 39000);
             }
             _ => unreachable!(),
         }

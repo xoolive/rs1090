@@ -151,8 +151,8 @@ mod tests {
                 barometric_setting,
                 ..
             } = bds.bds40.unwrap();
-            assert_eq!(selected_altitude_fms.unwrap(), 3008);
-            assert_eq!(selected_altitude_mcp.unwrap(), 3008);
+            assert_eq!(selected_altitude_fms.unwrap(), 3000);
+            assert_eq!(selected_altitude_mcp.unwrap(), 3000);
             assert_relative_eq!(
                 barometric_setting.unwrap(),
                 1020.,
