@@ -64,7 +64,7 @@ fn read_wind_speed(
         return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
     }
 
-    return Ok((rest, Some(value)));
+    Ok((rest, Some(value)))
 }
 
 fn read_wind_direction(
@@ -74,7 +74,7 @@ fn read_wind_direction(
     let (rest, value) =
         u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(9)))?;
 
-    if speed == None {
+    if speed.is_none() {
         if value != 0 {
             return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
         } else {
@@ -82,7 +82,7 @@ fn read_wind_direction(
         }
     }
 
-    return Ok((rest, Some(value as f64 * 180. / 256.)));
+    Ok((rest, Some(value as f64 * 180. / 256.)))
 }
 
 fn read_temperature(
@@ -99,10 +99,10 @@ fn read_temperature(
         value as f64 * 0.25
     };
 
-    if (temp > 60.) | (temp < -80.) {
+    if !(-80. ..=60.).contains(&temp) {
         return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
     }
-    return Ok((rest, temp));
+    Ok((rest, temp))
 }
 
 fn read_pressure(
@@ -122,7 +122,7 @@ fn read_pressure(
     }
 
     // Never seen any anyway
-    return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
+    Err(DekuError::Assertion("BDS 4,4 status".to_string()))
 
     // return Ok((rest, Some(value)));
 }
@@ -151,7 +151,7 @@ fn read_turbulence(
         _ => None, // never happens anyway
     };
 
-    return Ok((rest, value));
+    Ok((rest, value))
 }
 
 fn read_humidity(
@@ -170,7 +170,7 @@ fn read_humidity(
         }
     }
 
-    return Ok((rest, Some(value as f64 * 100. / 64.)));
+    Ok((rest, Some(value as f64 * 100. / 64.)))
 }
 
 #[cfg(test)]

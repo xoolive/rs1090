@@ -1,3 +1,5 @@
+#![allow(clippy::suspicious_else_formatting)]
+
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
@@ -83,7 +85,7 @@ pub enum TargetSource {
 }
 impl TargetSource {
     fn is_unknown(&self) -> bool {
-        return self == &Self::Unknown;
+        self == &Self::Unknown
     }
 }
 
@@ -109,7 +111,7 @@ fn read_selected(
         return Err(DekuError::Assertion("BDS 4,0 status".to_string()));
     }
 
-    return Ok((rest, Some(value)));
+    Ok((rest, Some(value)))
 }
 
 fn read_qnh(
@@ -128,7 +130,7 @@ fn read_qnh(
         }
     }
 
-    return Ok((rest, Some(value as f64 * 0.1 + 800.)));
+    Ok((rest, Some(value as f64 * 0.1 + 800.)))
 }
 
 #[cfg(test)]
