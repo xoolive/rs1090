@@ -5,6 +5,7 @@ build-backend = "maturin"
 [project]
 name = "rs1090"
 requires-python = ">=3.8"
+dependencies = ["msgpack>=1.0.8"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
