@@ -7,6 +7,7 @@ pub mod bds17;
 pub mod bds20;
 pub mod bds30;
 pub mod bds40;
+pub mod bds44;
 pub mod bds50;
 pub mod bds60;
 pub mod bds61;

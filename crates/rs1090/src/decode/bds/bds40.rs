@@ -34,15 +34,20 @@ pub struct SelectedVerticalIntention {
     #[deku(bits = 8)]
     pub reserved: u8, // 8 bits all zeros
 
-    /// Status of MCP/FCU mode
+    /// Status of MCP/FCU mode (usually just false)
     #[deku(bits = 1)]
+    #[serde(skip)]
     pub mcp_status: bool,
     #[deku(bits = 1)]
+    #[serde(skip)]
     pub vnav_mode: bool,
     #[deku(bits = 1)]
+    #[serde(skip)]
     pub alt_hold_mode: bool,
     #[deku(bits = 1)]
+    #[serde(skip)]
     pub approach_mode: bool,
+
     #[deku(map = "|v: u8| {
         if v == 0 { Ok(v) } else {
             Err(DekuError::Assertion(\"Reserved bits to 0\".to_string()))
@@ -51,15 +56,16 @@ pub struct SelectedVerticalIntention {
     #[deku(bits = 2)]
     #[serde(skip)]
     pub reserved1: u8, // 2 bits all zeros
-    /// Status of target altitude source
+
     #[deku(bits = 1)]
     #[serde(skip)]
+    /// Status of target altitude source
     pub source_status: bool,
-    /// Target altitude source
     #[serde(
         rename = "target_source",
         skip_serializing_if = "TargetSource::is_unknown"
     )]
+    /// Target altitude source
     pub target_altitude_source: TargetSource,
 }
 
@@ -97,6 +103,8 @@ fn read_selected(
         }
     }
     let value = value * 16;
+    // (encoded as a multiple of 16, but rounded to the closest 100 ft)
+    let value = (value + 8) / 100 * 100;
     if value > 45000 {
         return Err(DekuError::Assertion("BDS 4,0 status".to_string()));
     }

@@ -3,6 +3,7 @@ use super::bds::bds17::GICBCapabilityReport;
 use super::bds::bds20::AircraftIdentification;
 use super::bds::bds30::ACASResolutionAdvisory;
 use super::bds::bds40::SelectedVerticalIntention;
+use super::bds::bds44::MeteorologicalRoutineAirReport;
 use super::bds::bds50::TrackAndTurnReport;
 use super::bds::bds60::HeadingAndSpeedReport;
 use deku::bitvec::{BitSlice, Msb0};
@@ -20,6 +21,11 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
 pub struct DataSelector {
+    #[deku(reader = "check_empty_bds(deku::input_bits)")]
+    #[serde(skip)]
+    /// Always true, fails the whole decoding on messages with a zero BDS payload
+    pub empty: bool,
+
     #[deku(reader = "read_bds10(deku::input_bits)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds10: Option<DataLinkCapability>,
@@ -39,6 +45,10 @@ pub struct DataSelector {
     #[deku(reader = "read_bds40(deku::input_bits)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds40: Option<SelectedVerticalIntention>,
+
+    #[deku(reader = "read_bds44(deku::input_bits)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds44: Option<MeteorologicalRoutineAirReport>,
 
     #[deku(reader = "read_bds50(deku::input_bits)")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -114,6 +124,23 @@ fn read_bds40(
         Ok((input, None))
     }
 }
+
+fn read_bds44(
+    input: &BitSlice<u8, Msb0>,
+) -> Result<
+    (&BitSlice<u8, Msb0>, Option<MeteorologicalRoutineAirReport>),
+    DekuError,
+> {
+    let (_, bytes, _) = input.domain().region().unwrap();
+    if let Ok((_, bds44)) =
+        MeteorologicalRoutineAirReport::from_bytes((bytes, 0))
+    {
+        Ok((input, Some(bds44)))
+    } else {
+        Ok((input, None))
+    }
+}
+
 fn read_bds50(
     input: &BitSlice<u8, Msb0>,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<TrackAndTurnReport>), DekuError> {
@@ -134,4 +161,21 @@ fn read_bds60(
     } else {
         Ok((input, None))
     }
+}
+
+fn check_empty_bds(
+    rest: &BitSlice<u8, Msb0>,
+) -> Result<(&BitSlice<u8, Msb0>, bool), DekuError> {
+    let mut inside_rest = rest;
+    for _ in 0..=5 {
+        let (for_rest, value) = u8::read(
+            inside_rest,
+            (deku::ctx::Endian::Big, deku::ctx::BitSize(8)),
+        )?;
+        if value != 0 {
+            return Ok((rest, true));
+        }
+        inside_rest = for_rest;
+    }
+    Err(DekuError::InvalidParam("Empty BDS".to_string()))
 }
