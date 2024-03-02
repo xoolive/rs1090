@@ -1,0 +1,17 @@
+[package]
+name = "rs1090-python"
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+hex = "0.4.3"
+pyo3 = "0.19.0"
+rmp-serde = "1.1.2"
+rs1090 = { path = "../crates/rs1090" }
