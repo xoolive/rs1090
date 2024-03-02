@@ -23,38 +23,38 @@ use std::fmt;
 pub struct DataSelector {
     #[deku(reader = "check_empty_bds(deku::input_bits)")]
     #[serde(skip)]
-    /// Always true, fails the whole decoding on messages with a zero BDS payload
-    pub empty: bool,
+    /// Set to true if all zeros, then there is no need to parse
+    pub is_empty: bool,
 
-    #[deku(reader = "read_bds10(deku::input_bits)")]
+    #[deku(reader = "read_bds10(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds10: Option<DataLinkCapability>,
 
-    #[deku(reader = "read_bds17(deku::input_bits)")]
+    #[deku(reader = "read_bds17(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds17: Option<GICBCapabilityReport>,
 
-    #[deku(reader = "read_bds20(deku::input_bits)")]
+    #[deku(reader = "read_bds20(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds20: Option<AircraftIdentification>,
 
-    #[deku(reader = "read_bds30(deku::input_bits)")]
+    #[deku(reader = "read_bds30(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds30: Option<ACASResolutionAdvisory>,
 
-    #[deku(reader = "read_bds40(deku::input_bits)")]
+    #[deku(reader = "read_bds40(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds40: Option<SelectedVerticalIntention>,
 
-    #[deku(reader = "read_bds44(deku::input_bits)")]
+    #[deku(reader = "read_bds44(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds44: Option<MeteorologicalRoutineAirReport>,
 
-    #[deku(reader = "read_bds50(deku::input_bits)")]
+    #[deku(reader = "read_bds50(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds50: Option<TrackAndTurnReport>,
 
-    #[deku(reader = "read_bds60(deku::input_bits)")]
+    #[deku(reader = "read_bds60(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds60: Option<HeadingAndSpeedReport>,
 }
@@ -67,7 +67,11 @@ impl fmt::Display for DataSelector {
 
 fn read_bds10(
     input: &BitSlice<u8, Msb0>,
+    empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<DataLinkCapability>), DekuError> {
+    if empty {
+        return Err(DekuError::Parse("Empty BDS".to_string()));
+    }
     let (_, bytes, _) = input.domain().region().unwrap();
 
     if let Ok((_, bds10)) = DataLinkCapability::from_bytes((bytes, 0)) {
@@ -79,7 +83,11 @@ fn read_bds10(
 
 fn read_bds17(
     input: &BitSlice<u8, Msb0>,
+    empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<GICBCapabilityReport>), DekuError> {
+    if empty {
+        return Err(DekuError::Parse("Empty BDS".to_string()));
+    }
     let (_, bytes, _) = input.domain().region().unwrap();
 
     if let Ok((_, bds17)) = GICBCapabilityReport::from_bytes((bytes, 0)) {
@@ -91,7 +99,11 @@ fn read_bds17(
 
 fn read_bds20(
     input: &BitSlice<u8, Msb0>,
+    empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<AircraftIdentification>), DekuError> {
+    if empty {
+        return Err(DekuError::Parse("Empty BDS".to_string()));
+    }
     let (_, bytes, _) = input.domain().region().unwrap();
 
     if let Ok((_, bds20)) = AircraftIdentification::from_bytes((bytes, 0)) {
@@ -103,7 +115,11 @@ fn read_bds20(
 
 fn read_bds30(
     input: &BitSlice<u8, Msb0>,
+    empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<ACASResolutionAdvisory>), DekuError> {
+    if empty {
+        return Err(DekuError::Parse("Empty BDS".to_string()));
+    }
     let (_, bytes, _) = input.domain().region().unwrap();
 
     if let Ok((_, bds30)) = ACASResolutionAdvisory::from_bytes((bytes, 0)) {
@@ -115,8 +131,12 @@ fn read_bds30(
 
 fn read_bds40(
     input: &BitSlice<u8, Msb0>,
+    empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<SelectedVerticalIntention>), DekuError>
 {
+    if empty {
+        return Err(DekuError::Parse("Empty BDS".to_string()));
+    }
     let (_, bytes, _) = input.domain().region().unwrap();
     if let Ok((_, bds40)) = SelectedVerticalIntention::from_bytes((bytes, 0)) {
         Ok((input, Some(bds40)))
@@ -127,10 +147,14 @@ fn read_bds40(
 
 fn read_bds44(
     input: &BitSlice<u8, Msb0>,
+    empty: bool,
 ) -> Result<
     (&BitSlice<u8, Msb0>, Option<MeteorologicalRoutineAirReport>),
     DekuError,
 > {
+    if empty {
+        return Err(DekuError::Parse("Empty BDS".to_string()));
+    }
     let (_, bytes, _) = input.domain().region().unwrap();
     if let Ok((_, bds44)) =
         MeteorologicalRoutineAirReport::from_bytes((bytes, 0))
@@ -143,7 +167,11 @@ fn read_bds44(
 
 fn read_bds50(
     input: &BitSlice<u8, Msb0>,
+    empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<TrackAndTurnReport>), DekuError> {
+    if empty {
+        return Err(DekuError::Parse("Empty BDS".to_string()));
+    }
     let (_, bytes, _) = input.domain().region().unwrap();
     if let Ok((_, bds50)) = TrackAndTurnReport::from_bytes((bytes, 0)) {
         Ok((input, Some(bds50)))
@@ -154,7 +182,11 @@ fn read_bds50(
 
 fn read_bds60(
     input: &BitSlice<u8, Msb0>,
+    empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<HeadingAndSpeedReport>), DekuError> {
+    if empty {
+        return Err(DekuError::Parse("Empty BDS".to_string()));
+    }
     let (_, bytes, _) = input.domain().region().unwrap();
     if let Ok((_, bds60)) = HeadingAndSpeedReport::from_bytes((bytes, 0)) {
         Ok((input, Some(bds60)))
@@ -173,9 +205,9 @@ fn check_empty_bds(
             (deku::ctx::Endian::Big, deku::ctx::BitSize(8)),
         )?;
         if value != 0 {
-            return Ok((rest, true));
+            return Ok((rest, false));
         }
         inside_rest = for_rest;
     }
-    Err(DekuError::InvalidParam("Empty BDS".to_string()))
+    Ok((rest, true))
 }
