@@ -70,7 +70,7 @@ fn read_bds10(
     empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<DataLinkCapability>), DekuError> {
     if empty {
-        return Err(DekuError::Parse("Empty BDS".to_string()));
+        return Ok((input, None));
     }
     let (_, bytes, _) = input.domain().region().unwrap();
 
@@ -86,7 +86,7 @@ fn read_bds17(
     empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<GICBCapabilityReport>), DekuError> {
     if empty {
-        return Err(DekuError::Parse("Empty BDS".to_string()));
+        return Ok((input, None));
     }
     let (_, bytes, _) = input.domain().region().unwrap();
 
@@ -102,7 +102,7 @@ fn read_bds20(
     empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<AircraftIdentification>), DekuError> {
     if empty {
-        return Err(DekuError::Parse("Empty BDS".to_string()));
+        return Ok((input, None));
     }
     let (_, bytes, _) = input.domain().region().unwrap();
 
@@ -118,7 +118,7 @@ fn read_bds30(
     empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<ACASResolutionAdvisory>), DekuError> {
     if empty {
-        return Err(DekuError::Parse("Empty BDS".to_string()));
+        return Ok((input, None));
     }
     let (_, bytes, _) = input.domain().region().unwrap();
 
@@ -135,7 +135,7 @@ fn read_bds40(
 ) -> Result<(&BitSlice<u8, Msb0>, Option<SelectedVerticalIntention>), DekuError>
 {
     if empty {
-        return Err(DekuError::Parse("Empty BDS".to_string()));
+        return Ok((input, None));
     }
     let (_, bytes, _) = input.domain().region().unwrap();
     if let Ok((_, bds40)) = SelectedVerticalIntention::from_bytes((bytes, 0)) {
@@ -153,7 +153,7 @@ fn read_bds44(
     DekuError,
 > {
     if empty {
-        return Err(DekuError::Parse("Empty BDS".to_string()));
+        return Ok((input, None));
     }
     let (_, bytes, _) = input.domain().region().unwrap();
     if let Ok((_, bds44)) =
@@ -170,7 +170,7 @@ fn read_bds50(
     empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<TrackAndTurnReport>), DekuError> {
     if empty {
-        return Err(DekuError::Parse("Empty BDS".to_string()));
+        return Ok((input, None));
     }
     let (_, bytes, _) = input.domain().region().unwrap();
     if let Ok((_, bds50)) = TrackAndTurnReport::from_bytes((bytes, 0)) {
@@ -185,7 +185,7 @@ fn read_bds60(
     empty: bool,
 ) -> Result<(&BitSlice<u8, Msb0>, Option<HeadingAndSpeedReport>), DekuError> {
     if empty {
-        return Err(DekuError::Parse("Empty BDS".to_string()));
+        return Ok((input, None));
     }
     let (_, bytes, _) = input.domain().region().unwrap();
     if let Ok((_, bds60)) = HeadingAndSpeedReport::from_bytes((bytes, 0)) {
