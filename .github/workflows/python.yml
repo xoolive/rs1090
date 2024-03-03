@@ -23,11 +23,6 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python }}
-      - name: Run linter and formatter
-        working-directory: python
-        run: |
-            ruff
-            ruff format --check
       - name: Build the wrapper
         uses: PyO3/maturin-action@v1
         with:
@@ -35,6 +30,11 @@ jobs:
           command: develop
           args: -E dev
           sccache: 'true'
+      - name: Run linter and formatter
+        working-directory: python
+        run: |
+            ruff
+            ruff format --check
       - name: Run tests
         working-directory: python
         run: |
