@@ -18,9 +18,9 @@ See `--help` for more information.
 
   ```sh
   > decode1090 --host radarcape --port 10005
-  {"timestamp":1708901277.8567717,"frame":"8d4d224260595215b81666e59d7a","DF":"ADSB","icao24":"4d2242","BDS":"0,5","NUCp":6,"NICb":0,"altitude":16725,"source":"barometric","odd_flag":"even","lat_cpr":68316,"lon_cpr":5734}
-  {"timestamp":1708901277.858925,"frame":"2000179f86b805","DF":"DF4","altitude":36975,"icao24":"86b805"}
-  {"timestamp":1708901277.8650618,"frame":"8f400f02990c5c32f80c94b9ad6f","DF":"ADSB","icao24":"400f02","BDS":"0,9","NACv":1,"groundspeed":416.07,"track":347.37,"vrate_src":"GNSS","vertical_rate":-128,"geo_minus_baro":-475}
+  {"timestamp":1708901277.8567717,"frame":"8d4d224260595215b81666e59d7a","df":"17","icao24":"4d2242","bds":"05","NUCp":6,"NICb":0,"altitude":16725,"source":"barometric","odd_flag":"even","lat_cpr":68316,"lon_cpr":5734}
+  {"timestamp":1708901277.858925,"frame":"2000179f86b805","df":"4","altitude":36975,"icao24":"86b805"}
+  {"timestamp":1708901277.8650618,"frame":"8f400f02990c5c32f80c94b9ad6f","df":"17","icao24":"400f02","bds":"09","NACv":1,"groundspeed":416.07,"track":347.37,"vrate_src":"GNSS","vertical_rate":-128,"geo_minus_baro":-475}
   (...)
   ```
 
@@ -30,14 +30,14 @@ See `--help` for more information.
   ```sh
   > decode1090 5d3c66e6c6ad01 8d3c66e699086a919838884331c7 | jq .
   {
-    "DF": "DF11",
+    "df": "11",
     "capability": "airborne",
     "icao24": "3c66e6"
   }
   {
-    "DF": "ADSB",
+    "df": "ADSB",
     "icao24": "3c66e6",
-    "BDS": "0,9",
+    "bds": "09",
     "NACv": 1,
     "groundspeed": 174.2,
     "track": 142.93,

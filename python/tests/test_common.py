@@ -2,13 +2,13 @@ from rs1090 import decode
 
 
 def test_crc() -> None:
-    assert decode("8D406B902015A678D4D220AA4BDA")["DF"] == "ADSB"
-    assert decode("8d8960ed58bf053cf11bc5932b7d")["DF"] == "ADSB"
-    assert decode("8d45cab390c39509496ca9a32912")["DF"] == "ADSB"
-    assert decode("8d49d3d4e1089d00000000744c3b")["DF"] == "ADSB"
-    assert decode("8d74802958c904e6ef4ba0184d5c")["DF"] == "ADSB"
-    assert decode("8d4400cd9b0000b4f87000e71a10")["DF"] == "ADSB"
-    assert decode("8d4065de58a1054a7ef0218e226a")["DF"] == "ADSB"
+    assert decode("8D406B902015A678D4D220AA4BDA")["df"] == "17"
+    assert decode("8d8960ed58bf053cf11bc5932b7d")["df"] == "17"
+    assert decode("8d45cab390c39509496ca9a32912")["df"] == "17"
+    assert decode("8d49d3d4e1089d00000000744c3b")["df"] == "17"
+    assert decode("8d74802958c904e6ef4ba0184d5c")["df"] == "17"
+    assert decode("8d4400cd9b0000b4f87000e71a10")["df"] == "17"
+    assert decode("8d4065de58a1054a7ef0218e226a")["df"] == "17"
 
 
 def test_fail_crc() -> None:

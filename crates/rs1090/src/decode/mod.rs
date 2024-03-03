@@ -35,11 +35,11 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "5", ctx = "crc: u32")]
-#[serde(tag = "DF")]
+#[serde(tag = "df")]
 pub enum DF {
     /// DF=0: Short Air-Air Surveillance (3.1.2.8.2)
     #[deku(id = "0")]
-    #[serde(rename = "DF0")]
+    #[serde(rename = "0")]
     ShortAirAirSurveillance {
         /// Vertical status
         #[deku(bits = "1")]
@@ -80,7 +80,7 @@ pub enum DF {
 
     /// DF=4: Surveillance Altitude Reply (3.1.2.6.5)
     #[deku(id = "4")]
-    #[serde(rename = "DF4")]
+    #[serde(rename = "4")]
     SurveillanceAltitudeReply {
         /// Flight Status
         #[serde(skip)]
@@ -102,7 +102,7 @@ pub enum DF {
 
     /// DF=5: Surveillance Identity Reply (3.1.2.6.7)
     #[deku(id = "5")]
-    #[serde(rename = "DF5")]
+    #[serde(rename = "5")]
     SurveillanceIdentityReply {
         /// Flight Status
         fs: FlightStatus,
@@ -123,7 +123,7 @@ pub enum DF {
 
     /// DF=11: (Mode S) All-call reply, Downlink format 11 (2.1.2.5.2.2)
     #[deku(id = "11")]
-    #[serde(rename = "DF11")]
+    #[serde(rename = "11")]
     AllCallReply {
         /// Capability
         capability: Capability,
@@ -136,7 +136,7 @@ pub enum DF {
     },
 
     #[deku(id = "16")]
-    #[serde(rename = "DF16")]
+    #[serde(rename = "16")]
     /// Long Air-Air Surveillance, Downlink Format 16 (3.1.2.8.3)
     LongAirAirSurveillance {
         #[deku(bits = "1")]
@@ -176,7 +176,7 @@ pub enum DF {
     },
 
     #[deku(id = "17")]
-    #[serde(rename = "ADSB")]
+    #[serde(rename = "17")]
     /// Extended Squitter ADS-B, Downlink Format 17 (3.1.2.8.6)
     ExtendedSquitterADSB(ADSB),
 
@@ -204,7 +204,7 @@ pub enum DF {
 
     /// Comm-B Altitude Reply, Downlink Format 20 (3.1.2.6.6)
     #[deku(id = "20")]
-    #[serde(rename = "DF20")]
+    #[serde(rename = "20")]
     CommBAltitudeReply {
         /// Flight Status
         #[serde(skip)]
@@ -229,7 +229,7 @@ pub enum DF {
 
     /// Comm-B Identity Reply, Downlink Format 21 (3.1.2.6.8)
     #[deku(id = "21")]
-    #[serde(rename = "DF21")]
+    #[serde(rename = "21")]
     CommBIdentityReply {
         /// Flight Status
         #[serde(skip)]

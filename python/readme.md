@@ -20,5 +20,5 @@ pip install rs1090
 ```pycon
 >>> import rs1090
 >>> rs1090.decode("8c4841753a9a153237aef0f275be")
-{'DF': 'ADSB', 'icao24': '484175', 'BDS': '0,6', 'NUCp': 7, 'groundspeed': 17.0, 'track': 92.8125, 'parity': 'odd', 'lat_cpr': 39195, 'lon_cpr': 110320}
+{'df': '17', 'icao24': '484175', 'bds': '06', 'NUCp': 7, 'groundspeed': 17.0, 'track': 92.8125, 'parity': 'odd', 'lat_cpr': 39195, 'lon_cpr': 110320}
 ```

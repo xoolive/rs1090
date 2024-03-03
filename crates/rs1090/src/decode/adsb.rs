@@ -67,26 +67,26 @@ impl fmt::Display for ADSB {
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "5")]
 //#[serde(untagged)]
-#[serde(tag = "BDS")]
+#[serde(tag = "bds")]
 pub enum ME {
     #[deku(id = "0")]
     #[serde(skip)]
     NoPosition([u8; 6]),
 
     #[deku(id_pat = "1..=4")]
-    #[serde(rename = "0,8")]
+    #[serde(rename = "08")]
     BDS08(bds08::AircraftIdentification),
 
     #[deku(id_pat = "5..=8")]
-    #[serde(rename = "0,6")]
+    #[serde(rename = "06")]
     BDS06(bds06::SurfacePosition),
 
     #[deku(id_pat = "9..=18 | 20..=22")]
-    #[serde(rename = "0,5")]
+    #[serde(rename = "05")]
     BDS05(bds05::AirbornePosition),
 
     #[deku(id = "19")]
-    #[serde(rename = "0,9")]
+    #[serde(rename = "09")]
     BDS09(bds09::AirborneVelocity),
 
     #[deku(id = "23")]
@@ -102,11 +102,11 @@ pub enum ME {
     Reserved1([u8; 6]),
 
     #[deku(id = "28")]
-    #[serde(rename = "6,1")]
+    #[serde(rename = "61")]
     BDS61(bds61::AircraftStatus),
 
     #[deku(id = "29")]
-    #[serde(rename = "6,2")]
+    #[serde(rename = "62")]
     BDS62(bds62::TargetStateAndStatusInformation),
 
     #[deku(id = "30")]
@@ -114,7 +114,7 @@ pub enum ME {
     AircraftOperationalCoordination([u8; 6]),
 
     #[deku(id = "31")]
-    #[serde(rename = "6,5")]
+    #[serde(rename = "65")]
     BDS65(bds65::AircraftOperationStatus),
 }
 
