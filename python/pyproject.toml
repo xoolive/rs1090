@@ -4,8 +4,6 @@ build-backend = "maturin"
 
 [project]
 name = "rs1090"
-description = "Python binding to rs1090 library to decode Mode S and ADS-B messages"
-readme = "readme.md"
 requires-python = ">=3.8"
 dependencies = ["msgpack>=1.0.8"]
 classifiers = [

@@ -1,5 +1,9 @@
 [package]
 name = "rs1090-python"
+description = "Python binding to rs1090, a library to decode Mode S and ADS-B signals"
+repository = "https://github.com/xoolive/rs1090"
+keywords = ["aircraft", "ADS-B", "Mode-S", "decoding"]
+readme = "readme.md"
 authors.workspace = true
 version.workspace = true
 license.workspace = true
@@ -14,4 +18,4 @@ crate-type = ["cdylib"]
 hex = "0.4.3"
 pyo3 = "0.19.0"
 rmp-serde = "1.1.2"
-rs1090 = { path = "../crates/rs1090" }
+rs1090 = { version= "0.1.1", path = "../crates/rs1090" }
