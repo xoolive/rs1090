@@ -15,7 +15,7 @@ The direction ambitioned by rs1090 boil down to:
 
 If you just want to decode ADS-B messages from your Raspberry and visualize the data on a map, you may want to stick to one of the dump0190 implementations.
 
-The rs1090 library comes with a companion application [decode1090](https://crates.io/crates/decode1090).
+The rs1090 library comes with a companion application [decode1090](https://crates.io/crates/decode1090) and a Python binding [rs1090](https://pypi.org/project/rs1090).
 
 ## Installation
 
@@ -31,7 +31,15 @@ Or add the following line to your `Cargo.toml`:
 rs1090 = "0.2.0"  # check for the latest version
 ```
 
+For the Python binding:
+
+```sh
+pip install rs1090
+```
+
 ## Usage
+
+In Rust:
 
 ```rust
 use hexlit::hex;
@@ -46,4 +54,12 @@ fn main() {
         println!("{}", json);
     }
 }
+```
+
+In Python:
+
+```pycon
+>>> import rs1090
+>>> rs1090.decode("8c4841753a9a153237aef0f275be")
+{'DF': 'ADSB', 'icao24': '484175', 'BDS': '0,6', 'NUCp': 7, 'groundspeed': 17.0, 'track': 92.8125, 'parity': 'odd', 'lat_cpr': 39195, 'lon_cpr': 110320}
 ```

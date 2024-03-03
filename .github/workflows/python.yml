@@ -1,0 +1,41 @@
+name: Python 
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run linter and formatter
+        working-directory: python
+        run: |
+            ruff
+            ruff format --check
+      - name: Build the wrapper
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          command: develop
+          args: -E dev
+          sccache: 'true'
+      - name: Run tests
+        working-directory: python
+        run: |
+            pytest

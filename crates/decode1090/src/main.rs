@@ -102,10 +102,7 @@ async fn main() {
             if options.debug {
                 println!("{}", msg);
             } else {
-                println!(
-                    "{}",
-                    serde_json::to_string(&msg).expect("Failed to serialize")
-                );
+                println!("{}", serde_json::to_string(&msg).unwrap());
             }
         }
         return;
@@ -122,11 +119,7 @@ async fn main() {
                     if options.debug {
                         println!("{}", msg);
                     } else {
-                        println!(
-                            "{}",
-                            serde_json::to_string(&msg)
-                                .expect("Failed to serialize")
-                        );
+                        println!("{}", serde_json::to_string(&msg).unwrap());
                     }
                 }
             }

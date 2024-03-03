@@ -1,4 +1,3 @@
-use super::op_f64_threedecimals;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
@@ -9,12 +8,12 @@ use serde::Serialize;
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct TrackAndTurnReport {
     #[deku(reader = "read_roll(deku::rest)")] // 11 bits
-    #[serde(rename = "roll", serialize_with = "op_f64_threedecimals")]
+    #[serde(rename = "roll")]
     // Roll angle (negative sign means left wing down)
     pub roll_angle: Option<f64>,
 
     #[deku(reader = "read_track(deku::rest)")] // 12 bits
-    #[serde(rename = "track", serialize_with = "op_f64_threedecimals")]
+    #[serde(rename = "track")]
     pub track_angle: Option<f64>,
 
     #[deku(reader = "read_groundspeed(deku::rest)")] // 11 bits
@@ -22,7 +21,6 @@ pub struct TrackAndTurnReport {
     pub groundspeed: Option<u16>,
 
     #[deku(reader = "read_rate(deku::rest, *roll_angle)")] // 11 bits
-    #[serde(serialize_with = "op_f64_threedecimals")]
     pub track_rate: Option<f64>,
 
     #[deku(reader = "read_tas(deku::rest, *groundspeed)")] // 11 bits

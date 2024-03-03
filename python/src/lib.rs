@@ -4,9 +4,12 @@ use rs1090::prelude::*;
 #[pyfunction]
 fn decode(msg: String) -> PyResult<Vec<u8>> {
     let bytes = hex::decode(msg).unwrap();
-    let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-    let mbp = rmp_serde::to_vec_named(&msg).unwrap();
-    Ok(mbp)
+    if let Ok((_, msg)) = Message::from_bytes((&bytes, 0)) {
+        let mbp = rmp_serde::to_vec_named(&msg).unwrap();
+        Ok(mbp)
+    } else {
+        Ok([0xc0].to_vec())
+    }
 }
 
 /// A Python module implemented in Rust.

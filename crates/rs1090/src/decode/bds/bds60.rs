@@ -1,4 +1,3 @@
-use super::op_f64_threedecimals;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
@@ -20,11 +19,7 @@ use serde::Serialize;
 pub struct HeadingAndSpeedReport {
     #[deku(reader = "read_heading(deku::rest)")] // 12 bits
     /// The magnetic heading is the aircraft's heading with respect to the magnetic North
-    #[serde(
-        rename = "heading",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "op_f64_threedecimals"
-    )]
+    #[serde(rename = "heading", skip_serializing_if = "Option::is_none")]
     pub magnetic_heading: Option<f64>,
 
     #[deku(reader = "read_ias(deku::rest)")] // 11 bits
@@ -33,11 +28,7 @@ pub struct HeadingAndSpeedReport {
     pub indicated_airspeed: Option<u16>,
 
     #[deku(reader = "read_mach(deku::rest, *indicated_airspeed)")] // 11 bits
-    #[serde(
-        rename = "Mach",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "op_f64_threedecimals"
-    )]
+    #[serde(rename = "Mach", skip_serializing_if = "Option::is_none")]
     /// Mach number
     pub mach_number: Option<f64>,
 

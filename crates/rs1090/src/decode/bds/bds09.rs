@@ -1,6 +1,5 @@
 #![allow(clippy::suspicious_else_formatting)]
 
-use super::f64_twodecimals;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
@@ -186,7 +185,6 @@ pub struct GroundSpeedDecoding {
             Ok(libm::hypot(f64::abs(*ew_vel), f64::abs(*ns_vel)))
         }"
     )]
-    #[serde(serialize_with = "f64_twodecimals")]
     pub groundspeed: f64,
     #[deku(
         bits = "0",
@@ -195,7 +193,6 @@ pub struct GroundSpeedDecoding {
             if h < 0.0 { Ok( h + 360. ) } else { Ok(h) }
         }"
     )]
-    #[serde(serialize_with = "f64_twodecimals")]
     pub track: f64,
 }
 
