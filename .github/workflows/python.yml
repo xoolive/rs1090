@@ -17,12 +17,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python }}
+      - name: Create a virtualenv
+        working-directory: python
+        run: |
+            python -m venv .venv
       - name: Build the wrapper
         uses: PyO3/maturin-action@v1
         with:
@@ -33,9 +37,11 @@ jobs:
       - name: Run linter and formatter
         working-directory: python
         run: |
-            ruff
+            source .venv/bin/activate
+            ruff check
             ruff format --check
       - name: Run tests
         working-directory: python
         run: |
+            source .venv/bin/activate
             pytest

@@ -1,3 +1,5 @@
+#![allow(rustdoc::missing_crate_level_docs)]
+
 use pyo3::prelude::*;
 use rs1090::prelude::*;
 
