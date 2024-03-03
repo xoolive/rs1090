@@ -6,7 +6,7 @@ resolver = "2"
 license = "MIT"
 edition = "2021"
 readme = "readme.md"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Xavier Olive <git@xoolive.org>"]
 
 # Config for 'cargo dist'

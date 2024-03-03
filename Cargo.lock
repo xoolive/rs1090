@@ -370,7 +370,7 @@ dependencies = [
 
 [[package]]
 name = "decode1090"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "deku",
@@ -985,7 +985,7 @@ dependencies = [
 
 [[package]]
 name = "rs1090"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "approx",
  "async-stream",
@@ -1003,7 +1003,7 @@ dependencies = [
 
 [[package]]
 name = "rs1090-python"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "hex",
  "pyo3",
