@@ -7,10 +7,8 @@ name: Python wheels
 
 on:
   push:
-    branches:
-      - master
     tags:
-      - '*'
+      - 'rs1090-python-*'
   pull_request:
   workflow_dispatch:
 
