@@ -27,35 +27,35 @@ pub struct DataSelector {
     pub is_empty: bool,
 
     #[deku(reader = "read_bds10(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds10: Option<DataLinkCapability>,
 
     #[deku(reader = "read_bds17(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds17: Option<GICBCapabilityReport>,
 
     #[deku(reader = "read_bds20(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds20: Option<AircraftIdentification>,
 
     #[deku(reader = "read_bds30(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds30: Option<ACASResolutionAdvisory>,
 
     #[deku(reader = "read_bds40(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds40: Option<SelectedVerticalIntention>,
 
     #[deku(reader = "read_bds44(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds44: Option<MeteorologicalRoutineAirReport>,
 
     #[deku(reader = "read_bds50(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds50: Option<TrackAndTurnReport>,
 
     #[deku(reader = "read_bds60(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds60: Option<HeadingAndSpeedReport>,
 }
 

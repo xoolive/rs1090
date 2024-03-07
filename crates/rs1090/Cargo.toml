@@ -37,8 +37,8 @@ test = false
 
 [[example]]
 name = "decode_file"
-path = "examples/file.rs"
+path = "examples/flight.rs"
 test = false
 
-[[example]]
-name = "tcas_incidents"
+# [[example]]
+# name = "tcas_incidents"

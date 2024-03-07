@@ -2,10 +2,8 @@
 
 use pyo3::prelude::*;
 use rayon::prelude::*;
-use rs1090::{
-    decode::cpr::{decode_positions, Position},
-    prelude::*,
-};
+use rs1090::decode::cpr::{decode_positions, Position};
+use rs1090::prelude::*;
 
 #[pyfunction]
 fn decode_one(msg: String) -> PyResult<Vec<u8>> {
@@ -22,7 +20,7 @@ fn decode_one(msg: String) -> PyResult<Vec<u8>> {
 fn decode_vec_time(
     msgs: Vec<String>,
     ts: Vec<f64>,
-    position: Option<[f64; 2]>,
+    reference: Option<[f64; 2]>,
 ) -> PyResult<Vec<u8>> {
     let mut res = Vec::<TimedMessage>::with_capacity(msgs.len());
     for (msg, timestamp) in msgs.iter().zip(ts) {
@@ -34,7 +32,7 @@ fn decode_vec_time(
             });
         }
     }
-    if let Some(position) = position {
+    if let Some(position) = reference {
         decode_positions(
             &mut res,
             Some(Position {
@@ -86,7 +84,7 @@ fn decode_parallel(msgs_set: Vec<Vec<String>>) -> PyResult<Vec<u8>> {
 fn decode_parallel_time(
     msgs_set: Vec<Vec<String>>,
     ts_set: Vec<Vec<f64>>,
-    position: Option<[f64; 2]>,
+    reference: Option<[f64; 2]>,
 ) -> PyResult<Vec<u8>> {
     let mut res: Vec<TimedMessage> = msgs_set
         .par_iter()
@@ -110,7 +108,7 @@ fn decode_parallel_time(
         .flat_map(|v: Vec<TimedMessage>| v)
         .collect();
 
-    if let Some(position) = position {
+    if let Some(position) = reference {
         decode_positions(
             &mut res,
             Some(Position {

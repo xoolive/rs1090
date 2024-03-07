@@ -77,7 +77,7 @@ pub struct Unused {
 #[serde(tag = "bds")]
 pub enum ME {
     #[deku(id = "0")]
-    #[serde(rename = "no")]
+    #[serde(rename = "?")]
     NoPosition(Unused),
 
     #[deku(id_pat = "1..=4")]
@@ -97,15 +97,15 @@ pub enum ME {
     BDS09(bds09::AirborneVelocity),
 
     #[deku(id = "23")]
-    #[serde(rename = "no")]
+    #[serde(rename = "?")]
     Reserved0(Unused),
 
     #[deku(id_pat = "24")]
-    #[serde(rename = "no")]
+    #[serde(rename = "?")]
     SurfaceSystemStatus(Unused),
 
     #[deku(id_pat = "25..=27")]
-    #[serde(rename = "no")]
+    #[serde(rename = "?")]
     Reserved1(Unused),
 
     #[deku(id = "28")]
@@ -117,8 +117,8 @@ pub enum ME {
     BDS62(bds62::TargetStateAndStatusInformation),
 
     #[deku(id = "30")]
-    #[serde(rename = "no")]
-    AircraftOperationalCoordination { unused: [u8; 6] },
+    #[serde(rename = "?")]
+    AircraftOperationalCoordination(Unused),
 
     #[deku(id = "31")]
     #[serde(rename = "65")]

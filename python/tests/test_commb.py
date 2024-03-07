@@ -1,10 +1,13 @@
 from pytest import approx
+
 from rs1090 import decode
 
 
 def test_bds20() -> None:
-    assert decode("A000083E202CC371C31DE0AA1CCF")["bds20"]["callsign"] == "KLM1017"
-    assert decode("A0001993202422F2E37CE038738E")["bds20"]["callsign"] == "IBK2873"
+    bds20 = decode("A000083E202CC371C31DE0AA1CCF")["bds20"]
+    assert bds20["callsign"] == "KLM1017"
+    bds20 = decode("A0001993202422F2E37CE038738E")["bds20"]
+    assert bds20["callsign"] == "IBK2873"
 
 
 def test_bds40() -> None:

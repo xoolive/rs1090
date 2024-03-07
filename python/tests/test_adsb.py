@@ -1,4 +1,5 @@
 from pytest import approx
+
 from rs1090 import decode
 
 
