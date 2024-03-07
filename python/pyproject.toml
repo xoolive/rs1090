@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "rs1090"
-requires-python = ">=3.8"
-dependencies = ["msgpack>=1.0.8"]
+requires-python = ">=3.9"
+dependencies = []
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -42,12 +42,8 @@ dev = [
   "mypy>=1.8.0",
   "pytest>=8.0.2",
   "ruff>=0.3.0", 
+  "pandas>=2.2.0"
 ]
 
 [project.urls]
 repository = "https://github.com/xoolive/rs1090"
-
-[dev-dependencies]
-mypy = ">=1.8.0"
-pytest = ">=8.0.2"
-ruff = ">=0.3.0"
