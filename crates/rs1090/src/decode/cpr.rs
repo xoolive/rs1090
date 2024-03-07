@@ -1,7 +1,11 @@
-use super::bds::{bds05::AirbornePosition, bds06::SurfacePosition};
+use super::{
+    adsb::ME,
+    bds::{bds05::AirbornePosition, bds06::SurfacePosition},
+    TimedMessage, DF, ICAO,
+};
 use deku::prelude::*;
 use serde::Serialize;
-use std::fmt;
+use std::{collections::BTreeMap, fmt};
 
 /**
 * The position information is encoded in a Compact Position Reporting (CPR)
@@ -45,6 +49,13 @@ impl fmt::Display for CPRFormat {
 pub struct Position {
     pub latitude: f64,
     pub longitude: f64,
+}
+
+#[derive(Default)]
+struct AircraftState {
+    timestamp: f64,
+    pos: Option<Position>,
+    msg: Option<AirbornePosition>,
 }
 
 /// NZ represents the number of latitude zones between the equator and a pole.
@@ -296,6 +307,84 @@ pub fn surface_position_with_reference(
         latitude: lat,
         longitude: lon,
     }
+}
+
+pub fn decode_positions(res: &mut [TimedMessage], reference: Option<Position>) {
+    let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
+
+    let _: Vec<()> = res
+        .iter_mut()
+        .map(|msg| {
+            if let DF::ExtendedSquitterADSB(adsb) = &mut msg.message.df {
+                let icao24 = adsb.icao24;
+                let latest = aircraft.entry(icao24).or_insert(AircraftState {
+                    timestamp: msg.timestamp,
+                    pos: None,
+                    msg: None,
+                });
+
+                match &mut adsb.message {
+                    ME::BDS05(airborne) => {
+                        match (latest.timestamp, latest.msg, latest.pos) {
+                            (t, Some(oldest), _) if msg.timestamp - t < 10. => {
+                                let pos: Option<Position> = if let Some(pos) =
+                                    airborne_position(&oldest, airborne)
+                                {
+                                    Some(pos)
+                                } else {
+                                    latest.pos.map(|latest_pos| {
+                                        airborne_position_with_reference(
+                                            &oldest,
+                                            latest_pos.latitude,
+                                            latest_pos.longitude,
+                                        )
+                                    })
+                                };
+
+                                if let Some(pos) = pos {
+                                    airborne.latitude = Some(pos.latitude);
+                                    airborne.longitude = Some(pos.longitude);
+                                }
+                                latest.pos = pos;
+                                latest.msg = Some(*airborne);
+                                latest.timestamp = msg.timestamp;
+                            }
+                            _ => {
+                                latest.msg = Some(*airborne);
+                                latest.timestamp = msg.timestamp;
+                            }
+                        }
+                    }
+                    ME::BDS06(surface) => {
+                        let pos = match (latest.pos, reference) {
+                            (Some(pos), _) => {
+                                Some(surface_position_with_reference(
+                                    surface,
+                                    pos.latitude,
+                                    pos.longitude,
+                                ))
+                            }
+                            (_, Some(reference)) => {
+                                Some(surface_position_with_reference(
+                                    surface,
+                                    reference.latitude,
+                                    reference.longitude,
+                                ))
+                            }
+                            _ => None,
+                        };
+                        if let Some(pos) = pos {
+                            surface.latitude = Some(pos.latitude);
+                            surface.longitude = Some(pos.longitude);
+                            latest.pos = Some(pos);
+                            latest.timestamp = msg.timestamp;
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        })
+        .collect();
 }
 
 #[cfg(test)]

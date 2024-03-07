@@ -16,6 +16,7 @@ pub mod prelude {
     pub use crate::decode::bds::bds65::AircraftOperationStatus;
     /// The root structure to decode messages
     pub use crate::decode::Message;
+    pub use crate::decode::TimedMessage;
     pub use crate::decode::DF::*;
 
     /// This re-export is necessary for the following export

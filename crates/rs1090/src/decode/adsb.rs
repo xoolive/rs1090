@@ -65,13 +65,20 @@ impl fmt::Display for ADSB {
 */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+pub struct Unused {
+    #[deku(bits = 48)]
+    #[serde(skip)]
+    unused: u64, //[u8; 6],
+}
+
+#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "5")]
 //#[serde(untagged)]
 #[serde(tag = "bds")]
 pub enum ME {
     #[deku(id = "0")]
-    #[serde(skip)]
-    NoPosition([u8; 6]),
+    #[serde(rename = "no")]
+    NoPosition(Unused),
 
     #[deku(id_pat = "1..=4")]
     #[serde(rename = "08")]
@@ -90,16 +97,16 @@ pub enum ME {
     BDS09(bds09::AirborneVelocity),
 
     #[deku(id = "23")]
-    #[serde(skip)]
-    Reserved0([u8; 6]),
+    #[serde(rename = "no")]
+    Reserved0(Unused),
 
     #[deku(id_pat = "24")]
-    #[serde(skip)]
-    SurfaceSystemStatus([u8; 6]),
+    #[serde(rename = "no")]
+    SurfaceSystemStatus(Unused),
 
     #[deku(id_pat = "25..=27")]
-    #[serde(skip)]
-    Reserved1([u8; 6]),
+    #[serde(rename = "no")]
+    Reserved1(Unused),
 
     #[deku(id = "28")]
     #[serde(rename = "61")]
@@ -110,8 +117,8 @@ pub enum ME {
     BDS62(bds62::TargetStateAndStatusInformation),
 
     #[deku(id = "30")]
-    #[serde(skip)]
-    AircraftOperationalCoordination([u8; 6]),
+    #[serde(rename = "no")]
+    AircraftOperationalCoordination { unused: [u8; 6] },
 
     #[deku(id = "31")]
     #[serde(rename = "65")]
@@ -121,11 +128,11 @@ pub enum ME {
 impl fmt::Display for ME {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ME::NoPosition(_)
-            | ME::Reserved0(_)
-            | ME::Reserved1(_)
-            | ME::SurfaceSystemStatus(_)
-            | ME::AircraftOperationalCoordination(_) => Ok(()),
+            ME::NoPosition { .. }
+            | ME::Reserved0 { .. }
+            | ME::Reserved1 { .. }
+            | ME::SurfaceSystemStatus { .. }
+            | ME::AircraftOperationalCoordination { .. } => Ok(()),
             ME::BDS05(me) => {
                 write!(f, "{}", me)
             }

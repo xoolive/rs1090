@@ -145,8 +145,11 @@ pub struct ACASResolutionAdvisory {
 #[serde(untagged)]
 pub enum ThreatType {
     #[deku(id = "0")]
-    #[serde(skip)]
-    NoIdentity(#[deku(bits = "26")] u32),
+    NoIdentity {
+        #[deku(bits = "26")]
+        #[serde(skip)]
+        unused: u32,
+    },
 
     #[deku(id = "1")]
     ThreatAddress(ThreadAddress),
@@ -155,8 +158,11 @@ pub enum ThreatType {
     ThreatOrientation(ThreatOrientation),
 
     #[deku(id = "3")]
-    #[serde(skip)]
-    NotAssigned(#[deku(bits = "26")] u32),
+    NotAssigned {
+        #[deku(bits = "26")]
+        #[serde(skip)]
+        unused: u32,
+    },
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]

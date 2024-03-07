@@ -3,6 +3,7 @@ pub mod bds;
 pub mod commb;
 pub mod cpr;
 pub mod crc;
+pub mod flarm;
 
 use adsb::{ADSB, ME};
 use commb::DataSelector;
@@ -105,6 +106,7 @@ pub enum DF {
     #[serde(rename = "5")]
     SurveillanceIdentityReply {
         /// Flight Status
+        #[serde(skip)]
         fs: FlightStatus,
         /// Downlink Request
         #[serde(skip)]
@@ -185,17 +187,18 @@ pub enum DF {
     /// Non-Transponder-based ADS-B Transmitting Subsystems and TIS-B Transmitting equipment.
     /// Equipment that cannot be interrogated.
     #[deku(id = "18")]
-    #[serde(skip)]
+    #[serde(rename = "18")]
     ExtendedSquitterTisB {
         /// Enum containing message
+        #[serde(flatten)]
         cf: ControlField,
         /// Parity/interrogator identifier
+        #[serde(skip)]
         pi: ICAO,
     },
 
     /// DF=19: Extended Squitter Military Application, Downlink Format 19 (3.1.2.8.8)
     #[deku(id = "19")]
-    #[serde(skip)]
     ExtendedSquitterMilitary {
         /// Reserved
         #[deku(bits = "3")]
@@ -395,6 +398,14 @@ impl fmt::Display for Message {
         }
         Ok(())
     }
+}
+
+#[derive(serde::Serialize)]
+pub struct TimedMessage {
+    pub timestamp: f64,
+
+    #[serde(flatten)]
+    pub message: Message,
 }
 
 /// ICAO 24-bit address, commonly use to reference airframes, i.e. tail numbers
@@ -664,10 +675,13 @@ pub enum UtilityMessageType {
 /// The control field in TIS-B messages (DF=18)
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
 pub struct ControlField {
-    t: ControlFieldType,
+    #[serde(rename = "tisb")]
+    pub field_type: ControlFieldType,
     /// AA: Address, Announced
+    #[serde(rename = "icao24")]
     pub aa: ICAO,
     /// ME: message, extended squitter
+    #[serde(flatten)]
     pub me: ME,
 }
 
