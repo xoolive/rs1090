@@ -5,7 +5,7 @@ use super::{
 };
 use deku::prelude::*;
 use serde::Serialize;
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, str::FromStr};
 
 /**
 * The position information is encoded in a Compact Position Reporting (CPR)
@@ -51,8 +51,32 @@ pub struct Position {
     pub longitude: f64,
 }
 
+impl FromStr for Position {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split(',').map(|p| p.trim()).collect();
+
+        if parts.len() != 2 {
+            return Err("Invalid number of coordinates".to_string());
+        }
+
+        let latitude: f64 = parts[0]
+            .parse()
+            .map_err(|e| format!("Latitude parse error: {}", e))?;
+        let longitude: f64 = parts[1]
+            .parse()
+            .map_err(|e| format!("Longitude parse error: {}", e))?;
+
+        Ok(Position {
+            latitude,
+            longitude,
+        })
+    }
+}
+
 #[derive(Default)]
-struct AircraftState {
+pub struct AircraftState {
     timestamp: f64,
     pos: Option<Position>,
     msg: Option<AirbornePosition>,
@@ -145,6 +169,16 @@ fn nl(lat: f64) -> u64 {
 const D_LAT_EVEN: f64 = 360.0 / (4.0 * NZ);
 const D_LAT_ODD: f64 = 360.0 / (4.0 * NZ - 1.0);
 
+// Main difference for % between Python and Rust is that in Rust, the sign
+// of the result matches the sign of the dividend.
+fn modulo(a: f64, b: f64) -> f64 {
+    if a >= 0. {
+        a % b
+    } else {
+        a % b + libm::fabs(b)
+    }
+}
+
 /**
  * Decode airborne position from a pair of even and odd position message.
  */
@@ -184,8 +218,8 @@ pub fn airborne_position(
 
     let j = libm::floor(59.0 * cpr_lat_even - 60.0 * cpr_lat_odd + 0.5);
 
-    let mut lat_even = D_LAT_EVEN * (j % 60.0 + cpr_lat_even);
-    let mut lat_odd = D_LAT_ODD * (j % 59.0 + cpr_lat_odd);
+    let mut lat_even = D_LAT_EVEN * (modulo(j, 60.) + cpr_lat_even);
+    let mut lat_odd = D_LAT_ODD * (modulo(j, 59.) + cpr_lat_odd);
 
     if lat_even >= 270.0 {
         lat_even -= 360.0;
@@ -213,8 +247,7 @@ pub fn airborne_position(
             + 0.5,
     );
 
-    let r = m % ni;
-    let r = if r < 0.0 { r + libm::fabs(ni) } else { r };
+    let r = modulo(m, ni);
 
     let mut lon = (360.0 / ni) * (r + c);
     if lon >= 180.0 {
@@ -249,7 +282,7 @@ pub fn airborne_position_with_reference(
     };
 
     let j = libm::floor(latitude_ref / d_lat)
-        + libm::floor(0.5 + (latitude_ref % d_lat) / d_lat - cpr_lat);
+        + libm::floor(0.5 + modulo(latitude_ref, d_lat) / d_lat - cpr_lat);
 
     let lat = d_lat * (j + cpr_lat);
     let ni = if msg.parity == CPRFormat::Even {
@@ -259,7 +292,7 @@ pub fn airborne_position_with_reference(
     };
     let d_lon = if ni > 0 { 360. / ni as f64 } else { 360. };
     let m = libm::floor(longitude_ref / d_lon)
-        + libm::floor(0.5 + (longitude_ref % d_lon) / d_lon - cpr_lon);
+        + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);
     let lon = d_lon * (m + cpr_lon);
 
     Position {
@@ -290,7 +323,7 @@ pub fn surface_position_with_reference(
     };
 
     let j = libm::floor(latitude_ref / d_lat)
-        + libm::floor(0.5 + (latitude_ref % d_lat) / d_lat - cpr_lat);
+        + libm::floor(0.5 + modulo(latitude_ref, d_lat) / d_lat - cpr_lat);
 
     let lat = d_lat * (j + cpr_lat);
     let ni = if msg.parity == CPRFormat::Even {
@@ -300,7 +333,7 @@ pub fn surface_position_with_reference(
     };
     let d_lon = if ni > 0 { 90. / ni as f64 } else { 90. };
     let m = libm::floor(longitude_ref / d_lon)
-        + libm::floor(0.5 + (longitude_ref % d_lon) / d_lon - cpr_lon);
+        + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);
     let lon = d_lon * (m + cpr_lon);
 
     Position {
@@ -309,80 +342,128 @@ pub fn surface_position_with_reference(
     }
 }
 
+/**
+ * Mutates the ME message based on recent past positions (parameter `timestamp`)
+ * of the same aircraft (parameter `icao24`). For surface messages, the
+ * reference position will be considered; and possibly updated based on low
+ * altitude positions detected.
+ *
+ * - `aircraft` is a hashmap of aircraft containing their most recent state;
+ * - `reference` is a (possibly None) set of coordinates.
+ */
+
+pub fn decode_position(
+    message: &mut ME,
+    timestamp: f64,
+    icao24: &ICAO,
+    aircraft: &mut BTreeMap<ICAO, AircraftState>,
+    reference: &mut Option<Position>,
+) {
+    let latest = aircraft.entry(*icao24).or_insert(AircraftState {
+        timestamp: timestamp,
+        pos: None,
+        msg: None,
+    });
+    match message {
+        ME::BDS05(airborne) => {
+            match (latest.timestamp, latest.msg, latest.pos) {
+                (t, _, Some(latest_pos)) if timestamp - t < 10. => {
+                    let pos = airborne_position_with_reference(
+                        &airborne,
+                        latest_pos.latitude,
+                        latest_pos.longitude,
+                    );
+                    // First update the message
+                    airborne.latitude = Some(pos.latitude);
+                    airborne.longitude = Some(pos.longitude);
+                    // Then update the reference in aircraft
+                    latest.pos = Some(pos);
+                    latest.msg = Some(*airborne);
+                    latest.timestamp = timestamp;
+                    // If necessary update the reference position
+                    if let Some(alt) = airborne.alt {
+                        if alt < 1000 {
+                            *reference = Some(Position {
+                                latitude: pos.latitude,
+                                longitude: pos.longitude,
+                            })
+                        }
+                    }
+                }
+                (t, Some(oldest), None) if timestamp - t < 10. => {
+                    let pos: Option<Position> =
+                        airborne_position(&oldest, airborne);
+
+                    // First update the message
+                    if let Some(pos) = pos {
+                        airborne.latitude = Some(pos.latitude);
+                        airborne.longitude = Some(pos.longitude);
+                    }
+                    // Then update the reference in aircraft
+                    latest.pos = pos;
+                    latest.msg = Some(*airborne);
+                    latest.timestamp = timestamp;
+                }
+                _ => {
+                    // no airborne position, no position
+                    // or just too old position
+                    latest.msg = Some(*airborne);
+                    latest.timestamp = timestamp;
+                }
+            }
+        }
+        ME::BDS06(surface) => {
+            let pos = match (latest.pos, reference) {
+                (Some(pos), _) => Some(surface_position_with_reference(
+                    surface,
+                    pos.latitude,
+                    pos.longitude,
+                )),
+                (_, Some(reference)) => Some(surface_position_with_reference(
+                    surface,
+                    reference.latitude,
+                    reference.longitude,
+                )),
+                _ => None,
+            };
+            if let Some(pos) = pos {
+                // First update the message
+                surface.latitude = Some(pos.latitude);
+                surface.longitude = Some(pos.longitude);
+                // Then update the reference in aircraft
+                latest.pos = Some(pos);
+                latest.timestamp = timestamp;
+            }
+        }
+        _ => (),
+    }
+}
+
+/**
+ * This function is only used  for the decoding of offline messages.
+ */
 pub fn decode_positions(res: &mut [TimedMessage], reference: Option<Position>) {
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
+    let mut reference = reference;
 
     let _: Vec<()> = res
         .iter_mut()
-        .map(|msg| {
-            if let DF::ExtendedSquitterADSB(adsb) = &mut msg.message.df {
-                let icao24 = adsb.icao24;
-                let latest = aircraft.entry(icao24).or_insert(AircraftState {
-                    timestamp: msg.timestamp,
-                    pos: None,
-                    msg: None,
-                });
-
-                match &mut adsb.message {
-                    ME::BDS05(airborne) => {
-                        match (latest.timestamp, latest.msg, latest.pos) {
-                            (t, Some(oldest), _) if msg.timestamp - t < 10. => {
-                                let pos: Option<Position> = if let Some(pos) =
-                                    airborne_position(&oldest, airborne)
-                                {
-                                    Some(pos)
-                                } else {
-                                    latest.pos.map(|latest_pos| {
-                                        airborne_position_with_reference(
-                                            &oldest,
-                                            latest_pos.latitude,
-                                            latest_pos.longitude,
-                                        )
-                                    })
-                                };
-
-                                if let Some(pos) = pos {
-                                    airborne.latitude = Some(pos.latitude);
-                                    airborne.longitude = Some(pos.longitude);
-                                }
-                                latest.pos = pos;
-                                latest.msg = Some(*airborne);
-                                latest.timestamp = msg.timestamp;
-                            }
-                            _ => {
-                                latest.msg = Some(*airborne);
-                                latest.timestamp = msg.timestamp;
-                            }
-                        }
-                    }
-                    ME::BDS06(surface) => {
-                        let pos = match (latest.pos, reference) {
-                            (Some(pos), _) => {
-                                Some(surface_position_with_reference(
-                                    surface,
-                                    pos.latitude,
-                                    pos.longitude,
-                                ))
-                            }
-                            (_, Some(reference)) => {
-                                Some(surface_position_with_reference(
-                                    surface,
-                                    reference.latitude,
-                                    reference.longitude,
-                                ))
-                            }
-                            _ => None,
-                        };
-                        if let Some(pos) = pos {
-                            surface.latitude = Some(pos.latitude);
-                            surface.longitude = Some(pos.longitude);
-                            latest.pos = Some(pos);
-                            latest.timestamp = msg.timestamp;
-                        }
-                    }
-                    _ => (),
-                }
-            }
+        .map(|msg| match &mut msg.message.df {
+            DF::ExtendedSquitterADSB(adsb) => decode_position(
+                &mut adsb.message,
+                msg.timestamp,
+                &adsb.icao24,
+                &mut aircraft,
+                &mut reference,
+            ),
+            DF::ExtendedSquitterTisB { cf, .. } => decode_position(
+                &mut cf.me,
+                msg.timestamp,
+                &cf.aa,
+                &mut aircraft,
+                &mut reference,
+            ),
+            _ => {}
         })
         .collect();
 }
@@ -418,6 +499,30 @@ mod tests {
 
         assert_relative_eq!(latitude, 49.81755, max_relative = 1e-3);
         assert_relative_eq!(longitude, 6.08442, max_relative = 1e-3);
+
+        let b3 = hex!("8d4d224f58bf07c2d41a9a353d70");
+        let b4 = hex!("8d4d224f58bf003b221b34aa5b8d");
+
+        let msg1 = Message::from_bytes((&b3, 0)).unwrap().1;
+        let msg2 = Message::from_bytes((&b4, 0)).unwrap().1;
+
+        let (msg1, msg2) = match (msg1.df, msg2.df) {
+            (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
+                match (msg1.message, msg2.message) {
+                    (BDS05(m1), BDS05(m2)) => (m1, m2),
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        };
+
+        let Position {
+            latitude,
+            longitude,
+        } = airborne_position(&msg1, &msg2).unwrap();
+
+        assert_relative_eq!(latitude, 42.346, max_relative = 1e-3);
+        assert_relative_eq!(longitude, 0.4347, max_relative = 1e-3);
     }
 
     #[test]
