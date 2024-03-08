@@ -63,3 +63,13 @@ In Python:
 >>> rs1090.decode("8c4841753a9a153237aef0f275be")
 {'df': '17', 'icao24': '484175', 'bds': '06', 'NUCp': 7, 'groundspeed': 17.0, 'track': 92.8125, 'parity': 'odd', 'lat_cpr': 39195, 'lon_cpr': 110320}
 ```
+
+For large sets of messages in Python (e.g. what you can download through [pyopensky](https://github.com/open-aviation/pyopensky)):
+
+```pycon
+>>> import rs1090
+>>> rs1090.decode(msg_list, ts_list)  # includes CPR to position decoding
+...
+>>> rs1090.decode(msg_list, ts_list, reference=(lat0, lon0))  # useful for surface messages
+...
+```

@@ -108,14 +108,12 @@ fn decode_parallel_time(
         .flat_map(|v: Vec<TimedMessage>| v)
         .collect();
 
-    if let Some(position) = reference {
-        decode_positions(
-            &mut res,
-            Some(Position {
-                latitude: position[0],
-                longitude: position[1],
-            }),
-        );
+    if let Some([latitude, longitude]) = reference {
+        let position = Some(Position {
+            latitude,
+            longitude,
+        });
+        decode_positions(&mut res, position);
     }
 
     let pkl = serde_pickle::to_vec(&res, Default::default()).unwrap();
