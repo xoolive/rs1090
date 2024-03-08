@@ -360,7 +360,7 @@ pub fn decode_position(
     reference: &mut Option<Position>,
 ) {
     let latest = aircraft.entry(*icao24).or_insert(AircraftState {
-        timestamp: timestamp,
+        timestamp,
         pos: None,
         msg: None,
     });
@@ -369,7 +369,7 @@ pub fn decode_position(
             match (latest.timestamp, latest.msg, latest.pos) {
                 (t, _, Some(latest_pos)) if timestamp - t < 10. => {
                     let pos = airborne_position_with_reference(
-                        &airborne,
+                        airborne,
                         latest_pos.latitude,
                         latest_pos.longitude,
                     );

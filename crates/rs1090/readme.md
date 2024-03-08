@@ -28,18 +28,10 @@ cargo add rs1090
 Or add the following line to your `Cargo.toml`:
 
 ```toml
-rs1090 = "0.2.0"  # check for the latest version
-```
-
-For the Python binding:
-
-```sh
-pip install rs1090
+rs1090 = "1.0.0"  # check for the latest version, we are not there yet
 ```
 
 ## Usage
-
-In Rust:
 
 ```rust
 use hexlit::hex;
@@ -56,7 +48,17 @@ fn main() {
 }
 ```
 
-In Python:
+See more examples in the `crates/rs1090/examples` folder.
+
+## Python bindings
+
+You may install the bindings compiled for most Python versions with:
+
+```sh
+pip install rs1090
+```
+
+The library provides a single do-it-all function called `decode()`:
 
 ```pycon
 >>> import rs1090
@@ -72,4 +74,13 @@ For large sets of messages in Python (e.g. what you can download through [pyopen
 ...
 >>> rs1090.decode(msg_list, ts_list, reference=(lat0, lon0))  # useful for surface messages
 ...
+```
+
+## decode1090
+
+Prebuilt binaries are available on the [Releases page](https://github.com/xoolive/rs1090/releases?q=decode1090).  
+Usage is available with the help command.
+
+```sh
+decode1090 --help
 ```
