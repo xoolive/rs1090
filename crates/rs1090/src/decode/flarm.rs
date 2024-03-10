@@ -50,18 +50,18 @@ fn make_key(time: i64, address: i64) -> [u32; 4] {
         &KEY1
     };
     table.map(|tab| {
-        let obs = obscure(tab ^ ((time >> 6) ^ (address as i64)), 0x045D9F3B);
+        let obs = obscure(tab ^ ((time >> 6) ^ address), 0x045D9F3B);
         (obs ^ 0x87B562F4) as u32
     })
 }
 
-fn mx(sum: u32, y: u32, z: u32, p: u32, e: u32, k: &Vec<u32>) -> u32 {
+fn mx(sum: u32, y: u32, z: u32, p: u32, e: u32, k: &[u32]) -> u32 {
     ((z >> 5 ^ y << 2).wrapping_add(y >> 3 ^ z << 4))
         ^ ((sum ^ y).wrapping_add(k[(p & 3 ^ e) as usize] ^ z))
 }
 
-fn fixk(k: &Vec<u32>) -> Vec<u32> {
-    let mut key = k.clone();
+fn fixk(k: &[u32]) -> Vec<u32> {
+    let mut key = k.to_owned();
     if key.len() < 4 {
         let length = key.len();
         for _ in length..4 {
@@ -71,7 +71,7 @@ fn fixk(k: &Vec<u32>) -> Vec<u32> {
     key
 }
 
-fn btea(v: &mut Vec<u32>, k: &Vec<u32>) {
+fn btea(v: &mut [u32], k: &[u32]) {
     let length: u32 = v.len() as u32;
     let n: u32 = length - 1;
     let key: Vec<u32> = fixk(k);
@@ -87,14 +87,13 @@ fn btea(v: &mut Vec<u32>, k: &Vec<u32>) {
             z = v[p - 1];
             v[p] = v[p].wrapping_sub(mx(sum, y, z, p as u32, e, &key));
             y = v[p];
-            p = p - 1;
+            p -= 1;
         }
         z = v[n as usize];
         v[0] = v[0].wrapping_sub(mx(sum, y, z, 0, e, &key));
         y = v[0];
         sum = sum.wrapping_sub(DELTA);
     }
-    //return v.clone();
 }
 
 /*
@@ -300,7 +299,7 @@ impl Flarm {
         let (rest, p4) = u32::read(rest, deku::ctx::Endian::Little)?;
         let (rest, p5) = u32::read(rest, deku::ctx::Endian::Little)?;
         let mut decoded = vec![p1, p2, p3, p4, p5];
-        btea(&mut decoded, &key.to_vec());
+        btea(&mut decoded, key.as_ref());
 
         Ok((rest, decoded))
     }
@@ -354,10 +353,7 @@ impl Flarm {
         Ok(ac)
     }
 
-    fn decode_groundspeed(
-        ns: &Vec<i32>,
-        ew: &Vec<i32>,
-    ) -> Result<f32, DekuError> {
+    fn decode_groundspeed(ns: &[i32], ew: &[i32]) -> Result<f32, DekuError> {
         let speed: f32 = ns
             .iter()
             .zip(ew.iter())
@@ -370,13 +366,9 @@ impl Flarm {
         Ok(speed / 4.0)
     }
 
-    fn decode_track(
-        ns: &Vec<i32>,
-        ew: &Vec<i32>,
-        speed: f32,
-    ) -> Result<f32, DekuError> {
+    fn decode_track(ns: &[i32], ew: &[i32], v: f32) -> Result<f32, DekuError> {
         let track = |y: f32, x: f32| {
-            let v = if speed < 1e-6 { 1. } else { speed };
+            let v = if v < 1e-6 { 1. } else { v };
             modulo(
                 libm::atan2((x / v / 4.) as f64, (y / v / 4.) as f64) / 0.01745,
                 360.,
