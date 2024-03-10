@@ -71,7 +71,7 @@ fn fixk(k: &Vec<u32>) -> Vec<u32> {
     key
 }
 
-fn btea(v: &mut Vec<u32>, k: &Vec<u32>) -> () {
+fn btea(v: &mut Vec<u32>, k: &Vec<u32>) {
     let length: u32 = v.len() as u32;
     let n: u32 = length - 1;
     let key: Vec<u32> = fixk(k);
