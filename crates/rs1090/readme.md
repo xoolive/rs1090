@@ -1,12 +1,12 @@
 # rs1090
 
-rs1090 is a Rust library to decode Mode S and ADS-B messages.
+rs1090 is a Rust library to decode Mode S, ADS-B and FLARM messages.
 
 It takes its inspiration from the Python [pyModeS](https://github.com/junzis/pyModeS) library, and uses [deku](https://github.com/sharksforarms/deku) in order to decode binary data in a clean declarative way.
 
 The project started as a fork of a very similar project called [adsb-deku](https://crates.io/crates/adsb_deku), but modules have been refactored to match [pyModeS](https://github.com/junzis/pyModeS) design, implementations extensively reviewed, simplified, corrected, and completed.
 
-The direction ambitioned by rs1090 boil down to:
+The directions ambitioned by rs1090 boil down to:
 
 - improving the performance of Mode S decoding in Python;
 - exporting trajectory data to cross-platform formats such as JSON or parquet;
