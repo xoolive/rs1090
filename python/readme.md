@@ -1,8 +1,8 @@
 # rs1090
 
-rs1090 is a Python binding to the [rs1090](https://docs.rs/rs1090/) Rust library to decode Mode S and ADS-B messages.
+rs1090 is a Python binding to the [rs1090](https://docs.rs/rs1090/) Rust library to decode Mode S, ADS-B and FLARM messages. It takes its inspiration from the Python [pyModeS](https://github.com/junzis/pyModeS) library.
 
-It takes its inspiration from the Python [pyModeS](https://github.com/junzis/pyModeS) library. The direction ambitioned by rs1090 boils down to:
+The direction ambitioned by rs1090 boils down to:
 
 - improving the performance of Mode S decoding in Python;
 - exporting trajectory data to cross-platform formats such as JSON or parquet;
