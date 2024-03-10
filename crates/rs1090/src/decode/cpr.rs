@@ -1,11 +1,12 @@
-use super::{
-    adsb::ME,
-    bds::{bds05::AirbornePosition, bds06::SurfacePosition},
-    TimedMessage, DF, ICAO,
-};
+use super::adsb::ME;
+use super::bds::bds05::AirbornePosition;
+use super::bds::bds06::SurfacePosition;
+use super::{TimedMessage, DF, ICAO};
 use deku::prelude::*;
 use serde::Serialize;
-use std::{collections::BTreeMap, fmt, str::FromStr};
+use std::collections::BTreeMap;
+use std::fmt;
+use std::str::FromStr;
 
 /**
 * The position information is encoded in a Compact Position Reporting (CPR)
