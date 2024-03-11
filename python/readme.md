@@ -36,3 +36,25 @@ For batches of messages:
 >>> rs1090.decode(msg_list, ts_list, reference=(lat0, lon0))  # useful for surface messages
 ...
 ```
+
+For FLARM messages (also as batches):
+
+```pycon
+>>> msg = "7bf2381040ccc7e2395ecaa28e033a655d47e1d91d0bf986e1b0"
+>>> rs1090.flarm(msg, 1655279476, 43.61924, 5.11755)
+{'timestamp': 1655279476,
+ 'reference_lat': 43.61924,
+ 'reference_lon': 5.11755,
+ 'icao24': '38f27b',
+ 'is_icao24': True,
+ 'actype': 'Glider',
+ 'latitude': 43.6812864,
+ 'longitude': 5.150585599999999,
+ 'geoaltitude': 970,
+ 'vertical_speed': 1.0,
+ 'groundspeed': 18.698261951315153,
+ 'track': 29.655457935479006,
+ 'no_track': False,
+ 'stealth': False,
+ 'gps': 129}
+```

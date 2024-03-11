@@ -147,7 +147,7 @@ pub struct Flarm {
     pub is_icao24: bool,
 
     #[deku(reader = "Self::decode_btea(deku::rest, *icao24, *timestamp)")]
-    //#[serde(skip)]
+    #[serde(skip)]
     /// Decrypted information (as a table 5 u32 integers)
     pub decoded: Vec<u32>,
 
