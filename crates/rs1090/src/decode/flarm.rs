@@ -4,25 +4,6 @@ use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 
-/** ## FLARM
- *
- * https://pastebin.com/YK2f8bfm
- *
- * Swiss glider anti-colission system moved to a new encryption scheme: XXTEA
- * The algorithm encrypts all the packet after the header: total 20 bytes or 5 long int words of data
- *
- * XXTEA description and code are found here: http://en.wikipedia.org/wiki/XXTEA
- * The system uses 6 iterations of the main loop.
- *
- * The system version 6 sends two type of packets: position and ... some unknown data
- * The difference is made by bit 0 of byte 3 of the packet: for position data this bit is zero.
- *
- * For position data the key used depends on the time and transmitting device address.
- * The key is as well obscured by a weird algorithm.
- * The code to generate the key is:
- *
- * */
-
 const KEY1: [i64; 4] = [0xe43276df, 0xdca83759, 0x9802b8ac, 0x4675a56b];
 const KEY1B: [i64; 4] = [0xfc78ea65, 0x804b90ea, 0xb76542cd, 0x329dfa32];
 const DELTA: u32 = 0x9E3779B9;
@@ -96,6 +77,29 @@ fn btea(v: &mut [u32], k: &[u32]) {
     }
 }
 
+/**
+ * ## FLARM
+ *
+ * Swiss glider anti-colission system moved to a new encryption scheme, XXTEA.
+ * The algorithm encrypts all the packet after the header: total 20 bytes or 5
+ * long int words of data.
+ *
+ * XXTEA description and code are found here:
+ * <http://en.wikipedia.org/wiki/XXTEA>. The system uses 6 iterations of the
+ * main loop.
+ *
+ * The system version 6 sends two type of packets: position and ... some unknown
+ * data. The difference is made by bit 0 of byte 3 of the packet: for position
+ * data this bit is zero.
+ *
+ * For position data, the key used depends on the time and transmitting device
+ * address. The key is as well obscured by a weird algorithm.
+ *
+ * Reference: <https://pastebin.com/YK2f8bfm>
+ *
+ * Decode with [`Flarm::from_record`]
+ */
+
 /*
  * NEW PACKET FORMAT:
  *
@@ -105,6 +109,7 @@ fn btea(v: &mut [u32], k: &[u32]) {
  *  2     AAAA AAAA
  *  3     00aa 0000    aa = 10 or 01
  *
+ * (encrypted below)
  *  4     vvvv vvvv    vertical speed
  *  5     xxxx xxvv
  *  6     gggg gggg    GPS status
@@ -120,42 +125,40 @@ fn btea(v: &mut [u32], k: &[u32]) {
  * 14     xxxx NNNN
  * 15     FFxx xxxx    multiplying factor
  *
- * 16     SSSS SSSS    as in version 4
+ * 16     SSSS SSSS    n/s derivatives
  * 17     ssss ssss
  * 18     KKKK KKKK
  * 19     kkkk kkkk
  *
- * 20     EEEE EEEE
+ * 20     EEEE EEEE    e/w derivatives
  * 21     eeee eeee
  * 22     PPPP PPPP
  * 24     pppp pppp
  *
  */
 
-/**
- * FLARM messages are encrypted using icao24 address (unencrypted) and the
- * timestamp (the key changes every minute).
- *
- * The latitude and longitude need a nearby position to be decoded, (usually
- * the receiver location)
- *
- */
-
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct Flarm {
     #[deku(endian = "little")]
+    /// The timestamp must be passed for the decoding
     pub timestamp: u32,
 
-    pub sensor_lat: f32,
-    pub sensor_lon: f32,
+    /// A reference latitude, usually the latitude of the receiver
+    pub reference_lat: f32,
 
+    /// A reference longitude, usually the longitude of the receiver
+    pub reference_lon: f32,
+
+    /// The address of the transmitting device, either an icao24 address, or not
     pub icao24: Address,
 
     #[deku(map = "|v| -> Result<_, DekuError> { magic_value(v) }")]
+    /// A flag set to true if the address is an icao24 address
     pub is_icao24: bool,
 
     #[deku(reader = "Self::decode_btea(deku::rest, *icao24, *timestamp)")]
     #[serde(skip)]
+    /// Decrypted information (as a table 5 u32 integers)
     pub decoded: Vec<u32>,
 
     #[deku(
@@ -165,34 +168,39 @@ pub struct Flarm {
     }"
     )]
     #[serde(skip)]
+    /// A multiplying factor used for decoding vertical and lateral speeds
     pub mult: i32,
 
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> {Self::decode_actype(decoded[0])}"
     )]
+    /// A enum describing the type of aircraft (glider, paraglider, UAV, etc.)
     pub actype: AircraftType,
 
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> {
-            Self::decode_latitude(decoded[1], *sensor_lat)
+            Self::decode_latitude(decoded[1], *reference_lat)
         }"
     )]
+    /// Decoded latitude in degrees
     pub latitude: f32,
 
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> {
-            Self::decode_longitude(decoded[2], *sensor_lon)
+            Self::decode_longitude(decoded[2], *reference_lon)
         }"
     )]
+    /// Decoded longitude in degrees
     pub longitude: f32,
 
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> { Ok((decoded[1]>>19) & 0x1fff) }"
     )]
+    /// GPS altitude in meters
     pub geoaltitude: u32,
 
     #[deku(
@@ -201,6 +209,7 @@ pub struct Flarm {
             Ok((((decoded[0] & 0x3ff) as i8) as i32 * mult) as f32 / 10.)
         }"
     )]
+    /// Vertical speed in meters/second
     pub vertical_speed: f32,
 
     #[deku(
@@ -210,6 +219,7 @@ pub struct Flarm {
         }"
     )]
     #[serde(skip)]
+    /// Derivative along the North/South axis, at several timestamps ahead
     pub ns: Vec<i32>,
 
     #[deku(
@@ -219,30 +229,35 @@ pub struct Flarm {
         }"
     )]
     #[serde(skip)]
+    /// Derivative along the East/West axis, at several timestamps ahead
     pub ew: Vec<i32>,
 
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> {Self::decode_groundspeed(ns, ew)}"
     )]
+    /// An estimation of the groundspeed in meters/second
     pub groundspeed: f32,
 
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> {Self::decode_track(ns, ew, *groundspeed)}"
     )]
+    /// An estimation of the track angle in degrees
     pub track: f32,
 
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> { Ok(((decoded[0] >> 14) & 0x1) == 1) }"
     )]
+    /// A flag set to true if the transmitter asks to be tracked
     pub no_track: bool,
 
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> { Ok(((decoded[0] >> 13) & 0x1) == 1) }"
     )]
+    /// A flag set to true if the transmitter is in stealth mode
     pub stealth: bool,
 
     #[deku(
@@ -282,6 +297,27 @@ fn magic_value(v: u8) -> Result<bool, DekuError> {
     Err(DekuError::Assertion(
         "Magic must be 0x10 or 0x20".to_string(),
     ))
+}
+
+#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[deku(type = "u8", bits = "4", endian = "big")]
+pub enum AircraftType {
+    Unknown = 0,
+    Glider,
+    Towplane,
+    Helicopter,
+    Parachute,
+    DropPlane,
+    Hangglider,
+    Paraglider,
+    Aircraft,
+    Jet,
+    UFO,
+    Balloon,
+    Airship,
+    UAV,
+    Reserved,
+    StaticObstacle,
 }
 
 impl Flarm {
@@ -384,27 +420,31 @@ impl Flarm {
 
         Ok(track as f32)
     }
-}
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
-#[deku(type = "u8", bits = "4", endian = "big")]
-pub enum AircraftType {
-    Unknown = 0,
-    Glider,
-    Towplane,
-    Helicopter,
-    Parachute,
-    DropPlane,
-    Hangglider,
-    Paraglider,
-    Aircraft,
-    Jet,
-    UFO,
-    Balloon,
-    Airship,
-    UAV,
-    Reserved,
-    StaticObstacle,
+    /**
+     * The method wraps the [`Flarm::from_bytes`] used to decode deku structures.
+     *
+     * Parameters include:
+     * - the `timestamp` is necessary to decrypt the message;
+     * - the `reference` position (lat/lon in degrees);
+     * - the actual message as a u8 slice reference.
+     */
+    pub fn from_record(
+        timestamp: u32,
+        reference: &[f32; 2],
+        msg: &[u8],
+    ) -> Result<Self, DekuError> {
+        let mut combined_bytes = Vec::new();
+        combined_bytes.extend_from_slice(&timestamp.to_le_bytes());
+        combined_bytes.extend_from_slice(&reference[0].to_ne_bytes());
+        combined_bytes.extend_from_slice(&reference[1].to_ne_bytes());
+        combined_bytes.extend_from_slice(msg);
+
+        match Flarm::from_bytes((&combined_bytes, 0)) {
+            Ok((_, flarm)) => Ok(flarm),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -419,14 +459,7 @@ mod tests {
         let ts = 1655274034_u32;
 
         // Create a mutable vector to store the combined byte slices
-        let mut combined_bytes = Vec::new();
-        combined_bytes.extend_from_slice(&ts.to_le_bytes());
-        combined_bytes.extend_from_slice(&latlon[0].to_ne_bytes());
-        combined_bytes.extend_from_slice(&latlon[1].to_ne_bytes());
-        combined_bytes.extend_from_slice(&msg);
-
-        let (_, flarm) = Flarm::from_bytes((&combined_bytes, 0)).unwrap();
-
+        let flarm = Flarm::from_record(ts, &latlon, &msg).unwrap();
         // println!("{}", serde_json::to_string(&flarm).unwrap());
 
         assert!(flarm.icao24.0 == 0x38f27b);
