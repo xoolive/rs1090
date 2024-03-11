@@ -3,23 +3,23 @@ from pytest import approx
 from rs1090 import decode
 
 
-def test_icao24():
+def test_icao24() -> None:
     assert decode("8D406B902015A678D4D220AA4BDA")["icao24"] == "406b90"
 
 
-def test_wake_vortex():
+def test_wake_vortex() -> None:
     assert decode("8D406B902015A678D4D220AA4BDA")["wake_vortex"] == "n/a"
 
 
-def test_adsb_callsign():
+def test_adsb_callsign() -> None:
     assert decode("8D406B902015A678D4D220AA4BDA")["callsign"] == "EZY85MH"
 
 
-def test_adsb_alt():
+def test_adsb_alt() -> None:
     assert decode("8D40058B58C901375147EFD09357")["altitude"] == 39000
 
 
-def test_adsb_velocity():
+def test_adsb_velocity() -> None:
     msg = decode("8D485020994409940838175B284F")
     assert msg["groundspeed"] == approx(159.2, rel=1e-3)
     assert msg["vertical_rate"] == -832
@@ -32,13 +32,13 @@ def test_adsb_velocity():
     assert msg["heading"] == approx(243.98, rel=1e-3)
 
 
-def test_adsb_emergency():
+def test_adsb_emergency() -> None:
     msg = decode("8DA2C1B6E112B600000000760759")
     assert msg["emergency_state"] == "none"
     assert msg["squawk"] == "6513"
 
 
-def test_adsb_target_state_status():
+def test_adsb_target_state_status() -> None:
     msg = decode("8DA05629EA21485CBF3F8CADAEEB")
 
     assert msg["selected_altitude"] == 17000

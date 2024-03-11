@@ -4,11 +4,11 @@ import pickle
 from typing import Sequence
 
 from ._rust import (
-    decode_one,
-    decode_parallel,
-    decode_parallel_time,
-    decode_vec,
-    decode_vec_time,
+    decode_1090,
+    decode_1090_vec,
+    decode_1090t_vec,
+    decode_flarm,
+    decode_flarm_vec,
 )
 
 try:
@@ -26,7 +26,7 @@ except ImportError:
             yield batch
 
 
-__all__ = ["decode"]
+__all__ = ["decode", "flarm"]
 
 
 def decode(
@@ -34,10 +34,10 @@ def decode(
     timestamp: None | float | Sequence[float] = None,
     *,
     reference: None | tuple[float, float] = None,
-    batch: int | None = 1000,
+    batch: int = 1000,
 ):
     if isinstance(msg, str):
-        payload = decode_one(msg)
+        payload = decode_1090(msg)
 
     else:
         if timestamp is not None and isinstance(timestamp, (int, float)):
@@ -47,17 +47,44 @@ def decode(
         if timestamp is not None and len(timestamp) != len(msg):
             raise ValueError("`msg` and `timestamp` must be of the same length")
 
-        if batch is None:
-            if timestamp is None:
-                payload = decode_vec(msg)
-            else:
-                payload = decode_vec_time(msg, timestamp, reference)
+        batches = list(batched(msg, batch))
+        if timestamp is None:
+            payload = decode_1090_vec(batches)
         else:
-            batches = list(batched(msg, batch))
-            if timestamp is None:
-                payload = decode_parallel(batches)
-            else:
-                ts = list(batched(timestamp, batch))
-                payload = decode_parallel_time(batches, ts, reference)
+            ts = list(batched(timestamp, batch))
+            payload = decode_1090t_vec(batches, ts, reference)
+
+    return pickle.loads(bytes(payload))
+
+
+def flarm(
+    msg: str | Sequence[str],
+    timestamp: int | Sequence[int],
+    reference_latitude: float | Sequence[float],
+    reference_longitude: float | Sequence[float],
+    *,
+    batch: int = 1000,
+):
+    if isinstance(msg, str):
+        assert isinstance(timestamp, (int, float))
+        assert isinstance(reference_latitude, (int, float))
+        assert isinstance(reference_longitude, (int, float))
+        payload = decode_flarm(
+            msg,
+            timestamp,
+            reference_latitude,
+            reference_longitude,
+        )
+    else:
+        batches = list(batched(msg, batch))
+        assert not isinstance(timestamp, (int, float))
+        assert not isinstance(reference_latitude, (int, float))
+        assert not isinstance(reference_longitude, (int, float))
+
+        t = list(batched(timestamp, batch))
+        reflat = list(batched(reference_latitude, batch))
+        reflon = list(batched(reference_longitude, batch))
+
+        payload = decode_flarm_vec(batches, t, reflat, reflon)
 
     return pickle.loads(bytes(payload))
