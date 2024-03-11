@@ -12,6 +12,7 @@ use serde::Serialize;
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[serde(tag = "bds", rename = "17")]
 pub struct GICBCapabilityReport {
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]

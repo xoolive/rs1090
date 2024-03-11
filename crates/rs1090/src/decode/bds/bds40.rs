@@ -14,6 +14,7 @@ use serde::Serialize;
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[serde(tag = "bds", rename = "40")]
 pub struct SelectedVerticalIntention {
     #[deku(reader = "read_selected(deku::rest)")]
     #[serde(rename = "selected_mcp", skip_serializing_if = "Option::is_none")]

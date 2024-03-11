@@ -7,6 +7,7 @@ use serde::Serialize;
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[serde(tag = "bds", rename = "44")]
 pub struct MeteorologicalRoutineAirReport {
     /// Figure of merit / source
     #[deku(bits = 4)]

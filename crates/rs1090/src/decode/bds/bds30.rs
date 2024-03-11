@@ -11,6 +11,7 @@ use crate::decode::{AC13Field, ICAO};
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[serde(tag = "bds", rename = "30")]
 pub struct ACASResolutionAdvisory {
     #[deku(bits = "8", map = "fail_if_not30")]
     #[serde(skip)]

@@ -12,6 +12,7 @@ use serde::Serialize;
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[serde(tag = "bds", rename = "10")]
 pub struct DataLinkCapability {
     #[deku(bits = "8", map = "fail_if_not10")]
     #[serde(skip)]

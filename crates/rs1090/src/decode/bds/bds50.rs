@@ -6,6 +6,7 @@ use serde::Serialize;
  * ## Track and turn report (BDS 5,0)
  */
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[serde(tag = "bds", rename = "50")]
 pub struct TrackAndTurnReport {
     #[deku(reader = "read_roll(deku::rest)")] // 11 bits
     #[serde(rename = "roll")]

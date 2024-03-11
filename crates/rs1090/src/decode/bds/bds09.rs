@@ -2,7 +2,8 @@
 
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::ser::SerializeStruct;
+use serde::Serialize;
 use std::fmt;
 
 /**
@@ -25,7 +26,7 @@ use std::fmt;
  * subtypes 2 and 4 at this moment.
  *
  */
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct AirborneVelocity {
     #[deku(bits = "3")]
     #[serde(skip)]
@@ -104,7 +105,7 @@ fn read_geobaro(
     Ok((rest, value))
 }
 
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[deku(ctx = "subtype: u8", id = "subtype")]
 #[serde(untagged)]
 pub enum AirborneVelocitySubType {
@@ -155,7 +156,7 @@ impl fmt::Display for Sign {
     }
 }
 
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct GroundSpeedDecoding {
     #[serde(skip)]
     pub ew_sign: Sign,
@@ -226,7 +227,7 @@ pub struct AirspeedSubsonicDecoding {
 impl Serialize for AirspeedSubsonicDecoding {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::ser::Serializer,
     {
         let mut state = serializer.serialize_struct("Message", 2)?;
         if let Some(heading) = &self.heading {
@@ -276,7 +277,7 @@ pub struct AirspeedSupersonicDecoding {
 impl Serialize for AirspeedSupersonicDecoding {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::ser::Serializer,
     {
         let mut state = serializer.serialize_struct("Message", 2)?;
         if let Some(heading) = &self.heading {
@@ -330,7 +331,7 @@ pub enum DirectionNS {
     NorthToSouth = 1,
 }
 
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "1")]
 pub enum VerticalRateSource {
     #[serde(rename = "barometric")]

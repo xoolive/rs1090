@@ -10,7 +10,7 @@ use commb::DataSelector;
 use crc::modes_checksum;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
-use serde::ser::{Serialize, Serializer};
+use serde::Serialize;
 use std::fmt;
 
 /**
@@ -34,7 +34,7 @@ use std::fmt;
  * | 24       | [`DF::CommDExtended`]               | 3.1.2.7.3   |
  */
 
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[deku(type = "u8", bits = "5", ctx = "crc: u32")]
 #[serde(tag = "df")]
 pub enum DF {
@@ -278,7 +278,7 @@ pub enum DF {
 /// The entry point to Mode S and ADS-B decoding
 ///
 /// Use as `Message::from_bytes()` in mostly all applications
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct Message {
     /// Calculated from all bits, should be 0 for ADS-B (raises a DekuError),
     /// icao24 otherwise
@@ -400,7 +400,7 @@ impl fmt::Display for Message {
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 pub struct TimedMessage {
     pub timestamp: f64,
 
@@ -436,7 +436,7 @@ impl fmt::Display for IcaoParity {
 impl Serialize for IcaoParity {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::ser::Serializer,
     {
         let icao = format!("{:06x}", &self.0);
         serializer.serialize_str(&icao)
@@ -474,7 +474,7 @@ impl fmt::Display for ICAO {
 impl Serialize for ICAO {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::ser::Serializer,
     {
         let icao = format!("{:06x}", &self.0);
         serializer.serialize_str(&icao)
@@ -520,7 +520,7 @@ impl fmt::Display for IdentityCode {
 impl Serialize for IdentityCode {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::ser::Serializer,
     {
         let squawk = format!("{:04x}", &self.0);
         serializer.serialize_str(&squawk)
@@ -528,7 +528,7 @@ impl Serialize for IdentityCode {
 }
 
 /// 13 bit encoded altitude
-#[derive(Debug, PartialEq, Eq, serde::Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
 pub struct AC13Field(#[deku(reader = "Self::read(deku::rest)")] pub u16);
 
 impl AC13Field {
@@ -568,7 +568,7 @@ impl AC13Field {
 }
 
 /// Transponder level and additional information (3.1.2.5.2.2.1)
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[allow(non_camel_case_types)]
 pub enum Capability {
@@ -610,7 +610,7 @@ impl fmt::Display for Capability {
 }
 
 /// Airborne or Ground and SPI (used in DF=4, 5, 20 or 21)
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(type = "u8", bits = "3")]
 #[serde(rename_all = "snake_case")]
 pub enum FlightStatus {
@@ -673,7 +673,7 @@ pub enum UtilityMessageType {
 }
 
 /// The control field in TIS-B messages (DF=18)
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct ControlField {
     #[serde(rename = "tisb")]
     pub field_type: ControlFieldType,

@@ -10,6 +10,7 @@ use serde::Serialize;
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[serde(tag = "bds", rename = "20")]
 pub struct AircraftIdentification {
     #[deku(bits = "8", map = "fail_if_not20")]
     #[serde(skip)]

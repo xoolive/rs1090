@@ -13,15 +13,3 @@ pub mod bds60;
 pub mod bds61;
 pub mod bds62;
 pub mod bds65;
-
-/*
-use serde::ser::Serializer;
-
-fn f64_twodecimals<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let rounded_value = (value * 100.0).round() / 100.0; // Round to two decimals
-    serializer.serialize_f64(rounded_value)
-}
-*/

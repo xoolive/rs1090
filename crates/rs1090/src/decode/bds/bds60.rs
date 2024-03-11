@@ -16,6 +16,7 @@ use serde::Serialize;
 *
 */
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[serde(tag = "bds", rename = "60")]
 pub struct HeadingAndSpeedReport {
     #[deku(reader = "read_heading(deku::rest)")] // 12 bits
     /// The magnetic heading is the aircraft's heading with respect to the magnetic North
