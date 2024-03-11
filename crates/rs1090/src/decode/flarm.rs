@@ -8,16 +8,6 @@ const KEY1: [i64; 4] = [0xe43276df, 0xdca83759, 0x9802b8ac, 0x4675a56b];
 const KEY1B: [i64; 4] = [0xfc78ea65, 0x804b90ea, 0xb76542cd, 0x329dfa32];
 const DELTA: u32 = 0x9E3779B9;
 
-// Main difference for % between Python and Rust is that in Rust, the sign
-// of the result matches the sign of the dividend.
-fn modulo(a: f64, b: f64) -> f64 {
-    if a >= 0. {
-        a % b
-    } else {
-        a % b + libm::fabs(b)
-    }
-}
-
 fn obscure(key: i64, seed: u64) -> i64 {
     let m1 = seed.wrapping_mul((key ^ (key >> 16)) as u64) as u32;
     let m2 = seed.wrapping_mul((m1 ^ (m1 >> 16)) as u64) as u32;
@@ -144,10 +134,10 @@ pub struct Flarm {
     pub timestamp: u32,
 
     /// A reference latitude, usually the latitude of the receiver
-    pub reference_lat: f32,
+    pub reference_lat: f64,
 
     /// A reference longitude, usually the longitude of the receiver
-    pub reference_lon: f32,
+    pub reference_lon: f64,
 
     /// The address of the transmitting device, either an icao24 address, or not
     pub icao24: Address,
@@ -157,7 +147,7 @@ pub struct Flarm {
     pub is_icao24: bool,
 
     #[deku(reader = "Self::decode_btea(deku::rest, *icao24, *timestamp)")]
-    #[serde(skip)]
+    //#[serde(skip)]
     /// Decrypted information (as a table 5 u32 integers)
     pub decoded: Vec<u32>,
 
@@ -185,7 +175,7 @@ pub struct Flarm {
         }"
     )]
     /// Decoded latitude in degrees
-    pub latitude: f32,
+    pub latitude: f64,
 
     #[deku(
         bits = 1,
@@ -194,7 +184,7 @@ pub struct Flarm {
         }"
     )]
     /// Decoded longitude in degrees
-    pub longitude: f32,
+    pub longitude: f64,
 
     #[deku(
         bits = 1,
@@ -206,11 +196,11 @@ pub struct Flarm {
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> {
-            Ok((((decoded[0] & 0x3ff) as i8) as i32 * mult) as f32 / 10.)
+            Ok((((decoded[0] & 0x3ff) as i8) as i32 * mult) as f64 / 10.)
         }"
     )]
     /// Vertical speed in meters/second
-    pub vertical_speed: f32,
+    pub vertical_speed: f64,
 
     #[deku(
         bits = 1,
@@ -237,14 +227,14 @@ pub struct Flarm {
         map = "|_v: bool| -> Result<_, DekuError> {Self::decode_groundspeed(ns, ew)}"
     )]
     /// An estimation of the groundspeed in meters/second
-    pub groundspeed: f32,
+    pub groundspeed: f64,
 
     #[deku(
         bits = 1,
         map = "|_v: bool| -> Result<_, DekuError> {Self::decode_track(ns, ew, *groundspeed)}"
     )]
     /// An estimation of the track angle in degrees
-    pub track: f32,
+    pub track: f64,
 
     #[deku(
         bits = 1,
@@ -340,30 +330,24 @@ impl Flarm {
         Ok((rest, decoded))
     }
 
-    fn decode_latitude(
-        decoded: u32,
-        sensor_lat: f32,
-    ) -> Result<f32, DekuError> {
+    fn decode_latitude(decoded: u32, ref_lat: f64) -> Result<f64, DekuError> {
         let mut lat = (decoded & 0x7FFFF) as i32;
-        let sensor_lat = ((sensor_lat * 1e7) as i32) >> 7;
-        lat = (lat - sensor_lat) % 0x080000;
+        let round_lat = ((ref_lat * 1e7) as i32) >> 7;
+        lat = (lat - round_lat).rem_euclid(0x080000);
         if lat >= 0x040000 {
             lat -= 0x080000;
         }
-        Ok((((lat + sensor_lat) << 7) + 0x40) as f32 * 1e-7)
+        Ok((((lat + round_lat) << 7) + 0x40) as f64 * 1e-7)
     }
 
-    fn decode_longitude(
-        decoded: u32,
-        sensor_lon: f32,
-    ) -> Result<f32, DekuError> {
+    fn decode_longitude(decoded: u32, ref_lon: f64) -> Result<f64, DekuError> {
         let mut lon = (decoded & 0xFFFFF) as i32;
-        let sensor_lon = ((sensor_lon * 1e7) as i32) >> 7;
-        lon = (lon - sensor_lon) % 0x100000;
+        let round_lon = ((ref_lon * 1e7) as i32) >> 7;
+        lon = (lon - round_lon).rem_euclid(0x100000);
         if lon >= 0x080000 {
             lon -= 0x100000;
         }
-        Ok((((lon + sensor_lon) << 7) + 0x40) as f32 * 1e-7)
+        Ok((((lon + round_lon) << 7) + 0x40) as f64 * 1e-7)
     }
 
     fn decode_actype(decoded: u32) -> Result<AircraftType, DekuError> {
@@ -389,36 +373,33 @@ impl Flarm {
         Ok(ac)
     }
 
-    fn decode_groundspeed(ns: &[i32], ew: &[i32]) -> Result<f32, DekuError> {
-        let speed: f32 = ns
+    fn decode_groundspeed(ns: &[i32], ew: &[i32]) -> Result<f64, DekuError> {
+        let speed: f64 = ns
             .iter()
             .zip(ew.iter())
             .map(|(&n, &e)| {
-                let ns = n as f32 / 4.0;
-                let ew = e as f32 / 4.0;
+                let ns = n as f64 / 4.0;
+                let ew = e as f64 / 4.0;
                 (ns * ns + ew * ew).sqrt()
             })
-            .sum::<f32>();
+            .sum::<f64>();
         Ok(speed / 4.0)
     }
 
-    fn decode_track(ns: &[i32], ew: &[i32], v: f32) -> Result<f32, DekuError> {
-        let track = |y: f32, x: f32| {
+    fn decode_track(ns: &[i32], ew: &[i32], v: f64) -> Result<f64, DekuError> {
+        let track = |y: f64, x: f64| {
             let v = if v < 1e-6 { 1. } else { v };
-            modulo(
-                libm::atan2((x / v / 4.) as f64, (y / v / 4.) as f64) / 0.01745,
-                360.,
-            )
+            (libm::atan2(x / v / 4., y / v / 4.) / 0.01745).rem_euclid(360.)
         };
-        let track4 = track(ns[0] as f32, ew[0] as f32);
-        let track8 = track(ns[1] as f32, ew[1] as f32);
+        let track4 = track(ns[0] as f64, ew[0] as f64);
+        let track8 = track(ns[1] as f64, ew[1] as f64);
 
         let turning_rate =
-            |a1: f64, a2: f64| modulo((a2 - a1) + 540., 360.) - 180.;
+            |a1: f64, a2: f64| ((a2 - a1) + 540.).rem_euclid(360.) - 180.;
 
         let track = track4 - 4. * turning_rate(track4, track8) / 4.;
 
-        Ok(track as f32)
+        Ok(track)
     }
 
     /**
@@ -431,7 +412,7 @@ impl Flarm {
      */
     pub fn from_record(
         timestamp: u32,
-        reference: &[f32; 2],
+        reference: &[f64; 2],
         msg: &[u8],
     ) -> Result<Self, DekuError> {
         let mut combined_bytes = Vec::new();
@@ -450,29 +431,38 @@ impl Flarm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_relative_eq;
     use hexlit::hex;
 
     #[test]
     fn test_flarm() {
         let msg = hex!("7bf23810860b7eabb23952252fd4927024b21fd94e9e1ef416f0");
-        let latlon: [f32; 2] = [43.61924, 5.11755];
+        let latlon: [f64; 2] = [43.61924, 5.11755];
         let ts = 1655274034_u32;
 
-        // Create a mutable vector to store the combined byte slices
         let flarm = Flarm::from_record(ts, &latlon, &msg).unwrap();
-        // println!("{}", serde_json::to_string(&flarm).unwrap());
+        //println!("{}", serde_json::to_string(&flarm).unwrap());
 
         assert!(flarm.icao24.0 == 0x38f27b);
         assert!(flarm.is_icao24);
         assert!(flarm.actype == AircraftType::Glider);
-        assert!(flarm.latitude == 43.61822);
-        assert!(flarm.longitude == 5.117242);
+        assert_relative_eq!(flarm.latitude, 43.61822, max_relative = 1e-3);
+        assert_relative_eq!(flarm.longitude, 5.117242, max_relative = 1e-3);
         assert!(flarm.geoaltitude == 160);
-        assert!(flarm.vertical_speed == -1.1);
-        assert!(flarm.groundspeed == 0.7905694);
-        assert!(flarm.track == 198.40446);
+        assert_relative_eq!(flarm.vertical_speed, -1.1, max_relative = 1e-3);
+        assert_relative_eq!(flarm.groundspeed, 0.7905694, max_relative = 1e-3);
+        assert_relative_eq!(flarm.track, 198.40446, max_relative = 1e-3);
         assert!(!flarm.no_track);
         assert!(!flarm.stealth);
         assert!(flarm.gps == 3926);
+
+        let msg = hex!("7bf2381040ccc7e2395ecaa28e033a655d47e1d91d0bf986e1b0");
+        let ts = 1655279476_u32;
+
+        let flarm = Flarm::from_record(ts, &latlon, &msg).unwrap();
+        //println!("{}", serde_json::to_string(&flarm).unwrap());
+
+        assert_relative_eq!(flarm.latitude, 43.68129, max_relative = 1e-3);
+        assert_relative_eq!(flarm.longitude, 5.15059, max_relative = 1e-3);
     }
 }
