@@ -50,8 +50,8 @@ decoded = [bench_pms.decode(msg, py_common) for msg in data.rawmsg.str[18:]]
 n = data.shape[0]
 result = pd.DataFrame.from_records(
     [
-        {"type": "rs1090 (Rust, many cores)", "time": 0.755, "std": 0.015},
-        {"type": "rs1090 (Python, many cores)", "time": 1.46, "std": 0.03},
+        {"type": "rs1090 (Rust, default)", "time": 0.755, "std": 0.015},
+        {"type": "rs1090 (Python, default)", "time": 1.46, "std": 0.03},
         {"type": "rs1090 (Python, single core)", "time": 4.15, "std": 0.093},
         {"type": "pyModeS (compiled)", "time": 9.27, "std": 0.154},
         {"type": "pyModeS (Python)", "time": 16, "std": 0.183},

@@ -1,1 +1,202 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="marks" width="691" height="149" viewBox="0 0 691 149"><rect width="691" height="149" fill="white"/><g fill="none" stroke-miterlimit="10" transform="translate(185,5)"><g class="mark-group role-frame root" role="graphics-object" aria-roledescription="group mark container"><g transform="translate(0,0)"><path class="background" aria-hidden="true" d="M0.5,0.5h500v100h-500Z" stroke="#ddd"/><g><g class="mark-group role-axis" aria-hidden="true"><g transform="translate(0.5,100.5)"><path class="background" aria-hidden="true" d="M0,0h0v0h0Z" pointer-events="none"/><g><g class="mark-rule role-axis-grid" pointer-events="none"><line transform="translate(0,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(50,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(100,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(150,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(200,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(250,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(300,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(350,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(400,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(450,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/><line transform="translate(500,0)" x2="0" y2="-100" stroke="#ddd" stroke-width="1" opacity="1"/></g></g><path class="foreground" aria-hidden="true" d="" pointer-events="none" display="none"/></g></g><g class="mark-group role-axis" role="graphics-symbol" aria-roledescription="axis" aria-label="X-axis titled 'Decoding time (in μs per message)' for a linear scale with values from 0µ to 100µ"><g transform="translate(0.5,100.5)"><path class="background" aria-hidden="true" d="M0,0h0v0h0Z" pointer-events="none"/><g><g class="mark-rule role-axis-tick" pointer-events="none"><line transform="translate(0,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(50,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(100,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(150,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(200,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(250,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(300,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(350,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(400,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(450,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(500,0)" x2="0" y2="5" stroke="#888" stroke-width="1" opacity="1"/></g><g class="mark-text role-axis-label" pointer-events="none"><text text-anchor="start" transform="translate(0,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">0µ</text><text text-anchor="middle" transform="translate(50,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">10µ</text><text text-anchor="middle" transform="translate(100,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">20µ</text><text text-anchor="middle" transform="translate(150,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">30µ</text><text text-anchor="middle" transform="translate(200,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">40µ</text><text text-anchor="middle" transform="translate(250,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">50µ</text><text text-anchor="middle" transform="translate(300,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">60µ</text><text text-anchor="middle" transform="translate(350,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">70µ</text><text text-anchor="middle" transform="translate(400,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">80µ</text><text text-anchor="middle" transform="translate(450,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">90µ</text><text text-anchor="end" transform="translate(500,17)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">100µ</text></g><g class="mark-rule role-axis-domain" pointer-events="none"><line transform="translate(0,0)" x2="500" y2="0" stroke="#888" stroke-width="1" opacity="1"/></g><g class="mark-text role-axis-title" pointer-events="none"><text text-anchor="end" transform="translate(500,36)" font-family="Noto Sans" font-size="15px" font-weight="bold" fill="#000" opacity="1">Decoding time (in μs per message)</text></g></g><path class="foreground" aria-hidden="true" d="" pointer-events="none" display="none"/></g></g><g class="mark-group role-axis" role="graphics-symbol" aria-roledescription="axis" aria-label="Y-axis for a discrete scale with 5 values: pyModeS (Python), pyModeS (compiled), rs1090 (Python, single core), rs1090 (Python, many cores), rs1090 (Rust, many cores)"><g transform="translate(0.5,0.5)"><path class="background" aria-hidden="true" d="M0,0h0v0h0Z" pointer-events="none"/><g><g class="mark-rule role-axis-tick" pointer-events="none"><line transform="translate(0,10)" x2="-5" y2="0" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(0,30)" x2="-5" y2="0" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(0,50)" x2="-5" y2="0" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(0,70)" x2="-5" y2="0" stroke="#888" stroke-width="1" opacity="1"/><line transform="translate(0,90)" x2="-5" y2="0" stroke="#888" stroke-width="1" opacity="1"/></g><g class="mark-text role-axis-label" pointer-events="none"><text text-anchor="end" transform="translate(-7,13.5)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">pyModeS (Python)</text><text text-anchor="end" transform="translate(-7,33.5)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">pyModeS (compiled)</text><text text-anchor="end" transform="translate(-7,53.5)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">rs1090 (Python, single core)</text><text text-anchor="end" transform="translate(-7,73.5)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">rs1090 (Python, many cores)</text><text text-anchor="end" transform="translate(-7,93.5)" font-family="Noto Sans" font-size="13px" fill="#000" opacity="1">rs1090 (Rust, many cores)</text></g><g class="mark-rule role-axis-domain" pointer-events="none"><line transform="translate(0,0)" x2="0" y2="100" stroke="#888" stroke-width="1" opacity="1"/></g></g><path class="foreground" aria-hidden="true" d="" pointer-events="none" display="none"/></g></g><g class="mark-rect role-mark marks" role="graphics-object" aria-roledescription="rect mark container"><path aria-label="Decoding time (in μs per message): 4.37854µ; type: rs1090 (Rust, many cores)" role="graphics-symbol" aria-roledescription="bar" d="M0,81h21.892688132133244v18h-21.892688132133244Z" fill="#54a24b"/><path aria-label="Decoding time (in μs per message): 8.46711µ; type: rs1090 (Python, many cores)" role="graphics-symbol" aria-roledescription="bar" d="M0,61h42.33552936809872v18h-42.33552936809872Z" fill="#e45756"/><path aria-label="Decoding time (in μs per message): 24.0675µ; type: rs1090 (Python, single core)" role="graphics-symbol" aria-roledescription="bar" d="M0,41h120.33729238192447v18h-120.33729238192447Z" fill="#72b7b2"/><path aria-label="Decoding time (in μs per message): 53.7603µ; type: pyModeS (compiled)" role="graphics-symbol" aria-roledescription="bar" d="M0,21h268.80161454950354v18h-268.80161454950354Z" fill="#f58518"/><path aria-label="Decoding time (in μs per message): 92.7902µ; type: pyModeS (Python)" role="graphics-symbol" aria-roledescription="bar" d="M0,1h463.95100677368475v18h-463.95100677368475Z" fill="#4c78a8"/></g></g><path class="foreground" aria-hidden="true" d="" display="none"/></g></g></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1"
+    class="marks" width="691" height="149" viewBox="0 0 691 149">
+    <defs>
+        <style type="text/css">
+            @import
+            url('https://fonts.googleapis.com/css?family=Noto+Sans');</style>
+    </defs>
+    <rect width="691" height="149" fill="white" />
+    <g fill="none" stroke-miterlimit="10" transform="translate(185,5)">
+        <g class="mark-group role-frame root" role="graphics-object"
+            aria-roledescription="group mark container">
+            <g transform="translate(0,0)">
+                <path class="background" aria-hidden="true" d="M0.5,0.5h500v100h-500Z" stroke="#ddd" />
+                <g>
+                    <g class="mark-group role-axis" aria-hidden="true">
+                        <g transform="translate(0.5,100.5)">
+                            <path class="background" aria-hidden="true" d="M0,0h0v0h0Z"
+                                pointer-events="none" />
+                            <g>
+                                <g class="mark-rule role-axis-grid" pointer-events="none">
+                                    <line transform="translate(0,0)" x2="0" y2="-100" stroke="#ddd"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(50,0)" x2="0" y2="-100" stroke="#ddd"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(100,0)" x2="0" y2="-100"
+                                        stroke="#ddd" stroke-width="1" opacity="1" />
+                                    <line transform="translate(150,0)" x2="0" y2="-100"
+                                        stroke="#ddd" stroke-width="1" opacity="1" />
+                                    <line transform="translate(200,0)" x2="0" y2="-100"
+                                        stroke="#ddd" stroke-width="1" opacity="1" />
+                                    <line transform="translate(250,0)" x2="0" y2="-100"
+                                        stroke="#ddd" stroke-width="1" opacity="1" />
+                                    <line transform="translate(300,0)" x2="0" y2="-100"
+                                        stroke="#ddd" stroke-width="1" opacity="1" />
+                                    <line transform="translate(350,0)" x2="0" y2="-100"
+                                        stroke="#ddd" stroke-width="1" opacity="1" />
+                                    <line transform="translate(400,0)" x2="0" y2="-100"
+                                        stroke="#ddd" stroke-width="1" opacity="1" />
+                                    <line transform="translate(450,0)" x2="0" y2="-100"
+                                        stroke="#ddd" stroke-width="1" opacity="1" />
+                                    <line transform="translate(500,0)" x2="0" y2="-100"
+                                        stroke="#ddd" stroke-width="1" opacity="1" />
+                                </g>
+                            </g>
+                            <path class="foreground" aria-hidden="true" d="" pointer-events="none"
+                                display="none" />
+                        </g>
+                    </g>
+                    <g class="mark-group role-axis" role="graphics-symbol"
+                        aria-roledescription="axis"
+                        aria-label="X-axis titled 'Decoding time (in μs per message)' for a linear scale with values from 0µ to 100µ">
+                        <g transform="translate(0.5,100.5)">
+                            <path class="background" aria-hidden="true" d="M0,0h0v0h0Z"
+                                pointer-events="none" />
+                            <g>
+                                <g class="mark-rule role-axis-tick" pointer-events="none">
+                                    <line transform="translate(0,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(50,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(100,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(150,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(200,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(250,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(300,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(350,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(400,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(450,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(500,0)" x2="0" y2="5" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                </g>
+                                <g class="mark-text role-axis-label" pointer-events="none">
+                                    <text text-anchor="start" transform="translate(0,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">0µ</text>
+                                    <text text-anchor="middle" transform="translate(50,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">10µ</text>
+                                    <text text-anchor="middle" transform="translate(100,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">20µ</text>
+                                    <text text-anchor="middle" transform="translate(150,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">30µ</text>
+                                    <text text-anchor="middle" transform="translate(200,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">40µ</text>
+                                    <text text-anchor="middle" transform="translate(250,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">50µ</text>
+                                    <text text-anchor="middle" transform="translate(300,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">60µ</text>
+                                    <text text-anchor="middle" transform="translate(350,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">70µ</text>
+                                    <text text-anchor="middle" transform="translate(400,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">80µ</text>
+                                    <text text-anchor="middle" transform="translate(450,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">90µ</text>
+                                    <text text-anchor="end" transform="translate(500,17)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">100µ</text>
+                                </g>
+                                <g class="mark-rule role-axis-domain" pointer-events="none">
+                                    <line transform="translate(0,0)" x2="500" y2="0" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                </g>
+                                <g class="mark-text role-axis-title" pointer-events="none">
+                                    <text text-anchor="end" transform="translate(500,36)"
+                                        font-family="Noto Sans" font-size="15px" font-weight="bold"
+                                        fill="#000" opacity="1">Decoding time (in μs per message)</text>
+                                </g>
+                            </g>
+                            <path class="foreground" aria-hidden="true" d="" pointer-events="none"
+                                display="none" />
+                        </g>
+                    </g>
+                    <g class="mark-group role-axis" role="graphics-symbol"
+                        aria-roledescription="axis"
+                        aria-label="Y-axis for a discrete scale with 5 values: pyModeS (Python), pyModeS (compiled), rs1090 (Python, single core), rs1090 (Python, default), rs1090 (Rust, default)">
+                        <g transform="translate(0.5,0.5)">
+                            <path class="background" aria-hidden="true" d="M0,0h0v0h0Z"
+                                pointer-events="none" />
+                            <g>
+                                <g class="mark-rule role-axis-tick" pointer-events="none">
+                                    <line transform="translate(0,10)" x2="-5" y2="0" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(0,30)" x2="-5" y2="0" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(0,50)" x2="-5" y2="0" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(0,70)" x2="-5" y2="0" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                    <line transform="translate(0,90)" x2="-5" y2="0" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                </g>
+                                <g class="mark-text role-axis-label" pointer-events="none">
+                                    <text text-anchor="end" transform="translate(-7,13.5)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">pyModeS (Python)</text>
+                                    <text text-anchor="end" transform="translate(-7,33.5)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">pyModeS (compiled)</text>
+                                    <text text-anchor="end" transform="translate(-7,53.5)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">rs1090 (Python, single core)</text>
+                                    <text text-anchor="end" transform="translate(-7,73.5)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">rs1090 (Python, default)</text>
+                                    <text text-anchor="end" transform="translate(-7,93.5)"
+                                        font-family="Noto Sans" font-size="13px" fill="#000"
+                                        opacity="1">rs1090 (Rust, default)</text>
+                                </g>
+                                <g class="mark-rule role-axis-domain" pointer-events="none">
+                                    <line transform="translate(0,0)" x2="0" y2="100" stroke="#888"
+                                        stroke-width="1" opacity="1" />
+                                </g>
+                            </g>
+                            <path class="foreground" aria-hidden="true" d="" pointer-events="none"
+                                display="none" />
+                        </g>
+                    </g>
+                    <g class="mark-rect role-mark marks" role="graphics-object"
+                        aria-roledescription="rect mark container">
+                        <path
+                            aria-label="Decoding time (in μs per message): 4.37854µ; type: rs1090 (Rust, default)"
+                            role="graphics-symbol" aria-roledescription="bar"
+                            d="M0,81h21.892688132133244v18h-21.892688132133244Z" fill="#54a24b" />
+                        <path
+                            aria-label="Decoding time (in μs per message): 8.46711µ; type: rs1090 (Python, default)"
+                            role="graphics-symbol" aria-roledescription="bar"
+                            d="M0,61h42.33552936809872v18h-42.33552936809872Z" fill="#e45756" />
+                        <path
+                            aria-label="Decoding time (in μs per message): 24.0675µ; type: rs1090 (Python, single core)"
+                            role="graphics-symbol" aria-roledescription="bar"
+                            d="M0,41h120.33729238192447v18h-120.33729238192447Z" fill="#72b7b2" />
+                        <path
+                            aria-label="Decoding time (in μs per message): 53.7603µ; type: pyModeS (compiled)"
+                            role="graphics-symbol" aria-roledescription="bar"
+                            d="M0,21h268.80161454950354v18h-268.80161454950354Z" fill="#f58518" />
+                        <path
+                            aria-label="Decoding time (in μs per message): 92.7902µ; type: pyModeS (Python)"
+                            role="graphics-symbol" aria-roledescription="bar"
+                            d="M0,1h463.95100677368475v18h-463.95100677368475Z" fill="#4c78a8" />
+                    </g>
+                </g>
+                <path class="foreground" aria-hidden="true" d="" display="none" />
+            </g>
+        </g>
+    </g>
+</svg>

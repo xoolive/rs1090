@@ -23,15 +23,18 @@ Benchmarking performed on the decoding of a gate-to-gate [European flight](./cra
 
 - [pyModeS](https://github.com/junzis/pyModeS) in full Python mode;
 - [pyModeS](https://github.com/junzis/pyModeS) with Cython compiled functions;
-- rs1090 with Python bindings on a single core (for a fair comparison);
-- rs1090 with Python bindings on many cores (parallelization with [rayon](https://docs.rs/rayon/));
-- full Rust rs1090 parallelized benchmark.
+- `rs1090` with Python bindings on a single core (for a fair comparison);
+- `rs1090` with Python bindings on many cores **(default)**;
+- full Rust `rs1090` benchmark on many cores **(default)**.
 
 The Python script for benchmarking is in [python/examples](python/examples/benchmark.py).  
 The Rust benchmark is executed with `cargo bench`.  
 Both scripts are run on an Intel(R) Core(TM) i7-10850H CPU @ 2.70GHz.
 
 ![](./python/examples/benchmark.svg)
+
+> [!NOTE]  
+> The default out-of-the-box mode of `rs1090` is an execution distributed on all your cores. This benchmark was performed on a regular laptop. It can be much faster on supercomputers, but considering that most laptops now have at least 4 cores, this default mode yields the speed-up you should get on your own computer.
 
 ## Installation
 
