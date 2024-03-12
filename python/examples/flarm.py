@@ -87,5 +87,6 @@ flight.query("gs < 20000").plot(
 ax.spines["geo"].set_visible(False)
 ax.yaxis.set_visible(False)
 ax.set_extent((5.1, 5.16, 43.59, 43.64))
+fig.savefig("flarm.png")
 
 # %%
