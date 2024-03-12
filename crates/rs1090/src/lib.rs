@@ -1,3 +1,4 @@
+#![allow(rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../readme.md")]
 pub mod decode;
 pub mod source;
