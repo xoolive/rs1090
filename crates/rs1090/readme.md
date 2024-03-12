@@ -24,7 +24,7 @@ Benchmarking performed on the decoding of a gate-to-gate [European flight](./cra
 - [pyModeS](https://github.com/junzis/pyModeS) in full Python mode;
 - [pyModeS](https://github.com/junzis/pyModeS) with Cython compiled functions;
 - rs1090 with Python bindings on a single core (for a fair comparison);
-- rs1090 with Python bindings on 12 cores (parallelization with [rayon](https://docs.rs/rayon/));
+- rs1090 with Python bindings on many cores (parallelization with [rayon](https://docs.rs/rayon/));
 - full Rust rs1090 parallelized benchmark.
 
 The Python script for benchmarking is in [python/examples](python/examples/benchmark.py).  
