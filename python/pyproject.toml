@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "rs1090"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["pandas>=2.2.0"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -41,8 +41,7 @@ warn_unused_ignores = true
 dev = [
   "mypy>=1.8.0",
   "pytest>=8.0.2",
-  "ruff>=0.3.0", 
-  "pandas>=2.2.0"
+  "ruff>=0.3.0"
 ]
 
 [project.urls]

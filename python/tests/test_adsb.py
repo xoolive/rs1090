@@ -1,46 +1,62 @@
 from pytest import approx
 
-from rs1090 import decode
+import rs1090
 
 
 def test_icao24() -> None:
-    assert decode("8D406B902015A678D4D220AA4BDA")["icao24"] == "406b90"
+    assert rs1090.decode("8D406B902015A678D4D220AA4BDA")["icao24"] == "406b90"
 
 
 def test_wake_vortex() -> None:
-    assert decode("8D406B902015A678D4D220AA4BDA")["wake_vortex"] == "n/a"
+    msg = rs1090.decode("8D406B902015A678D4D220AA4BDA")
+    assert rs1090.is_df17(msg)
+    assert rs1090.is_bds08(msg)
+    assert msg["wake_vortex"] == "n/a"
 
 
 def test_adsb_callsign() -> None:
-    assert decode("8D406B902015A678D4D220AA4BDA")["callsign"] == "EZY85MH"
+    msg = rs1090.decode("8D406B902015A678D4D220AA4BDA")
+    assert rs1090.is_df17(msg)
+    assert rs1090.is_bds08(msg)
+    assert msg["callsign"] == "EZY85MH"
 
 
 def test_adsb_alt() -> None:
-    assert decode("8D40058B58C901375147EFD09357")["altitude"] == 39000
+    msg = rs1090.decode("8D40058B58C901375147EFD09357")
+    assert rs1090.is_df17(msg)
+    assert rs1090.is_bds05(msg)
+    assert msg["altitude"] == 39000
 
 
 def test_adsb_velocity() -> None:
-    msg = decode("8D485020994409940838175B284F")
+    msg = rs1090.decode("8D485020994409940838175B284F")
+    assert rs1090.is_df17(msg)
+    assert rs1090.is_bds09(msg)
     assert msg["groundspeed"] == approx(159.2, rel=1e-3)
     assert msg["vertical_rate"] == -832
     assert msg["track"] == approx(182.88, rel=1e-3)
     assert msg["geo_minus_baro"] == 550
 
-    msg = decode("8DA05F219B06B6AF189400CBC33F")
+    msg = rs1090.decode("8DA05F219B06B6AF189400CBC33F")
+    assert rs1090.is_df17(msg)
+    assert rs1090.is_bds09(msg)
     assert msg["TAS"] == 375
     assert msg["vertical_rate"] == -2304
     assert msg["heading"] == approx(243.98, rel=1e-3)
 
 
 def test_adsb_emergency() -> None:
-    msg = decode("8DA2C1B6E112B600000000760759")
+    msg = rs1090.decode("8DA2C1B6E112B600000000760759")
+    assert rs1090.is_df17(msg)
+    assert rs1090.is_bds61(msg)
     assert msg["emergency_state"] == "none"
     assert msg["squawk"] == "6513"
 
 
 def test_adsb_target_state_status() -> None:
-    msg = decode("8DA05629EA21485CBF3F8CADAEEB")
-
+    msg = rs1090.decode("8DA05629EA21485CBF3F8CADAEEB")
+    assert rs1090.is_df17(msg)
+    assert rs1090.is_bds62(msg)
     assert msg["selected_altitude"] == 17000
     assert msg["source"] == "MCP/FCU"
     assert msg["barometric_setting"] == approx(1012.8)

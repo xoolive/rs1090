@@ -127,7 +127,7 @@ def decode(msg: str, common: Any = py_common) -> dict[str, Any]:
                 decoded["tcas_type"] = tcas_ra_types[tcas_ra]
                 decoded["emergency_status"] = emergency_types[emergency_status]
             else:
-                alt, alt_source = adsb.selected_altitude(msg)  # type: ignore
+                alt, alt_source = adsb.selected_altitude(msg)
                 baro = adsb.baro_pressure_setting(msg)
                 hdg = adsb.selected_heading(msg)
                 autopilot = adsb.autopilot(msg)

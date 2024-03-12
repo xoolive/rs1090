@@ -179,6 +179,7 @@ pub struct ThreadAddress {
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct ThreatOrientation {
     /// Altitude code on 13 bits
+    #[serde(rename = "threat_altitude")]
     altitude: AC13Field,
 
     #[deku(
@@ -188,6 +189,7 @@ pub struct ThreatOrientation {
         }"
     )]
     /// Most recent threat range from ACAS (max 12.55 nautical miles)
+    #[serde(rename = "threat_range")]
     range: Option<f32>,
 
     #[deku(
@@ -198,6 +200,7 @@ pub struct ThreatOrientation {
     )]
     /// Most recent estimated bearing of the threat aircraft,
     /// relative to their own heading (3 degree precision)
+    #[serde(rename = "threat_bearing")]
     bearing: Option<u16>,
 }
 

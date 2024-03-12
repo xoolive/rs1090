@@ -314,7 +314,7 @@ pub struct AirborneV1 {
 pub struct AirborneV2 {
     #[deku(bits = "1")]
     #[serde(rename = "NICa")]
-    /// NIC supplement A (NICs)
+    /// NIC supplement A (NICa)
     pub nic_a: u8,
 
     #[deku(bits = "4")]

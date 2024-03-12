@@ -1,7 +1,7 @@
 # ruff: noqa: E402
 # %%
 import bench_pms
-import pandas as pd  # type: ignore
+import pandas as pd
 from pyModeS import c_common, py_common
 
 from rs1090 import decode
@@ -72,7 +72,7 @@ chart = (
             title="Decoding time (in μs per message)",
         ),
         alt.Y("type", title=None, sort="-x"),
-        alt.Color("type", legend=None),
+        alt.Color("type", legend=None),  # type: ignore
     )
     .transform_calculate(time=f"datum.time / {n}")
     .properties(width=500, height=100)
