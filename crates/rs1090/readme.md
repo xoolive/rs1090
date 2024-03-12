@@ -27,8 +27,7 @@ Benchmarking performed on the decoding of a gate-to-gate [European flight](./cra
 - rs1090 with Python bindings on 12 cores (parallelization with [rayon](https://docs.rs/rayon/));
 - full Rust rs1090 parallelized benchmark.
 
-The Python script for benchmarking is in [python/examples](python/examples/benchmark.py). The Rust benchmark is executed with `cargo bench`.  
-Executed on an Intel(R) Core(TM) i7-10850H CPU @ 2.70GHz.
+The Python script for benchmarking is in [python/examples](python/examples/benchmark.py). The Rust benchmark is executed with `cargo bench`. Executed on an Intel(R) Core(TM) i7-10850H CPU @ 2.70GHz.
 
 ![](./python/examples/benchmark.svg)
 

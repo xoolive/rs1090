@@ -1,7 +1,7 @@
 # ruff: noqa: E402
 # %%
 import bench_pms
-import pandas as pd
+import pandas as pd  # type: ignore
 from pyModeS import c_common, py_common
 
 from rs1090 import decode
