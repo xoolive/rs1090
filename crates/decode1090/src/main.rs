@@ -1,73 +1,12 @@
 #![doc = include_str!("../readme.md")]
 
 use clap::Parser;
-use deku::DekuContainerRead;
-use futures_util::pin_mut;
 use rs1090::decode::cpr::{decode_position, AircraftState, Position};
 use rs1090::prelude::*;
-use serde::Serialize;
 use std::collections::BTreeMap;
-use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::net::TcpStream;
-
-fn today() -> i64 {
-    86_400
-        * (SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("SystemTime before unix epoch")
-            .as_secs() as i64
-            / 86_400)
-}
-
-#[derive(Serialize)]
-struct TimedMessage {
-    timestamp: f64,
-
-    //#[serde(skip)]
-    frame: String,
-
-    #[serde(flatten)]
-    message: Message,
-}
-
-impl fmt::Display for TimedMessage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
-        writeln!(f, "{}", &self.message)
-    }
-}
-impl fmt::Debug for TimedMessage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
-        writeln!(f, "{:#}", &self.message)
-    }
-}
-
-fn process_radarcape(msg: &[u8]) -> Option<TimedMessage> {
-    // Copy the bytes from the slice into the array starting from index 2
-    let mut array = [0u8; 8];
-    array[2..8].copy_from_slice(&msg[2..8]);
-
-    let ts = u64::from_be_bytes(array);
-    let seconds = ts >> 30;
-    let nanos = ts & 0x00003FFFFFFF;
-    let ts = seconds as f64 + nanos as f64 * 1e-9;
-    let frame = msg[9..]
-        .iter()
-        .map(|&b| format!("{:02x}", b))
-        .collect::<Vec<String>>()
-        .join("");
-    if let Ok((_, msg)) = Message::from_bytes((&msg[9..], 0)) {
-        Some(TimedMessage {
-            timestamp: today() as f64 + ts,
-            frame,
-            message: msg,
-        })
-    } else {
-        None
-    }
-}
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
+use tokio::sync::mpsc;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -78,12 +17,16 @@ fn process_radarcape(msg: &[u8]) -> Option<TimedMessage> {
 )]
 struct Options {
     /// Address of the demodulating server (beast feed)
-    #[arg(long, default_value = "radarcape")]
+    #[arg(long, default_value = "localhost")]
     host: String,
 
     /// Port of the demodulating server
-    #[arg(short, long, default_value = "10005")]
+    #[arg(short, long, default_value = "30005")]
     port: u16,
+
+    /// Demodulate data from a RTL-SDR dongle
+    #[arg(long, default_value = "false")]
+    rtlsdr: bool,
 
     /// Activate JSON output
     #[arg(long, default_value = "false")]
@@ -99,7 +42,7 @@ struct Options {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let options = Options::parse();
 
     if !options.msgs.is_empty() {
@@ -108,20 +51,47 @@ async fn main() {
             let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
             println!("{}", serde_json::to_string(&msg).unwrap());
         }
-        return;
+        return Ok(());
     }
 
-    let server_address = format!("{}:{}", options.host, options.port);
     let mut reference = options.latlon;
+    let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
+    let mut file = fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open("output.jsonl")
+        .await?;
 
-    match TcpStream::connect(server_address).await {
-        Ok(stream) => {
-            let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
-            let msg_stream = beast::next_msg(stream).await;
-            pin_mut!(msg_stream); // needed for iteration
-            while let Some(msg) = msg_stream.next().await {
-                if let Some(mut msg) = process_radarcape(&msg) {
-                    match &mut msg.message.df {
+    let mut rx: Option<mpsc::Receiver<TimedMessage>> = None;
+    if options.rtlsdr {
+        #[cfg(not(feature = "rtlsdr"))]
+        {
+            eprintln!(
+                "Not compiled with RTL-SDR support, use the rtlsdr feature"
+            );
+            std::process::exit(127);
+        }
+        #[cfg(feature = "rtlsdr")]
+        {
+            rtlsdr::discover();
+            rx = Some(rtlsdr::receiver().await);
+        }
+    } else {
+        let server_address = format!("{}:{}", options.host, options.port);
+        rx = Some(radarcape::receiver(server_address).await);
+    }
+    if let Some(mut rx) = rx {
+        while let Some(tmsg) = rx.recv().await {
+            let frame = hex::decode(&tmsg.frame).unwrap();
+            if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
+                let mut msg = TimedMessage {
+                    timestamp: tmsg.timestamp,
+                    frame: tmsg.frame.to_string(),
+                    message: Some(msg),
+                };
+
+                if let Some(message) = &mut msg.message {
+                    match &mut message.df {
                         ExtendedSquitterADSB(adsb) => decode_position(
                             &mut adsb.message,
                             msg.timestamp,
@@ -137,15 +107,18 @@ async fn main() {
                             &mut reference,
                         ),
                         _ => {}
-                    };
-                    if options.json {
-                        println!("{}", serde_json::to_string(&msg).unwrap());
                     }
+                };
+
+                let json = serde_json::to_string(&msg).unwrap();
+                if options.json {
+                    println!("{}", json);
                 }
+                file.write_all(json.as_bytes()).await?;
+                file.write_all("\n".as_bytes()).await?;
             }
         }
-        Err(e) => {
-            panic!("Failed to connect: {}", e);
-        }
     }
+
+    Ok(())
 }

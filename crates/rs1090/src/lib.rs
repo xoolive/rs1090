@@ -25,4 +25,8 @@ pub mod prelude {
 
     /// Information on the structure of a Beast message
     pub use crate::source::beast;
+    pub use crate::source::radarcape;
+
+    #[cfg(feature = "rtlsdr")]
+    pub use crate::source::rtlsdr;
 }

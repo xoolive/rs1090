@@ -22,7 +22,7 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-
 # Publish jobs to run in CI
 pr-run-mode = "plan"
 # A GitHub repo to push Homebrew formulas to
-tap = "xoolive/homebrew-gander"
+tap = "xoolive/homebrew-homebrew"
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]
 

@@ -64,7 +64,8 @@ fn main() -> io::Result<()> {
                 let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
                 res.push(TimedMessage {
                     timestamp,
-                    message: msg,
+                    frame: hex.to_string(),
+                    message: Some(msg),
                 });
             }
             res

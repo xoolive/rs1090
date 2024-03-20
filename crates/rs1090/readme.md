@@ -34,7 +34,7 @@ Both scripts are run on an Intel(R) Core(TM) i7-10850H CPU @ 2.70GHz.
 ![](./python/examples/benchmark.svg)
 
 > [!NOTE]  
-> The default out-of-the-box mode of `rs1090` is an execution distributed on all your cores. This benchmark was performed on a regular laptop. It can be much faster on supercomputers, but considering that most laptops now have at least 4 cores, this default mode yields the speed-up you should get on your own computer.
+> The default out-of-the-box mode of `rs1090` is an execution distributed on all your cores. This benchmark was performed on a regular laptop. It can be much faster on supercomputers, but considering that most laptops now have at least 4 cores, this benchmark yields the speed-up you should get on your own computer.
 
 ## Installation
 

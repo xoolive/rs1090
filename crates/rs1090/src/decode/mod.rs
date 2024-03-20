@@ -404,8 +404,29 @@ impl fmt::Display for Message {
 pub struct TimedMessage {
     pub timestamp: f64,
 
+    pub frame: String,
+
     #[serde(flatten)]
-    pub message: Message,
+    pub message: Option<Message>,
+}
+
+impl fmt::Display for TimedMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
+        if let Some(msg) = &self.message {
+            writeln!(f, "{}", msg)?;
+        }
+        write!(f, "")
+    }
+}
+impl fmt::Debug for TimedMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
+        if let Some(msg) = &self.message {
+            writeln!(f, "{:#}", msg)?;
+        }
+        write!(f, "")
+    }
 }
 
 /// ICAO 24-bit address, commonly use to reference airframes, i.e. tail numbers

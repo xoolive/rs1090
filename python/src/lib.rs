@@ -53,10 +53,11 @@ fn decode_1090t_vec(
                 .zip(ts)
                 .filter_map(|(msg, timestamp)| {
                     let bytes = hex::decode(msg).unwrap();
-                    if let Ok((_, msg)) = Message::from_bytes((&bytes, 0)) {
+                    if let Ok((_, message)) = Message::from_bytes((&bytes, 0)) {
                         Some(TimedMessage {
                             timestamp,
-                            message: msg,
+                            frame: msg.to_string(),
+                            message: Some(message),
                         })
                     } else {
                         None

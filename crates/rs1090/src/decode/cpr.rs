@@ -449,22 +449,26 @@ pub fn decode_positions(res: &mut [TimedMessage], reference: Option<Position>) {
 
     let _: Vec<()> = res
         .iter_mut()
-        .map(|msg| match &mut msg.message.df {
-            DF::ExtendedSquitterADSB(adsb) => decode_position(
-                &mut adsb.message,
-                msg.timestamp,
-                &adsb.icao24,
-                &mut aircraft,
-                &mut reference,
-            ),
-            DF::ExtendedSquitterTisB { cf, .. } => decode_position(
-                &mut cf.me,
-                msg.timestamp,
-                &cf.aa,
-                &mut aircraft,
-                &mut reference,
-            ),
-            _ => {}
+        .map(|msg| {
+            if let Some(message) = &mut msg.message {
+                match &mut message.df {
+                    DF::ExtendedSquitterADSB(adsb) => decode_position(
+                        &mut adsb.message,
+                        msg.timestamp,
+                        &adsb.icao24,
+                        &mut aircraft,
+                        &mut reference,
+                    ),
+                    DF::ExtendedSquitterTisB { cf, .. } => decode_position(
+                        &mut cf.me,
+                        msg.timestamp,
+                        &cf.aa,
+                        &mut aircraft,
+                        &mut reference,
+                    ),
+                    _ => {}
+                }
+            }
         })
         .collect();
 }
