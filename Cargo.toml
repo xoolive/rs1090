@@ -25,6 +25,21 @@ pr-run-mode = "plan"
 tap = "xoolive/homebrew-homebrew"
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]
+# Whether to pass --all-features to cargo build
+all-features = true
+# Allow to edit the release.yml file (see Windows dependencies)
+allow-dirty = ["ci"]
+
+[workspace.metadata.dist.dependencies.apt]
+libsoapysdr-dev = "*"
+soapysdr-module-rtlsdr = "*"
+
+[workspace.metadata.dist.dependencies.homebrew]
+soapysdr = { stage = ["build", "run"] }
+soapyrtlsdr = { stage = ["run"] }
+
+[workspace.metadata.dist.github-custom-runners]
+aarch64-apple-darwin = "macos-14"
 
 [profile.release]
 lto = true
