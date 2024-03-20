@@ -6,7 +6,6 @@ use rs1090::prelude::*;
 use std::collections::BTreeMap;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::mpsc;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -62,8 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .open("output.jsonl")
         .await?;
 
-    let mut rx: Option<mpsc::Receiver<TimedMessage>> = None;
-    if options.rtlsdr {
+    let mut rx = if options.rtlsdr {
         #[cfg(not(feature = "rtlsdr"))]
         {
             eprintln!(
@@ -74,49 +72,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(feature = "rtlsdr")]
         {
             rtlsdr::discover();
-            rx = Some(rtlsdr::receiver().await);
+            rtlsdr::receiver().await
         }
     } else {
         let server_address = format!("{}:{}", options.host, options.port);
-        rx = Some(radarcape::receiver(server_address).await);
-    }
-    if let Some(mut rx) = rx {
-        while let Some(tmsg) = rx.recv().await {
-            let frame = hex::decode(&tmsg.frame).unwrap();
-            if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
-                let mut msg = TimedMessage {
-                    timestamp: tmsg.timestamp,
-                    frame: tmsg.frame.to_string(),
-                    message: Some(msg),
-                };
+        radarcape::receiver(server_address).await
+    };
 
-                if let Some(message) = &mut msg.message {
-                    match &mut message.df {
-                        ExtendedSquitterADSB(adsb) => decode_position(
-                            &mut adsb.message,
-                            msg.timestamp,
-                            &adsb.icao24,
-                            &mut aircraft,
-                            &mut reference,
-                        ),
-                        ExtendedSquitterTisB { cf, .. } => decode_position(
-                            &mut cf.me,
-                            msg.timestamp,
-                            &cf.aa,
-                            &mut aircraft,
-                            &mut reference,
-                        ),
-                        _ => {}
-                    }
-                };
+    while let Some(tmsg) = rx.recv().await {
+        let frame = hex::decode(&tmsg.frame).unwrap();
+        if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
+            let mut msg = TimedMessage {
+                timestamp: tmsg.timestamp,
+                frame: tmsg.frame.to_string(),
+                message: Some(msg),
+            };
 
-                let json = serde_json::to_string(&msg).unwrap();
-                if options.json {
-                    println!("{}", json);
+            if let Some(message) = &mut msg.message {
+                match &mut message.df {
+                    ExtendedSquitterADSB(adsb) => decode_position(
+                        &mut adsb.message,
+                        msg.timestamp,
+                        &adsb.icao24,
+                        &mut aircraft,
+                        &mut reference,
+                    ),
+                    ExtendedSquitterTisB { cf, .. } => decode_position(
+                        &mut cf.me,
+                        msg.timestamp,
+                        &cf.aa,
+                        &mut aircraft,
+                        &mut reference,
+                    ),
+                    _ => {}
                 }
-                file.write_all(json.as_bytes()).await?;
-                file.write_all("\n".as_bytes()).await?;
+            };
+
+            let json = serde_json::to_string(&msg).unwrap();
+            if options.json {
+                println!("{}", json);
             }
+            file.write_all(json.as_bytes()).await?;
+            file.write_all("\n".as_bytes()).await?;
         }
     }
 

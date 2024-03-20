@@ -244,7 +244,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: "xoolive/homebrew-gander"
+          repository: "xoolive/homebrew-homebrew"
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       # So we have access to the formula
       - name: Fetch local artifacts
