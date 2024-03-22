@@ -2,7 +2,9 @@ use super::adsb::ME;
 use super::bds::bds05::AirbornePosition;
 use super::bds::bds06::SurfacePosition;
 use super::{TimedMessage, DF, ICAO};
+use crate::airports::one_airport;
 use deku::prelude::*;
+use regex::Regex;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -56,6 +58,13 @@ impl FromStr for Position {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let regex_list = [Regex::new(s).unwrap()];
+        if let Some(airport) = one_airport(&regex_list) {
+            return Ok(Position {
+                latitude: airport.lat,
+                longitude: airport.lon,
+            });
+        }
         let parts: Vec<&str> = s.split(',').map(|p| p.trim()).collect();
 
         if parts.len() != 2 {

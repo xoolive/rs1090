@@ -32,7 +32,8 @@ struct Options {
     json: bool,
 
     /// Reference coordinates for the decoding
-    ///  (e.g. --latlon 43.3,1.35 or --latlon ' -34,18.6' if negative)
+    ///  (e.g. --latlon LFPG for major airports,
+    ///   --latlon 43.3,1.35 or --latlon ' -34,18.6' if negative)
     #[arg(long, default_value=None)]
     latlon: Option<Position>,
 
