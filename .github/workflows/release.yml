@@ -40,7 +40,7 @@ permissions:
 on:
   push:
     tags:
-      - '**[0-9]+.[0-9]+.[0-9]+*'
+      - "**[0-9]+.[0-9]+.[0-9]+*"
   pull_request:
 
 jobs:
@@ -87,6 +87,7 @@ jobs:
     needs:
       - plan
     if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') }}
+    # if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null  }}
     strategy:
       fail-fast: false
       # Target platforms/runners are computed by cargo-dist in create-release.
@@ -121,6 +122,15 @@ jobs:
       - name: Install dependencies
         run: |
           ${{ matrix.packages_install }}
+      - name: Install dependencies for Windows
+        if: ${{ matrix.runner == 'windows-2019' }}
+        shell: bash
+        run: |
+          curl -L https://downloads.myriadrf.org/builds/PothosSDR/PothosSDR-2021.07.25-vc16-x64.exe -o pothossdr.exe
+          7z x -opothos -y pothossdr.exe
+          echo "${{github.workspace}}/pothos/bin" >> $GITHUB_PATH
+          # for pkg-config?
+          echo "C:\\msys64\\mingw64\\bin" >> $GITHUB_PATH
       - name: Build artifacts
         run: |
           # Actually do builds and make zips and whatnot
