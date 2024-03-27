@@ -26,4 +26,7 @@ tokio = { version = "1.36.0", features = ["full"] }
 [[bin]]
 name = "decode1090"
 path = "src/main.rs"
-required-features = ["rtlsdr"]
+
+[[bin]]
+name = "jet1090"
+path = "src/jet.rs"
