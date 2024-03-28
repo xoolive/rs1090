@@ -16,8 +16,8 @@ use tokio::io::AsyncWriteExt;
 )]
 struct Options {
     /// Address of the demodulating server (beast feed)
-    #[arg(long, default_value=None)]
-    host: Option<String>,
+    #[arg(long, default_value = "0.0.0.0")]
+    host: String,
 
     /// Port of the demodulating server
     #[arg(long, default_value=None)]
@@ -71,46 +71,58 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut reference = options.latlon;
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
 
-    if let Some(host) = options.host {
-        if let Some(port) = options.port {
-            let server_address = format!("{}:{}", host, port);
-            let mut rx = radarcape::receiver(server_address).await;
+    if let Some(port) = options.port {
+        let server_address = format!("{}:{}", options.host, port);
+        let mut rx = radarcape::receiver(server_address).await;
 
-            while let Some(tmsg) = rx.recv().await {
-                let frame = hex::decode(&tmsg.frame).unwrap();
-                if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
-                    let mut msg = TimedMessage {
-                        timestamp: tmsg.timestamp,
-                        frame: tmsg.frame.to_string(),
-                        message: Some(msg),
-                    };
+        while let Some(tmsg) = rx.recv().await {
+            let frame = hex::decode(&tmsg.frame).unwrap();
+            if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
+                let mut msg = TimedMessage {
+                    timestamp: tmsg.timestamp,
+                    frame: tmsg.frame.to_string(),
+                    message: Some(msg),
+                };
 
-                    if let Some(message) = &mut msg.message {
-                        match &mut message.df {
-                            ExtendedSquitterADSB(adsb) => decode_position(
-                                &mut adsb.message,
-                                msg.timestamp,
-                                &adsb.icao24,
-                                &mut aircraft,
-                                &mut reference,
-                            ),
-                            ExtendedSquitterTisB { cf, .. } => decode_position(
-                                &mut cf.me,
-                                msg.timestamp,
-                                &cf.aa,
-                                &mut aircraft,
-                                &mut reference,
-                            ),
-                            _ => {}
+                if let Some(message) = &mut msg.message {
+                    match &mut message.df {
+                        ExtendedSquitterADSB(adsb) => decode_position(
+                            &mut adsb.message,
+                            msg.timestamp,
+                            &adsb.icao24,
+                            &mut aircraft,
+                            &mut reference,
+                        ),
+                        ExtendedSquitterTisB { cf, .. } => decode_position(
+                            &mut cf.me,
+                            msg.timestamp,
+                            &cf.aa,
+                            &mut aircraft,
+                            &mut reference,
+                        ),
+                        CommBAltitudeReply { bds, .. } => {
+                            if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60)
+                            {
+                                bds.bds50 = None;
+                                bds.bds60 = None
+                            }
                         }
-                    };
-                    let json = serde_json::to_string(&msg).unwrap();
-                    if let Some(file) = &mut file {
-                        file.write_all(json.as_bytes()).await?;
-                        file.write_all("\n".as_bytes()).await?;
-                    } else {
-                        println!("{}", json);
+                        CommBIdentityReply { bds, .. } => {
+                            if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60)
+                            {
+                                bds.bds50 = None;
+                                bds.bds60 = None
+                            }
+                        }
+                        _ => {}
                     }
+                };
+                let json = serde_json::to_string(&msg).unwrap();
+                if let Some(file) = &mut file {
+                    file.write_all(json.as_bytes()).await?;
+                    file.write_all("\n".as_bytes()).await?;
+                } else {
+                    println!("{}", json);
                 }
             }
         }

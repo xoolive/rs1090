@@ -1,15 +1,17 @@
 use crate::prelude::*;
+use crate::source::beast::DataSource;
 use futures_util::pin_mut;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::{net::TcpStream, sync::mpsc};
+use tokio::net::{TcpStream, UdpSocket};
+use tokio::sync::mpsc;
 
 pub async fn receiver(address: String) -> mpsc::Receiver<TimedMessage> {
     let (tx, rx) = mpsc::channel(100);
 
-    match TcpStream::connect(address).await {
+    match TcpStream::connect(&address).await {
         Ok(stream) => {
             tokio::spawn(async move {
-                let msg_stream = beast::next_msg(stream).await;
+                let msg_stream = beast::next_msg(DataSource::Tcp(stream)).await;
                 pin_mut!(msg_stream); // needed for iteration
                 loop {
                     while let Some(msg) = msg_stream.next().await {
@@ -19,10 +21,33 @@ pub async fn receiver(address: String) -> mpsc::Receiver<TimedMessage> {
                 }
             });
         }
-        Err(e) => {
-            panic!("Failed to connect: {}", e);
+        Err(err_tcp) => {
+            match UdpSocket::bind(&address).await {
+                Ok(socket) => {
+                    tokio::spawn(async move {
+                        let msg_stream =
+                            beast::next_msg(DataSource::Udp(socket)).await;
+                        pin_mut!(msg_stream); // needed for iteration
+                        loop {
+                            while let Some(msg) = msg_stream.next().await {
+                                let msg = process_radarcape(&msg);
+                                tx.send(msg)
+                                    .await
+                                    .expect("Failed to send message");
+                            }
+                        }
+                    });
+                }
+                Err(err_udp) => {
+                    panic!(
+                        "Failed to connect in TCP ({}) and UDP ({})",
+                        err_tcp, err_udp
+                    );
+                }
+            }
         }
     }
+
     rx
 }
 

@@ -5,7 +5,8 @@ use num_complex::Complex;
 use soapysdr::{Device, Direction};
 use tokio::sync::mpsc;
 
-use crate::decode::{crc::modes_checksum, TimedMessage};
+use crate::decode::crc::modes_checksum;
+use crate::decode::TimedMessage;
 use std::fmt::{self, Display, Formatter};
 
 const DIRECTION: Direction = Direction::Rx;

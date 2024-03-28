@@ -2,8 +2,7 @@ use ansi_term::Color;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Deserialize;
-use std::fmt::Display;
-use std::fmt::Result;
+use std::fmt::{Display, Result};
 
 #[derive(Debug, Deserialize)]
 pub struct Airport {
