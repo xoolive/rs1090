@@ -1,25 +1,23 @@
 #![doc = include_str!("../readme.md")]
 
+mod tui;
+
+use chrono::prelude::*;
 use clap::Parser;
-use crossterm::{
-    event::{self, Event, KeyCode},
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
-        LeaveAlternateScreen,
-    },
-    ExecutableCommand,
-};
+use color_eyre::eyre::Result;
+use crossterm::event::KeyCode;
 use ratatui::{prelude::*, widgets::*};
 use rs1090::decode::adsb::{ADSB, ME};
 use rs1090::decode::cpr::{decode_position, AircraftState, Position};
 use rs1090::decode::IdentityCode;
 use rs1090::prelude::*;
 use std::collections::BTreeMap;
-use std::io::{self, stdout};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use tui::Event;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -106,21 +104,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         radarcape::receiver(server_address).await
     };
 
-    // Initialize ratatui
-    enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+    let mut terminal = tui::init()?;
+    let mut events = tui::EventHandler::new();
+    let mut app = App {
+        counter: 0,
+        should_quit: false,
+    };
 
-    std::thread::spawn(move || {
+    tokio::spawn(async move {
         loop {
-            terminal.draw(|frame| build_table(frame, &states_tui))?;
-            if handle_events()? {
+            if let Ok(event) = events.next().await {
+                let _ = update(&mut app, event);
+            } // new
+            if app.should_quit {
                 break;
             }
+            terminal.draw(|frame| build_table(frame, &states_tui))?;
         }
-        disable_raw_mode()?;
-        stdout().execute(LeaveAlternateScreen)?;
-        Ok::<(), io::Error>(())
+        tui::restore()
     });
 
     while let Some(tmsg) = rx.recv().await {
@@ -174,8 +175,9 @@ pub struct StateVectors {
 }
 
 impl StateVectors {
-    fn new(ts: u32) -> StateVectors {
+    fn new(ts: u64, icao24: String) -> StateVectors {
         let cur = Snapshot {
+            icao24,
             first: ts,
             last: ts,
             callsign: None,
@@ -196,8 +198,9 @@ impl StateVectors {
 
 #[derive(Debug)]
 pub struct Snapshot {
-    pub first: u32,
-    pub last: u32,
+    pub icao24: String,
+    pub first: u64,
+    pub last: u64,
     pub callsign: Option<String>,
     pub squawk: Option<IdentityCode>,
     pub latitude: Option<f64>,
@@ -212,14 +215,14 @@ pub struct Snapshot {
 }
 
 fn icao24(msg: &Message) -> Option<String> {
-    match msg.df {
+    match &msg.df {
         ShortAirAirSurveillance { ap, .. } => Some(ap.to_string()),
         SurveillanceAltitudeReply { ap, .. } => Some(ap.to_string()),
         SurveillanceIdentityReply { ap, .. } => Some(ap.to_string()),
         AllCallReply { icao, .. } => Some(icao.to_string()),
         LongAirAirSurveillance { ap, .. } => Some(ap.to_string()),
         ExtendedSquitterADSB(ADSB { icao24, .. }) => Some(icao24.to_string()),
-        ExtendedSquitterTisB { pi, .. } => Some(pi.to_string()),
+        ExtendedSquitterTisB { cf, .. } => Some(cf.aa.to_string()),
         CommBAltitudeReply { ap, .. } => Some(ap.to_string()),
         CommBIdentityReply { ap, .. } => Some(ap.to_string()),
         _ => None,
@@ -239,9 +242,9 @@ async fn update_snapshot(
         if let Some(icao24) = icao24(message) {
             let mut states = states.lock().unwrap();
             let aircraft = states
-                .entry(icao24)
-                .or_insert(StateVectors::new(*timestamp as u32));
-            aircraft.cur.last = *timestamp as u32;
+                .entry(icao24.to_string())
+                .or_insert(StateVectors::new(*timestamp as u64, icao24));
+            aircraft.cur.last = *timestamp as u64;
 
             match &mut message.df {
                 SurveillanceIdentityReply { id, .. } => {
@@ -321,31 +324,34 @@ async fn update_snapshot(
     }
 }
 
-fn handle_events() -> io::Result<bool> {
-    if event::poll(std::time::Duration::from_millis(500))? {
-        if let Event::Key(key) = event::read()? {
-            if key.kind == event::KeyEventKind::Press
-                && key.code == KeyCode::Char('q')
-            {
-                return Ok(true);
-            }
-        }
-    }
-    Ok(false)
+fn ts_to_utc(timestamp: u64) -> String {
+    let dt: DateTime<Utc> =
+        DateTime::from_timestamp(timestamp as i64, 0).unwrap();
+    format!("{}", dt.format("%H:%M:%S"))
 }
 
 fn build_table(
     frame: &mut Frame<'_>,
     states_tui: &Arc<Mutex<BTreeMap<String, StateVectors>>>,
 ) {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("SystemTime before unix epoch")
+        .as_secs();
+
     let rows: Vec<Row> = states_tui
         .lock()
         .unwrap()
-        .iter()
-        .map(|(icao, sv)| {
+        .values()
+        .filter(|sv| (now as i64 - sv.cur.last as i64) < 30)
+        .map(|sv| {
             Row::new(vec![
-                icao.to_owned(),
+                sv.cur.icao24.to_owned(),
                 sv.cur.callsign.to_owned().unwrap_or("".to_string()),
+                sv.cur
+                    .squawk
+                    .map(|s| s.to_string())
+                    .unwrap_or("".to_string()),
                 if let Some(lat) = sv.cur.latitude {
                     format!("{}", lat)
                 } else {
@@ -361,29 +367,71 @@ fn build_table(
                 } else {
                     "".to_string()
                 },
-                format!("{}", sv.cur.first),
-                format!("{}", sv.cur.last),
+                if let Some(gs) = sv.cur.groundspeed {
+                    format!("{}", gs)
+                } else {
+                    "".to_string()
+                },
+                if let Some(ias) = sv.cur.ias {
+                    format!("{}", ias)
+                } else {
+                    "".to_string()
+                },
+                if let Some(mach) = sv.cur.mach {
+                    format!("{}", mach)
+                } else {
+                    "".to_string()
+                },
+                if let Some(vrate) = sv.cur.vertical_rate {
+                    format!("{}", vrate)
+                } else {
+                    "".to_string()
+                },
+                if let Some(trk) = sv.cur.track {
+                    format!("{}", trk)
+                } else {
+                    "".to_string()
+                },
+                if let Some(roll) = sv.cur.roll {
+                    format!("{}", roll)
+                } else {
+                    "".to_string()
+                },
+                ts_to_utc(sv.cur.first),
+                if now > sv.cur.last {
+                    format!("{}s ago", now - sv.cur.last)
+                } else {
+                    "".to_string()
+                },
             ])
         })
         .collect();
-    //let rows = [Row::new(vec!["Cell1", "Cell2", "Cell3"])];
-    // Columns widths are constrained in the same way as Layout...
+
     let widths = [
         Constraint::Length(6),
-        Constraint::Length(10),
         Constraint::Length(8),
+        Constraint::Length(4),
+        Constraint::Length(6),
+        Constraint::Length(6),
+        Constraint::Length(5),
+        Constraint::Length(3),
+        Constraint::Length(3),
+        Constraint::Length(5),
+        Constraint::Length(5),
         Constraint::Length(8),
-        Constraint::Length(8),
+        Constraint::Length(4),
         Constraint::Length(8),
         Constraint::Length(8),
     ];
     let size = &rows.len();
     let table = Table::new(rows, widths)
-        .column_spacing(1)
+        .column_spacing(2)
         .header(
             Row::new(vec![
-                "icao24", "callsign", "lat", "lon", "alt", "first", "last",
+                "icao24", "callsign", "sqwk", "lat", "lon", "alt", "gs", "ias",
+                "mach", "vrate", "trk", "roll", "first", "last",
             ])
+            .bottom_margin(1)
             .style(Style::new().bold()),
         )
         .block(
@@ -391,6 +439,7 @@ fn build_table(
                 .title_bottom(format!("jet1090 ({} aircraft)", size))
                 .title_alignment(Alignment::Right)
                 .title_style(Style::new().blue().bold())
+                .padding(Padding::symmetric(1, 0))
                 .borders(Borders::ALL),
         )
         // The selected row and its content can also be styled.
@@ -399,4 +448,22 @@ fn build_table(
         .highlight_symbol(">>");
 
     frame.render_widget(table, frame.size());
+}
+
+#[derive(Debug, Default)]
+pub struct App {
+    counter: u8,
+    should_quit: bool,
+}
+
+fn update(app: &mut App, event: Event) -> Result<()> {
+    if let Event::Key(key) = event {
+        match key.code {
+            KeyCode::Char('j') => app.counter += 1,
+            KeyCode::Char('k') => app.counter -= 1,
+            KeyCode::Char('q') => app.should_quit = true,
+            _ => {}
+        }
+    }
+    Ok(())
 }

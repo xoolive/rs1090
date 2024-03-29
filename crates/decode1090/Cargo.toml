@@ -13,9 +13,12 @@ edition.workspace = true
 rtlsdr = ['soapysdr']
 
 [dependencies]
+chrono = "0.4.37"
 clap = { version = "4.5.1", features = ["color", "derive", "wrap_help"] }
-crossterm = "0.27.0"
+color-eyre = "0.6.3"
+crossterm = { version = "0.27.0", features = ["event-stream"] }
 deku = "0.16.0"
+futures = "0.3.30"
 futures-util = "0.3.30"
 hex = "0.4.3"
 ratatui = "0.26.1"
@@ -24,6 +27,7 @@ serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
 soapysdr = { version = "0.4.0", optional = true }
 tokio = { version = "1.36.0", features = ["full"] }
+tokio-util = "0.7.9" # required for `CancellationToken` introduced in the next section
 
 [[bin]]
 name = "decode1090"
