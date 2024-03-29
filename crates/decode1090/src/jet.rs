@@ -1,11 +1,23 @@
 #![doc = include_str!("../readme.md")]
 
 use clap::Parser;
+use crossterm::{
+    event::{self, Event, KeyCode},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
+    ExecutableCommand,
+};
+use ratatui::{prelude::*, widgets::*};
 use rs1090::decode::adsb::{ADSB, ME};
 use rs1090::decode::cpr::{decode_position, AircraftState, Position};
 use rs1090::decode::IdentityCode;
 use rs1090::prelude::*;
 use std::collections::BTreeMap;
+use std::io::{self, stdout};
+use std::sync::Arc;
+use std::sync::Mutex;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
@@ -70,7 +82,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut reference = options.latlon;
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
-    let mut states: BTreeMap<String, StateVectors> = BTreeMap::new();
+
+    let states: Arc<Mutex<BTreeMap<String, StateVectors>>> =
+        Arc::new(Mutex::new(BTreeMap::new()));
+    let states_tui = Arc::clone(&states);
 
     let mut rx = if options.rtlsdr {
         #[cfg(not(feature = "rtlsdr"))]
@@ -90,6 +105,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             format!("{}:{}", options.host, options.port.unwrap());
         radarcape::receiver(server_address).await
     };
+
+    // Initialize ratatui
+    enable_raw_mode()?;
+    stdout().execute(EnterAlternateScreen)?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+
+    std::thread::spawn(move || {
+        loop {
+            terminal.draw(|frame| build_table(frame, &states_tui))?;
+            if handle_events()? {
+                break;
+            }
+        }
+        disable_raw_mode()?;
+        stdout().execute(LeaveAlternateScreen)?;
+        Ok::<(), io::Error>(())
+    });
 
     while let Some(tmsg) = rx.recv().await {
         let frame = hex::decode(&tmsg.frame).unwrap();
@@ -120,9 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            update_snapshot(&mut states, &mut msg);
-            //dbg!(&states);
-
+            update_snapshot(&states, &mut msg).await;
             let json = serde_json::to_string(&msg).unwrap();
             if options.verbose {
                 println!("{}", json);
@@ -196,8 +226,8 @@ fn icao24(msg: &Message) -> Option<String> {
     }
 }
 
-fn update_snapshot(
-    states: &mut BTreeMap<String, StateVectors>,
+async fn update_snapshot(
+    states: &Mutex<BTreeMap<String, StateVectors>>,
     msg: &mut TimedMessage,
 ) {
     if let TimedMessage {
@@ -207,6 +237,7 @@ fn update_snapshot(
     } = msg
     {
         if let Some(icao24) = icao24(message) {
+            let mut states = states.lock().unwrap();
             let aircraft = states
                 .entry(icao24)
                 .or_insert(StateVectors::new(*timestamp as u32));
@@ -284,9 +315,88 @@ fn update_snapshot(
                         aircraft.cur.mach = bds60.mach_number;
                     }
                 }
-
                 _ => {}
             };
         }
     }
+}
+
+fn handle_events() -> io::Result<bool> {
+    if event::poll(std::time::Duration::from_millis(500))? {
+        if let Event::Key(key) = event::read()? {
+            if key.kind == event::KeyEventKind::Press
+                && key.code == KeyCode::Char('q')
+            {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn build_table(
+    frame: &mut Frame<'_>,
+    states_tui: &Arc<Mutex<BTreeMap<String, StateVectors>>>,
+) {
+    let rows: Vec<Row> = states_tui
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(icao, sv)| {
+            Row::new(vec![
+                icao.to_owned(),
+                sv.cur.callsign.to_owned().unwrap_or("".to_string()),
+                if let Some(lat) = sv.cur.latitude {
+                    format!("{}", lat)
+                } else {
+                    "".to_string()
+                },
+                if let Some(lon) = sv.cur.longitude {
+                    format!("{}", lon)
+                } else {
+                    "".to_string()
+                },
+                if let Some(alt) = sv.cur.altitude {
+                    format!("{}", alt)
+                } else {
+                    "".to_string()
+                },
+                format!("{}", sv.cur.first),
+                format!("{}", sv.cur.last),
+            ])
+        })
+        .collect();
+    //let rows = [Row::new(vec!["Cell1", "Cell2", "Cell3"])];
+    // Columns widths are constrained in the same way as Layout...
+    let widths = [
+        Constraint::Length(6),
+        Constraint::Length(10),
+        Constraint::Length(8),
+        Constraint::Length(8),
+        Constraint::Length(8),
+        Constraint::Length(8),
+        Constraint::Length(8),
+    ];
+    let size = &rows.len();
+    let table = Table::new(rows, widths)
+        .column_spacing(1)
+        .header(
+            Row::new(vec![
+                "icao24", "callsign", "lat", "lon", "alt", "first", "last",
+            ])
+            .style(Style::new().bold()),
+        )
+        .block(
+            Block::default()
+                .title_bottom(format!("jet1090 ({} aircraft)", size))
+                .title_alignment(Alignment::Right)
+                .title_style(Style::new().blue().bold())
+                .borders(Borders::ALL),
+        )
+        // The selected row and its content can also be styled.
+        .highlight_style(Style::new().reversed())
+        // ...and potentially show a symbol in front of the selection.
+        .highlight_symbol(">>");
+
+    frame.render_widget(table, frame.size());
 }
