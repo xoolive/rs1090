@@ -1,6 +1,7 @@
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use crossterm::{execute, terminal::*};
+use crossterm::execute;
+use crossterm::terminal::*;
 use futures::{FutureExt, StreamExt};
 use ratatui::prelude::*;
 use std::io::{self, stderr, Stderr};
@@ -58,6 +59,14 @@ impl EventHandler {
                           crossterm::event::Event::Key(key) => {
                             if key.kind == crossterm::event::KeyEventKind::Press {
                               tx.send(Event::Key(key)).unwrap();
+                            }
+                          },
+                          crossterm::event::Event::Mouse(event) => {
+                            if event.kind == crossterm::event::MouseEventKind::ScrollUp {
+                              tx.send(Event::Key(KeyEvent::new(crossterm::event::KeyCode::Char('k'), event.modifiers))).unwrap();
+                            }
+                            if event.kind == crossterm::event::MouseEventKind::ScrollDown {
+                              tx.send(Event::Key(KeyEvent::new(crossterm::event::KeyCode::Char('j'), event.modifiers))).unwrap();
                             }
                           },
                           _ => {},

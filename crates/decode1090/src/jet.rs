@@ -1,25 +1,19 @@
 #![doc = include_str!("../readme.md")]
 
+mod snapshot;
+mod table;
 mod tui;
 
-use chrono::prelude::*;
 use clap::Parser;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyCode;
-use ratatui::{prelude::*, widgets::*};
-use rs1090::decode::adsb::{ADSB, ME};
-use rs1090::decode::bds::bds09::AirborneVelocitySubType::AirspeedSubsonic;
-use rs1090::decode::bds::bds09::AirborneVelocitySubType::GroundSpeedDecoding;
-use rs1090::decode::bds::bds09::AirspeedType::{IAS, TAS};
 use rs1090::decode::cpr::{decode_position, AircraftState, Position};
-use rs1090::decode::IdentityCode;
 use rs1090::prelude::*;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
 use tui::Event;
 
 #[derive(Debug, Parser)]
@@ -84,9 +78,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut reference = options.latlon;
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
 
-    let states: Arc<Mutex<BTreeMap<String, StateVectors>>> =
-        Arc::new(Mutex::new(BTreeMap::new()));
-    let states_tui = Arc::clone(&states);
+    let app_tui = Arc::new(Mutex::new(Jet1090 {
+        scroll_pos: 0,
+        should_quit: false,
+        state_vectors: BTreeMap::new(),
+    }));
+    let app_dec = app_tui.clone();
 
     let mut rx = if options.rtlsdr {
         #[cfg(not(feature = "rtlsdr"))]
@@ -109,20 +106,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut terminal = tui::init()?;
     let mut events = tui::EventHandler::new();
-    let mut app = App {
-        counter: 0,
-        should_quit: false,
-    };
 
     tokio::spawn(async move {
         loop {
             if let Ok(event) = events.next().await {
-                let _ = update(&mut app, event);
+                let _ = update(&mut app_tui.lock().await, event);
             } // new
+            let app = app_tui.lock().await;
             if app.should_quit {
                 break;
             }
-            terminal.draw(|frame| build_table(frame, &states_tui))?;
+            let states = &app.state_vectors;
+            let rows = table::build_rows(states).await;
+            let counter = app.scroll_pos;
+            terminal.draw(|frame| table::build_table(frame, rows, counter))?;
         }
         tui::restore()
     });
@@ -156,7 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            update_snapshot(&states, &mut msg).await;
+            snapshot::update_snapshot(&app_dec, &mut msg).await;
 
             let json = serde_json::to_string(&msg).unwrap();
             if options.verbose {
@@ -167,395 +164,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 file.write_all("\n".as_bytes()).await?;
             }
         }
+        if app_dec.lock().await.should_quit {
+            break;
+        }
     }
-
     Ok(())
 }
 
-#[derive(Debug)]
-pub struct StateVectors {
-    pub cur: Snapshot,
-    //pub hist: Vec<TimedMessage>,
-}
-
-impl StateVectors {
-    fn new(ts: u64, icao24: String) -> StateVectors {
-        let cur = Snapshot {
-            icao24,
-            first: ts,
-            last: ts,
-            callsign: None,
-            squawk: None,
-            latitude: None,
-            longitude: None,
-            altitude: None,
-            selected_altitude: None,
-            groundspeed: None,
-            vertical_rate: None,
-            track: None,
-            ias: None,
-            tas: None,
-            mach: None,
-            roll: None,
-            heading: None,
-            selected_heading: None,
-            nic: None,
-        };
-        StateVectors { cur }
-    }
-}
-
-#[derive(Debug)]
-pub struct Snapshot {
-    pub icao24: String,
-    pub first: u64,
-    pub last: u64,
-    pub callsign: Option<String>,
-    pub squawk: Option<IdentityCode>,
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
-    pub altitude: Option<u16>,
-    pub selected_altitude: Option<u16>,
-    pub groundspeed: Option<f64>,
-    pub vertical_rate: Option<i16>,
-    pub track: Option<f64>,
-    pub ias: Option<u16>,
-    pub tas: Option<u16>,
-    pub mach: Option<f64>,
-    pub roll: Option<f64>,
-    pub heading: Option<f64>,
-    pub selected_heading: Option<f32>,
-    pub nic: Option<u8>,
-}
-
-fn icao24(msg: &Message) -> Option<String> {
-    match &msg.df {
-        ShortAirAirSurveillance { ap, .. } => Some(ap.to_string()),
-        SurveillanceAltitudeReply { ap, .. } => Some(ap.to_string()),
-        SurveillanceIdentityReply { ap, .. } => Some(ap.to_string()),
-        AllCallReply { icao, .. } => Some(icao.to_string()),
-        LongAirAirSurveillance { ap, .. } => Some(ap.to_string()),
-        ExtendedSquitterADSB(ADSB { icao24, .. }) => Some(icao24.to_string()),
-        ExtendedSquitterTisB { cf, .. } => Some(cf.aa.to_string()),
-        CommBAltitudeReply { ap, .. } => Some(ap.to_string()),
-        CommBIdentityReply { ap, .. } => Some(ap.to_string()),
-        _ => None,
-    }
-}
-
-async fn update_snapshot(
-    states: &Mutex<BTreeMap<String, StateVectors>>,
-    msg: &mut TimedMessage,
-) {
-    if let TimedMessage {
-        timestamp,
-        message: Some(message),
-        ..
-    } = msg
-    {
-        if let Some(icao24) = icao24(message) {
-            let mut states = states.lock().unwrap();
-            let aircraft = states
-                .entry(icao24.to_string())
-                .or_insert(StateVectors::new(*timestamp as u64, icao24));
-            aircraft.cur.last = *timestamp as u64;
-
-            match &mut message.df {
-                SurveillanceIdentityReply { id, .. } => {
-                    aircraft.cur.squawk = Some(*id)
-                }
-                SurveillanceAltitudeReply { ac, .. } => {
-                    aircraft.cur.altitude = Some(ac.0);
-                }
-                ExtendedSquitterADSB(adsb) => match &adsb.message {
-                    ME::BDS05(bds05) => {
-                        aircraft.cur.latitude = bds05.latitude;
-                        aircraft.cur.longitude = bds05.longitude;
-                        aircraft.cur.altitude = bds05.alt;
-                    }
-                    ME::BDS06(bds06) => {
-                        aircraft.cur.latitude = bds06.latitude;
-                        aircraft.cur.longitude = bds06.longitude;
-                        aircraft.cur.track = bds06.track;
-                        aircraft.cur.groundspeed = bds06.groundspeed;
-                    }
-                    ME::BDS08(bds08) => {
-                        aircraft.cur.callsign = Some(bds08.callsign.to_string())
-                    }
-                    ME::BDS09(bds09) => {
-                        aircraft.cur.vertical_rate = bds09.vertical_rate;
-                        match &bds09.velocity {
-                            GroundSpeedDecoding(spd) => {
-                                aircraft.cur.groundspeed =
-                                    Some(spd.groundspeed);
-                                aircraft.cur.track = Some(spd.track)
-                            }
-                            AirspeedSubsonic(spd) => {
-                                match spd.airspeed_type {
-                                    IAS => aircraft.cur.ias = spd.airspeed,
-                                    TAS => aircraft.cur.tas = spd.airspeed,
-                                }
-                                aircraft.cur.heading = spd.heading;
-                            }
-                            _ => {}
-                        }
-                    }
-                    ME::BDS61(bds61) => {
-                        aircraft.cur.squawk = Some(bds61.squawk);
-                    }
-                    ME::BDS62(bds62) => {
-                        aircraft.cur.selected_altitude =
-                            bds62.selected_altitude;
-                        aircraft.cur.selected_heading = bds62.selected_heading;
-                    }
-                    _ => {}
-                },
-                ExtendedSquitterTisB { cf, .. } => match &cf.me {
-                    ME::BDS05(bds05) => {
-                        aircraft.cur.latitude = bds05.latitude;
-                        aircraft.cur.longitude = bds05.longitude;
-                        aircraft.cur.altitude = bds05.alt;
-                    }
-                    ME::BDS06(bds06) => {
-                        aircraft.cur.latitude = bds06.latitude;
-                        aircraft.cur.longitude = bds06.longitude;
-                        aircraft.cur.track = bds06.track;
-                        aircraft.cur.groundspeed = bds06.groundspeed;
-                    }
-                    ME::BDS08(bds08) => {
-                        aircraft.cur.callsign = Some(bds08.callsign.to_string())
-                    }
-                    _ => {}
-                },
-                CommBAltitudeReply { bds, .. } => {
-                    // Invalidate data if marked as both BDS50 and BDS60
-                    if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-                        bds.bds50 = None;
-                        bds.bds60 = None
-                    }
-                    if let Some(bds20) = &bds.bds20 {
-                        aircraft.cur.callsign =
-                            Some(bds20.callsign.to_string());
-                    }
-                    if let Some(bds40) = &bds.bds40 {
-                        aircraft.cur.selected_altitude =
-                            bds40.selected_altitude_mcp;
-                    }
-                    if let Some(bds50) = &bds.bds50 {
-                        aircraft.cur.roll = bds50.roll_angle;
-                        aircraft.cur.track = bds50.track_angle;
-                        aircraft.cur.groundspeed =
-                            bds50.groundspeed.map(|x| x as f64);
-                        aircraft.cur.tas = bds50.true_airspeed;
-                    }
-                    if let Some(bds60) = &bds.bds60 {
-                        aircraft.cur.ias = bds60.indicated_airspeed;
-                        aircraft.cur.mach = bds60.mach_number;
-                        aircraft.cur.heading = bds60.magnetic_heading;
-                    }
-                }
-                CommBIdentityReply { bds, .. } => {
-                    // Invalidate data if marked as both BDS50 and BDS60
-                    if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-                        bds.bds50 = None;
-                        bds.bds60 = None
-                    }
-                    if let Some(bds20) = &bds.bds20 {
-                        aircraft.cur.callsign =
-                            Some(bds20.callsign.to_string());
-                    }
-                    if let Some(bds40) = &bds.bds40 {
-                        aircraft.cur.selected_altitude =
-                            bds40.selected_altitude_mcp;
-                    }
-                    if let Some(bds50) = &bds.bds50 {
-                        aircraft.cur.roll = bds50.roll_angle;
-                        aircraft.cur.track = bds50.track_angle;
-                        aircraft.cur.groundspeed =
-                            bds50.groundspeed.map(|x| x as f64);
-                        aircraft.cur.tas = bds50.true_airspeed;
-                    }
-                    if let Some(bds60) = &bds.bds60 {
-                        aircraft.cur.ias = bds60.indicated_airspeed;
-                        aircraft.cur.mach = bds60.mach_number;
-                        aircraft.cur.heading = bds60.magnetic_heading;
-                    }
-                }
-                _ => {}
-            };
-        }
-    }
-}
-
-fn ts_to_utc(timestamp: u64) -> String {
-    let dt: DateTime<Utc> =
-        DateTime::from_timestamp(timestamp as i64, 0).unwrap();
-    format!("{}", dt.format("%H:%M:%S"))
-}
-
-fn build_table(
-    frame: &mut Frame<'_>,
-    states_tui: &Arc<Mutex<BTreeMap<String, StateVectors>>>,
-) {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("SystemTime before unix epoch")
-        .as_secs();
-
-    let rows: Vec<Row> = states_tui
-        .lock()
-        .unwrap()
-        .values()
-        .filter(|sv| (now as i64 - sv.cur.last as i64) < 30)
-        .map(|sv| {
-            Row::new(vec![
-                sv.cur.icao24.to_owned(),
-                sv.cur.callsign.to_owned().unwrap_or("".to_string()),
-                sv.cur
-                    .squawk
-                    .map(|s| s.to_string())
-                    .unwrap_or("".to_string()),
-                if let Some(lat) = sv.cur.latitude {
-                    format!("{}", lat)
-                } else {
-                    "".to_string()
-                },
-                if let Some(lon) = sv.cur.longitude {
-                    format!("{}", lon)
-                } else {
-                    "".to_string()
-                },
-                if let Some(alt) = sv.cur.altitude {
-                    format!("{}", alt)
-                } else {
-                    "".to_string()
-                },
-                if let Some(sel) = sv.cur.selected_altitude {
-                    format!("{}", sel)
-                } else {
-                    "".to_string()
-                },
-                if let Some(gs) = sv.cur.groundspeed {
-                    format!("{}", gs)
-                } else {
-                    "".to_string()
-                },
-                if let Some(tas) = sv.cur.tas {
-                    format!("{}", tas)
-                } else {
-                    "".to_string()
-                },
-                if let Some(ias) = sv.cur.ias {
-                    format!("{}", ias)
-                } else {
-                    "".to_string()
-                },
-                if let Some(mach) = sv.cur.mach {
-                    format!("{}", mach)
-                } else {
-                    "".to_string()
-                },
-                if let Some(vrate) = sv.cur.vertical_rate {
-                    format!("{}", vrate)
-                } else {
-                    "".to_string()
-                },
-                if let Some(trk) = sv.cur.track {
-                    format!("{}", trk)
-                } else {
-                    "".to_string()
-                },
-                if let Some(heading) = sv.cur.heading {
-                    format!("{}", heading)
-                } else {
-                    "".to_string()
-                },
-                if let Some(selected_heading) = sv.cur.selected_heading {
-                    format!("{}", selected_heading)
-                } else {
-                    "".to_string()
-                },
-                if let Some(roll) = sv.cur.roll {
-                    format!("{}", roll)
-                } else {
-                    "".to_string()
-                },
-                if let Some(nic) = sv.cur.nic {
-                    format!("{}", nic)
-                } else {
-                    "".to_string()
-                },
-                if now > sv.cur.last {
-                    format!("{}s ago", now - sv.cur.last)
-                } else {
-                    "".to_string()
-                },
-                ts_to_utc(sv.cur.first),
-            ])
-        })
-        .collect();
-
-    let widths = [
-        Constraint::Length(6),
-        Constraint::Length(8),
-        Constraint::Length(4),
-        Constraint::Length(6),
-        Constraint::Length(6),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(3),
-        Constraint::Length(3),
-        Constraint::Length(3),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(4),
-        Constraint::Length(4),
-        Constraint::Length(8),
-        Constraint::Length(8),
-    ];
-    let size = &rows.len();
-    let table = Table::new(rows, widths)
-        .column_spacing(2)
-        .header(
-            Row::new(vec![
-                "icao24", "callsign", "sqwk", "lat", "lon", "alt", "sel", "gs",
-                "tas", "ias", "mach", "vrate", "trk", "hdg", "sel", "roll",
-                "nic", "last", "first",
-            ])
-            .bottom_margin(1)
-            .style(Style::new().bold()),
-        )
-        .block(
-            Block::default()
-                .title_bottom(format!("jet1090 ({} aircraft)", size))
-                .title_alignment(Alignment::Right)
-                .title_style(Style::new().blue().bold())
-                .padding(Padding::symmetric(1, 0))
-                .borders(Borders::ALL),
-        )
-        // The selected row and its content can also be styled.
-        .highlight_style(Style::new().reversed())
-        // ...and potentially show a symbol in front of the selection.
-        .highlight_symbol(">>");
-
-    frame.render_widget(table, frame.size());
-}
-
 #[derive(Debug, Default)]
-pub struct App {
-    counter: u8,
+pub struct Jet1090 {
+    scroll_pos: usize,
     should_quit: bool,
+    state_vectors: BTreeMap<String, snapshot::StateVectors>,
 }
 
-fn update(app: &mut App, event: Event) -> Result<()> {
+fn update(
+    jet1090: &mut tokio::sync::MutexGuard<Jet1090>,
+    event: Event,
+) -> Result<()> {
     if let Event::Key(key) = event {
         match key.code {
-            KeyCode::Char('j') => app.counter += 1,
-            KeyCode::Char('k') => app.counter -= 1,
-            KeyCode::Char('q') => app.should_quit = true,
+            KeyCode::Char('j') => jet1090.scroll_pos += 1,
+            KeyCode::Char('k') => {
+                jet1090.scroll_pos = if jet1090.scroll_pos == 0 {
+                    0
+                } else {
+                    jet1090.scroll_pos - 1
+                }
+            }
+            KeyCode::Char('q') | KeyCode::Esc => jet1090.should_quit = true,
             _ => {}
         }
     }
