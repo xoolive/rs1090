@@ -206,10 +206,10 @@ pub struct AirspeedSubsonicDecoding {
         endian = "big",
         bits = "10",
         map = "|val: u16| -> Result<_, DekuError> {
-            Ok(if *status_heading { Some(val as f32 * 360. / 1024.) } else { None })
+            Ok(if *status_heading { Some(val as f64 * 360. / 1024.) } else { None })
         }"
     )]
-    pub heading: Option<f32>,
+    pub heading: Option<f64>,
 
     pub airspeed_type: AirspeedType,
 

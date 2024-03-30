@@ -8,6 +8,9 @@ use color_eyre::eyre::Result;
 use crossterm::event::KeyCode;
 use ratatui::{prelude::*, widgets::*};
 use rs1090::decode::adsb::{ADSB, ME};
+use rs1090::decode::bds::bds09::AirborneVelocitySubType::AirspeedSubsonic;
+use rs1090::decode::bds::bds09::AirborneVelocitySubType::GroundSpeedDecoding;
+use rs1090::decode::bds::bds09::AirspeedType::{IAS, TAS};
 use rs1090::decode::cpr::{decode_position, AircraftState, Position};
 use rs1090::decode::IdentityCode;
 use rs1090::prelude::*;
@@ -154,6 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             update_snapshot(&states, &mut msg).await;
+
             let json = serde_json::to_string(&msg).unwrap();
             if options.verbose {
                 println!("{}", json);
@@ -185,12 +189,17 @@ impl StateVectors {
             latitude: None,
             longitude: None,
             altitude: None,
+            selected_altitude: None,
             groundspeed: None,
             vertical_rate: None,
             track: None,
             ias: None,
+            tas: None,
             mach: None,
             roll: None,
+            heading: None,
+            selected_heading: None,
+            nic: None,
         };
         StateVectors { cur }
     }
@@ -206,12 +215,17 @@ pub struct Snapshot {
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
     pub altitude: Option<u16>,
+    pub selected_altitude: Option<u16>,
     pub groundspeed: Option<f64>,
     pub vertical_rate: Option<i16>,
     pub track: Option<f64>,
     pub ias: Option<u16>,
+    pub tas: Option<u16>,
     pub mach: Option<f64>,
     pub roll: Option<f64>,
+    pub heading: Option<f64>,
+    pub selected_heading: Option<f32>,
+    pub nic: Option<u8>,
 }
 
 fn icao24(msg: &Message) -> Option<String> {
@@ -253,30 +267,49 @@ async fn update_snapshot(
                 SurveillanceAltitudeReply { ac, .. } => {
                     aircraft.cur.altitude = Some(ac.0);
                 }
-                ExtendedSquitterADSB(adsb) => {
-                    match &adsb.message {
-                        ME::BDS05(bds05) => {
-                            aircraft.cur.latitude = bds05.latitude;
-                            aircraft.cur.longitude = bds05.longitude;
-                            aircraft.cur.altitude = bds05.alt;
-                        }
-                        ME::BDS06(bds06) => {
-                            aircraft.cur.latitude = bds06.latitude;
-                            aircraft.cur.longitude = bds06.longitude;
-                            aircraft.cur.track = bds06.track;
-                            aircraft.cur.groundspeed = bds06.groundspeed;
-                        }
-                        ME::BDS08(bds08) => {
-                            aircraft.cur.callsign =
-                                Some(bds08.callsign.to_string())
-                        }
-                        ME::BDS09(bds09) => {
-                            aircraft.cur.vertical_rate = bds09.vertical_rate;
-                            //aircraft.cur.groundspeed = bds09.s
-                        }
-                        _ => {}
+                ExtendedSquitterADSB(adsb) => match &adsb.message {
+                    ME::BDS05(bds05) => {
+                        aircraft.cur.latitude = bds05.latitude;
+                        aircraft.cur.longitude = bds05.longitude;
+                        aircraft.cur.altitude = bds05.alt;
                     }
-                }
+                    ME::BDS06(bds06) => {
+                        aircraft.cur.latitude = bds06.latitude;
+                        aircraft.cur.longitude = bds06.longitude;
+                        aircraft.cur.track = bds06.track;
+                        aircraft.cur.groundspeed = bds06.groundspeed;
+                    }
+                    ME::BDS08(bds08) => {
+                        aircraft.cur.callsign = Some(bds08.callsign.to_string())
+                    }
+                    ME::BDS09(bds09) => {
+                        aircraft.cur.vertical_rate = bds09.vertical_rate;
+                        match &bds09.velocity {
+                            GroundSpeedDecoding(spd) => {
+                                aircraft.cur.groundspeed =
+                                    Some(spd.groundspeed);
+                                aircraft.cur.track = Some(spd.track)
+                            }
+                            AirspeedSubsonic(spd) => {
+                                match spd.airspeed_type {
+                                    IAS => aircraft.cur.ias = spd.airspeed,
+                                    TAS => aircraft.cur.tas = spd.airspeed,
+                                }
+                                aircraft.cur.heading = spd.heading;
+                            }
+                            _ => {}
+                        }
+                    }
+                    ME::BDS61(bds61) => {
+                        aircraft.cur.squawk = Some(bds61.squawk);
+                    }
+                    ME::BDS62(bds62) => {
+                        aircraft.cur.selected_altitude =
+                            bds62.selected_altitude;
+                        aircraft.cur.selected_heading = bds62.selected_heading;
+                    }
+                    _ => {}
+                },
                 ExtendedSquitterTisB { cf, .. } => match &cf.me {
                     ME::BDS05(bds05) => {
                         aircraft.cur.latitude = bds05.latitude;
@@ -300,6 +333,26 @@ async fn update_snapshot(
                         bds.bds50 = None;
                         bds.bds60 = None
                     }
+                    if let Some(bds20) = &bds.bds20 {
+                        aircraft.cur.callsign =
+                            Some(bds20.callsign.to_string());
+                    }
+                    if let Some(bds40) = &bds.bds40 {
+                        aircraft.cur.selected_altitude =
+                            bds40.selected_altitude_mcp;
+                    }
+                    if let Some(bds50) = &bds.bds50 {
+                        aircraft.cur.roll = bds50.roll_angle;
+                        aircraft.cur.track = bds50.track_angle;
+                        aircraft.cur.groundspeed =
+                            bds50.groundspeed.map(|x| x as f64);
+                        aircraft.cur.tas = bds50.true_airspeed;
+                    }
+                    if let Some(bds60) = &bds.bds60 {
+                        aircraft.cur.ias = bds60.indicated_airspeed;
+                        aircraft.cur.mach = bds60.mach_number;
+                        aircraft.cur.heading = bds60.magnetic_heading;
+                    }
                 }
                 CommBIdentityReply { bds, .. } => {
                     // Invalidate data if marked as both BDS50 and BDS60
@@ -307,15 +360,25 @@ async fn update_snapshot(
                         bds.bds50 = None;
                         bds.bds60 = None
                     }
+                    if let Some(bds20) = &bds.bds20 {
+                        aircraft.cur.callsign =
+                            Some(bds20.callsign.to_string());
+                    }
+                    if let Some(bds40) = &bds.bds40 {
+                        aircraft.cur.selected_altitude =
+                            bds40.selected_altitude_mcp;
+                    }
                     if let Some(bds50) = &bds.bds50 {
                         aircraft.cur.roll = bds50.roll_angle;
                         aircraft.cur.track = bds50.track_angle;
                         aircraft.cur.groundspeed =
                             bds50.groundspeed.map(|x| x as f64);
+                        aircraft.cur.tas = bds50.true_airspeed;
                     }
                     if let Some(bds60) = &bds.bds60 {
                         aircraft.cur.ias = bds60.indicated_airspeed;
                         aircraft.cur.mach = bds60.mach_number;
+                        aircraft.cur.heading = bds60.magnetic_heading;
                     }
                 }
                 _ => {}
@@ -367,8 +430,18 @@ fn build_table(
                 } else {
                     "".to_string()
                 },
+                if let Some(sel) = sv.cur.selected_altitude {
+                    format!("{}", sel)
+                } else {
+                    "".to_string()
+                },
                 if let Some(gs) = sv.cur.groundspeed {
                     format!("{}", gs)
+                } else {
+                    "".to_string()
+                },
+                if let Some(tas) = sv.cur.tas {
+                    format!("{}", tas)
                 } else {
                     "".to_string()
                 },
@@ -392,17 +465,32 @@ fn build_table(
                 } else {
                     "".to_string()
                 },
+                if let Some(heading) = sv.cur.heading {
+                    format!("{}", heading)
+                } else {
+                    "".to_string()
+                },
+                if let Some(selected_heading) = sv.cur.selected_heading {
+                    format!("{}", selected_heading)
+                } else {
+                    "".to_string()
+                },
                 if let Some(roll) = sv.cur.roll {
                     format!("{}", roll)
                 } else {
                     "".to_string()
                 },
-                ts_to_utc(sv.cur.first),
+                if let Some(nic) = sv.cur.nic {
+                    format!("{}", nic)
+                } else {
+                    "".to_string()
+                },
                 if now > sv.cur.last {
                     format!("{}s ago", now - sv.cur.last)
                 } else {
                     "".to_string()
                 },
+                ts_to_utc(sv.cur.first),
             ])
         })
         .collect();
@@ -414,11 +502,16 @@ fn build_table(
         Constraint::Length(6),
         Constraint::Length(6),
         Constraint::Length(5),
+        Constraint::Length(5),
+        Constraint::Length(3),
         Constraint::Length(3),
         Constraint::Length(3),
         Constraint::Length(5),
         Constraint::Length(5),
-        Constraint::Length(8),
+        Constraint::Length(5),
+        Constraint::Length(5),
+        Constraint::Length(5),
+        Constraint::Length(4),
         Constraint::Length(4),
         Constraint::Length(8),
         Constraint::Length(8),
@@ -428,8 +521,9 @@ fn build_table(
         .column_spacing(2)
         .header(
             Row::new(vec![
-                "icao24", "callsign", "sqwk", "lat", "lon", "alt", "gs", "ias",
-                "mach", "vrate", "trk", "roll", "first", "last",
+                "icao24", "callsign", "sqwk", "lat", "lon", "alt", "sel", "gs",
+                "tas", "ias", "mach", "vrate", "trk", "hdg", "sel", "roll",
+                "nic", "last", "first",
             ])
             .bottom_margin(1)
             .style(Style::new().bold()),

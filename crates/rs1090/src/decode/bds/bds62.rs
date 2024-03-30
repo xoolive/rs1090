@@ -24,7 +24,7 @@ pub struct TargetStateAndStatusInformation {
     #[deku(
         bits = "11",// bit 9..20
         endian = "big",
-        map = "|altitude: u32| -> Result<_, DekuError> {
+        map = "|altitude: u16| -> Result<_, DekuError> {
             Ok(
                 if altitude > 1 {Some(((altitude - 1) * 32 + 16) / 100 * 100)}
                 else {None}
@@ -34,7 +34,7 @@ pub struct TargetStateAndStatusInformation {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The selected altitude in the FMS or MCP/FCU, in feet
     /// (encoded as a multiple of 32 + 16, but rounded to the closest 100 ft)
-    pub selected_altitude: Option<u32>,
+    pub selected_altitude: Option<u16>,
 
     #[deku(
         bits = "9", // bit 20..29
