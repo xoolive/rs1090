@@ -16,7 +16,7 @@ pub async fn receiver(address: String) -> mpsc::Receiver<TimedMessage> {
                 loop {
                     while let Some(msg) = msg_stream.next().await {
                         let msg = process_radarcape(&msg);
-                        tx.send(msg).await.expect("Failed to send message");
+                        tx.send(msg).await.expect("Connection closed");
                     }
                 }
             });
@@ -31,9 +31,7 @@ pub async fn receiver(address: String) -> mpsc::Receiver<TimedMessage> {
                         loop {
                             while let Some(msg) = msg_stream.next().await {
                                 let msg = process_radarcape(&msg);
-                                tx.send(msg)
-                                    .await
-                                    .expect("Failed to send message");
+                                tx.send(msg).await.expect("Connection closed");
                             }
                         }
                     });

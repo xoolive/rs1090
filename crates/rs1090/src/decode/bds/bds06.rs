@@ -140,7 +140,7 @@ mod tests {
         let bytes = hex!("8c4841753a9a153237aef0f275be");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
-            if let BDS06(SurfacePosition {
+            if let ME::BDS06(SurfacePosition {
                 track, groundspeed, ..
             }) = adsb_msg.message
             {

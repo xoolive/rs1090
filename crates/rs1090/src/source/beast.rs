@@ -101,8 +101,7 @@ pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
                     let msg = data.drain(..msg_size).collect::<Vec<u8>>();
                     yield msg
                 } else {
-                    // Log a warning for probably corrupted message
-                    println!("Probably corrupted message");
+                    // Probably corrupted message
                     data = data.split_off(1);
                 }
             } else {

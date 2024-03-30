@@ -240,7 +240,7 @@ mod tests {
         let bytes = hex!("8DA05629EA21485CBF3F8CADAEEB");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
-            if let BDS62(TargetStateAndStatusInformation {
+            if let ME::BDS62(TargetStateAndStatusInformation {
                 selected_altitude,
                 alt_source,
                 barometric_setting,

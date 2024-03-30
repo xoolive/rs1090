@@ -375,11 +375,7 @@ impl fmt::Display for AirborneVelocity {
                     )?;
                 }
                 if let Some(value) = v.heading {
-                    writeln!(
-                        f,
-                        "  Heading:       {}°",
-                        libm::round(value as f64)
-                    )?;
+                    writeln!(f, "  Heading:       {}°", libm::round(value))?;
                 }
             }
             AirborneVelocitySubType::AirspeedSupersonic(v) => {
@@ -424,7 +420,7 @@ mod tests {
         let bytes = hex!("8D485020994409940838175B284F");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
-            if let BDS09(velocity) = adsb_msg.message {
+            if let ME::BDS09(velocity) = adsb_msg.message {
                 if let AirborneVelocitySubType::GroundSpeedDecoding(_gsd) =
                     velocity.velocity
                 {
@@ -473,7 +469,7 @@ mod tests {
         let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
-            if let BDS09(velocity) = adsb_msg.message {
+            if let ME::BDS09(velocity) = adsb_msg.message {
                 if let AirborneVelocitySubType::AirspeedSubsonic(asd) =
                     velocity.velocity
                 {

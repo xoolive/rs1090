@@ -499,7 +499,7 @@ mod tests {
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
                 match (msg1.message, msg2.message) {
-                    (BDS05(m1), BDS05(m2)) => (m1, m2),
+                    (ME::BDS05(m1), ME::BDS05(m2)) => (m1, m2),
                     _ => unreachable!(),
                 }
             }
@@ -523,7 +523,7 @@ mod tests {
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
                 match (msg1.message, msg2.message) {
-                    (BDS05(m1), BDS05(m2)) => (m1, m2),
+                    (ME::BDS05(m1), ME::BDS05(m2)) => (m1, m2),
                     _ => unreachable!(),
                 }
             }
@@ -546,7 +546,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                BDS05(msg) => msg,
+                ME::BDS05(msg) => msg,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -565,7 +565,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                BDS05(msg) => msg,
+                ME::BDS05(msg) => msg,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -587,7 +587,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                BDS06(msg) => msg,
+                ME::BDS06(msg) => msg,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
