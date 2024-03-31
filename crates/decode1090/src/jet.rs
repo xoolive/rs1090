@@ -5,8 +5,8 @@ mod table;
 mod tui;
 
 use clap::Parser;
-use color_eyre::eyre::Result;
 use crossterm::event::KeyCode;
+use ratatui::widgets::*;
 use rs1090::decode::cpr::{decode_position, AircraftState, Position};
 use rs1090::prelude::*;
 use std::collections::BTreeMap;
@@ -79,9 +79,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
 
     let app_tui = Arc::new(Mutex::new(Jet1090 {
-        scroll_pos: 0,
+        items: Vec::new(),
+        state: TableState::default().with_selected(0),
+        scroll_state: ScrollbarState::new(0),
         should_quit: false,
         state_vectors: BTreeMap::new(),
+        sort_key: SortKey::default(),
+        sort_asc: true,
     }));
     let app_dec = app_tui.clone();
 
@@ -111,15 +115,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             if let Ok(event) = events.next().await {
                 let _ = update(&mut app_tui.lock().await, event);
-            } // new
-            let app = app_tui.lock().await;
+            }
+            let mut app = app_tui.lock().await;
             if app.should_quit {
                 break;
             }
-            let states = &app.state_vectors;
-            let rows = table::build_rows(states).await;
-            let counter = app.scroll_pos;
-            terminal.draw(|frame| table::build_table(frame, rows, counter))?;
+            terminal.draw(|frame| table::build_table(frame, &mut app))?;
         }
         tui::restore()
     });
@@ -173,28 +174,85 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Debug, Default)]
 pub struct Jet1090 {
-    scroll_pos: usize,
+    state: TableState,
+    items: Vec<String>,
+    scroll_state: ScrollbarState,
     should_quit: bool,
     state_vectors: BTreeMap<String, snapshot::StateVectors>,
+    sort_key: SortKey,
+    sort_asc: bool,
+}
+
+#[derive(Debug, Default)]
+pub enum SortKey {
+    CALLSIGN,
+    #[default]
+    ALTITUDE,
+    VRATE,
+    FIRST,
+    LAST,
 }
 
 fn update(
     jet1090: &mut tokio::sync::MutexGuard<Jet1090>,
     event: Event,
-) -> Result<()> {
+) -> std::io::Result<()> {
     if let Event::Key(key) = event {
+        use KeyCode::*;
         match key.code {
-            KeyCode::Char('j') => jet1090.scroll_pos += 1,
-            KeyCode::Char('k') => {
-                jet1090.scroll_pos = if jet1090.scroll_pos == 0 {
-                    0
-                } else {
-                    jet1090.scroll_pos - 1
-                }
+            Char('j') | Down => jet1090.next(),
+            Char('k') | Up => jet1090.previous(),
+            Char('q') | Esc => jet1090.should_quit = true,
+            Char('a') => {
+                jet1090.sort_key = SortKey::ALTITUDE;
             }
-            KeyCode::Char('q') | KeyCode::Esc => jet1090.should_quit = true,
+            Char('c') => {
+                jet1090.sort_key = SortKey::CALLSIGN;
+            }
+            Char('v') => {
+                jet1090.sort_key = SortKey::VRATE;
+            }
+            Char('f') => {
+                jet1090.sort_key = SortKey::FIRST;
+            }
+            Char('l') => {
+                jet1090.sort_key = SortKey::LAST;
+            }
+            Char('-') => jet1090.sort_asc = !jet1090.sort_asc,
             _ => {}
         }
     }
     Ok(())
+}
+
+impl Jet1090 {
+    pub fn next(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i >= self.items.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+        self.scroll_state = self.scroll_state.position(i);
+    }
+
+    pub fn previous(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.items.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+        self.scroll_state = self.scroll_state.position(i);
+    }
 }

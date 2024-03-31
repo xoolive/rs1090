@@ -1,4 +1,3 @@
-use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use crossterm::execute;
 use crossterm::terminal::*;
@@ -79,7 +78,7 @@ impl EventHandler {
                     }
                   },
                   _ = delay => {
-                      tx.send(Event::Tick).unwrap();
+                       tx.send(Event::Tick).unwrap_or(());
                   },
                 }
             }
@@ -92,10 +91,9 @@ impl EventHandler {
         }
     }
 
-    pub async fn next(&mut self) -> Result<Event, color_eyre::eyre::Error> {
-        self.rx
-            .recv()
-            .await
-            .ok_or(color_eyre::eyre::eyre!("Unable to get event"))
+    pub async fn next(&mut self) -> Result<Event, io::Error> {
+        self.rx.recv().await.ok_or_else(|| {
+            io::Error::new(io::ErrorKind::Other, "Unable to get event")
+        })
     }
 }
