@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         state_vectors: BTreeMap::new(),
         sort_key: SortKey::default(),
         sort_asc: true,
-        width: width,
+        width,
     }));
     let app_dec = app_tui.clone();
     tokio::spawn(async move {

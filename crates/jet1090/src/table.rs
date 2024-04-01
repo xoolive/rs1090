@@ -244,11 +244,12 @@ impl TableColors {
 }
 
 trait Render {
-    fn cell(self: &Self, snapshot: &Snapshot, now: u64) -> String;
-    fn header(self: &Self, sort_key: &SortKey) -> Cell;
-    fn constraint(self: &Self) -> Constraint;
+    fn cell(&self, snapshot: &Snapshot, now: u64) -> String;
+    fn header(&self, sort_key: &SortKey) -> Cell;
+    fn constraint(&self) -> Constraint;
 }
 
+#[allow(clippy::upper_case_acronyms)]
 enum ColumnRender {
     ICAO24,
     CALLSIGN,
@@ -271,7 +272,7 @@ enum ColumnRender {
 }
 
 impl Render for ColumnRender {
-    fn cell(self: &Self, s: &Snapshot, now: u64) -> String {
+    fn cell(&self, s: &Snapshot, now: u64) -> String {
         match self {
             Self::ICAO24 => s.icao24.to_string(),
             Self::CALLSIGN => s.callsign.to_owned().unwrap_or("".to_string()),
@@ -344,7 +345,7 @@ impl Render for ColumnRender {
         }
     }
 
-    fn header(self: &Self, sort_key: &SortKey) -> Cell {
+    fn header(&self, sort_key: &SortKey) -> Cell {
         match self {
             ColumnRender::ICAO24 => Cell::from("icao24".to_string()),
             ColumnRender::CALLSIGN => {
@@ -396,7 +397,7 @@ impl Render for ColumnRender {
             }
         }
     }
-    fn constraint(self: &Self) -> Constraint {
+    fn constraint(&self) -> Constraint {
         match self {
             ColumnRender::ICAO24 => Constraint::Length(6),
             ColumnRender::CALLSIGN => Constraint::Length(8),
