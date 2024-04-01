@@ -185,7 +185,7 @@ pub struct Jet1090 {
     width: u16,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub enum SortKey {
     CALLSIGN,
     #[default]

@@ -4,15 +4,10 @@ use ratatui::widgets::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 use style::palette::tailwind;
 
+use crate::snapshot::Snapshot;
 use crate::{Jet1090, SortKey};
 
 const INFO_TEXT: &str = "(Esc/Q) quit | (↑/K) up | (↓/J) down ";
-
-fn ts_to_utc(timestamp: u64) -> String {
-    let dt: DateTime<Utc> =
-        DateTime::from_timestamp(timestamp as i64, 0).unwrap();
-    format!("{}", dt.format("%H:%M"))
-}
 
 pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     let now = SystemTime::now()
@@ -59,7 +54,87 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     if !&app.sort_asc {
         sorted_elts.reverse();
     }
-
+    let columns = {
+        use ColumnRender::*;
+        match app.width {
+            w if w <= 70 => {
+                vec![
+                    ICAO24,
+                    CALLSIGN,
+                    LATITUDE,
+                    LONGITUDE,
+                    ALTITUDE,
+                    GROUNDSPEED,
+                    TRACK,
+                ]
+            }
+            w if w <= 80 => {
+                vec![
+                    ICAO24,
+                    CALLSIGN,
+                    LATITUDE,
+                    LONGITUDE,
+                    ALTITUDE,
+                    GROUNDSPEED,
+                    TRACK,
+                    LAST,
+                ]
+            }
+            w if w <= 100 => {
+                vec![
+                    ICAO24,
+                    CALLSIGN,
+                    SQUAWK,
+                    LATITUDE,
+                    LONGITUDE,
+                    ALTITUDE,
+                    GROUNDSPEED,
+                    VRATE,
+                    TRACK,
+                    LAST,
+                    FIRST,
+                ]
+            }
+            w if w <= 120 => {
+                vec![
+                    ICAO24,
+                    CALLSIGN,
+                    SQUAWK,
+                    LATITUDE,
+                    LONGITUDE,
+                    ALTITUDE,
+                    GROUNDSPEED,
+                    VRATE,
+                    TRACK,
+                    NACP,
+                    LAST,
+                    FIRST,
+                ]
+            }
+            _ => {
+                vec![
+                    ICAO24,
+                    CALLSIGN,
+                    SQUAWK,
+                    LATITUDE,
+                    LONGITUDE,
+                    ALTITUDE,
+                    SELALT,
+                    GROUNDSPEED,
+                    TAS,
+                    IAS,
+                    MACH,
+                    VRATE,
+                    TRACK,
+                    HEADING,
+                    ROLL,
+                    NACP,
+                    LAST,
+                    FIRST,
+                ]
+            }
+        }
+    };
     let rows = sorted_elts
         .iter()
         .filter(|sv| (now as i64 - sv.cur.last as i64) < 30)
@@ -69,163 +144,31 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
                 0 => colors.normal_row_color,
                 _ => colors.alt_row_color,
             };
-            Row::new(vec![
-                sv.cur.icao24.to_owned(),
-                sv.cur.callsign.to_owned().unwrap_or("".to_string()),
-                sv.cur
-                    .squawk
-                    .map(|s| s.to_string())
-                    .unwrap_or("".to_string()),
-                if let Some(lat) = sv.cur.latitude {
-                    format!("{}", lat)
-                } else {
-                    "".to_string()
-                },
-                if let Some(lon) = sv.cur.longitude {
-                    format!("{}", lon)
-                } else {
-                    "".to_string()
-                },
-                if let Some(alt) = sv.cur.altitude {
-                    format!("{}", alt)
-                } else {
-                    "".to_string()
-                },
-                match (sv.cur.selected_altitude, sv.cur.altitude) {
-                    (Some(sel), Some(alt)) if u16::abs_diff(sel, alt) <= 50 => {
-                        "=".to_string()
-                    }
-                    (Some(sel), _) => {
-                        format!("{}", sel / 100)
-                    }
-                    _ => "".to_string(),
-                },
-                if let Some(gs) = sv.cur.groundspeed {
-                    format!("{}", gs)
-                } else {
-                    "".to_string()
-                },
-                if let Some(tas) = sv.cur.tas {
-                    format!("{}", tas)
-                } else {
-                    "".to_string()
-                },
-                if let Some(ias) = sv.cur.ias {
-                    format!("{}", ias)
-                } else {
-                    "".to_string()
-                },
-                if let Some(mach) = sv.cur.mach {
-                    format!("{}", mach)
-                } else {
-                    "".to_string()
-                },
-                if let Some(vrate) = sv.cur.vertical_rate {
-                    format!("{}", vrate)
-                } else {
-                    "".to_string()
-                },
-                if let Some(trk) = sv.cur.track {
-                    format!("{}", trk)
-                } else {
-                    "".to_string()
-                },
-                if let Some(heading) = sv.cur.heading {
-                    format!("{}", heading)
-                } else {
-                    "".to_string()
-                },
-                if let Some(roll) = sv.cur.roll {
-                    format!("{}", roll)
-                } else {
-                    "".to_string()
-                },
-                if let Some(nac) = sv.cur.nacp {
-                    format!("{}", nac)
-                } else {
-                    "".to_string()
-                },
-                if now > sv.cur.last + 5 {
-                    format!("{}s ago", now - sv.cur.last)
-                } else {
-                    "".to_string()
-                },
-                ts_to_utc(sv.cur.first),
-            ])
-            .style(Style::new().fg(colors.row_fg).bg(color))
+            columns
+                .iter()
+                .map(|c| c.cell(&sv.cur, now))
+                .collect::<Row<'_>>()
+                .style(Style::new().fg(colors.row_fg).bg(color))
         })
         .collect::<Vec<Row<'_>>>();
 
-    let widths = [
-        Constraint::Length(6),
-        Constraint::Length(8),
-        Constraint::Length(4),
-        Constraint::Length(6),
-        Constraint::Length(6),
-        Constraint::Length(5),
-        Constraint::Length(3),
-        Constraint::Length(3),
-        Constraint::Length(3),
-        Constraint::Length(3),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(5),
-        Constraint::Length(4),
-        Constraint::Length(3),
-        Constraint::Length(7),
-        Constraint::Length(5),
-    ];
-
     let size = &rows.len();
     let bar = "█";
-    let mut callsign_style = Style::default();
-    let mut altitude_style = Style::default();
-    let mut vrate_style = Style::default();
-    let mut first_style = Style::default();
-    let mut last_style = Style::default();
-    let hl = tailwind::AMBER.c400;
-    match app.sort_key {
-        SortKey::CALLSIGN => {
-            callsign_style = callsign_style.fg(hl);
-        }
-        SortKey::ALTITUDE => {
-            altitude_style = altitude_style.fg(hl);
-        }
-        SortKey::VRATE => {
-            vrate_style = vrate_style.fg(hl);
-        }
-        SortKey::FIRST => {
-            first_style = first_style.fg(hl);
-        }
-        SortKey::LAST => {
-            last_style = last_style.fg(hl);
-        }
-    }
-    let colnames = vec![
-        Cell::from("icao24"),
-        Cell::from("callsign").style(callsign_style),
-        Cell::from("sqwk"),
-        Cell::from("lat"),
-        Cell::from("lon"),
-        Cell::from("alt").style(altitude_style),
-        Cell::from("sel"),
-        Cell::from("gs"),
-        Cell::from("tas"),
-        Cell::from("ias"),
-        Cell::from("mach"),
-        Cell::from("vrate").style(vrate_style),
-        Cell::from("trk"),
-        Cell::from("hdg"),
-        Cell::from("roll"),
-        Cell::from("nac"),
-        Cell::from("last").style(last_style),
-        Cell::from("first").style(first_style),
-    ];
-    let table = Table::new(rows, widths)
+
+    let header = columns
+        .iter()
+        .map(|c| c.header(&app.sort_key))
+        .collect::<Vec<Cell<'_>>>();
+
+    let constraints = columns
+        .iter()
+        .map(|c| c.constraint())
+        .collect::<Vec<Constraint>>();
+
+    let table = Table::new(rows, constraints)
         .column_spacing(2)
         .header(
-            Row::new(colnames)
+            Row::new(header)
                 //.bottom_margin(1)
                 .style(
                     Style::default()
@@ -296,6 +239,183 @@ impl TableColors {
             normal_row_color: tailwind::SLATE.c950,
             alt_row_color: tailwind::SLATE.c900,
             //footer_border_color: color.c400,
+        }
+    }
+}
+
+trait Render {
+    fn cell(self: &Self, snapshot: &Snapshot, now: u64) -> String;
+    fn header(self: &Self, sort_key: &SortKey) -> Cell;
+    fn constraint(self: &Self) -> Constraint;
+}
+
+enum ColumnRender {
+    ICAO24,
+    CALLSIGN,
+    SQUAWK,
+    LATITUDE,
+    LONGITUDE,
+    ALTITUDE,
+    SELALT,
+    GROUNDSPEED,
+    TAS,
+    IAS,
+    MACH,
+    VRATE,
+    TRACK,
+    HEADING,
+    ROLL,
+    NACP,
+    LAST,
+    FIRST,
+}
+
+impl Render for ColumnRender {
+    fn cell(self: &Self, s: &Snapshot, now: u64) -> String {
+        match self {
+            Self::ICAO24 => s.icao24.to_string(),
+            Self::CALLSIGN => s.callsign.to_owned().unwrap_or("".to_string()),
+            Self::SQUAWK => {
+                s.squawk.map(|s| s.to_string()).unwrap_or("".to_string())
+            }
+            Self::LATITUDE => s
+                .latitude
+                .map(|v| format!("{}", v))
+                .unwrap_or("".to_string()),
+            Self::LONGITUDE => s
+                .longitude
+                .map(|v| format!("{}", v))
+                .unwrap_or("".to_string()),
+            Self::ALTITUDE => s
+                .altitude
+                .map(|v| format!("{}", v))
+                .unwrap_or("".to_string()),
+            Self::SELALT => match (s.selected_altitude, s.altitude) {
+                (Some(sel), Some(alt)) if u16::abs_diff(sel, alt) <= 50 => {
+                    "=".to_string()
+                }
+                (Some(sel), _) => {
+                    format!("{}", sel / 100)
+                }
+                _ => "".to_string(),
+            },
+            Self::GROUNDSPEED => s
+                .groundspeed
+                .map(|v| format!("{}", v))
+                .unwrap_or("".to_string()),
+            Self::TAS => {
+                s.tas.map(|v| format!("{}", v)).unwrap_or("".to_string())
+            }
+            Self::IAS => {
+                s.ias.map(|v| format!("{}", v)).unwrap_or("".to_string())
+            }
+            Self::MACH => {
+                s.mach.map(|v| format!("{}", v)).unwrap_or("".to_string())
+            }
+            Self::VRATE => s
+                .vertical_rate
+                .map(|v| format!("{}", v))
+                .unwrap_or("".to_string()),
+            Self::TRACK => {
+                s.track.map(|v| format!("{}", v)).unwrap_or("".to_string())
+            }
+            Self::HEADING => s
+                .heading
+                .map(|v| format!("{}", v))
+                .unwrap_or("".to_string()),
+            Self::ROLL => {
+                s.roll.map(|v| format!("{}", v)).unwrap_or("".to_string())
+            }
+            Self::NACP => {
+                s.nacp.map(|v| format!("{}", v)).unwrap_or("".to_string())
+            }
+            Self::LAST => {
+                if now > s.last + 5 {
+                    format!("{}s ago", now - s.last)
+                } else {
+                    "".to_string()
+                }
+            }
+            Self::FIRST => {
+                let dt: DateTime<Utc> =
+                    DateTime::from_timestamp(s.first as i64, 0).unwrap();
+                format!("{}", dt.format("%H:%M"))
+            }
+        }
+    }
+
+    fn header(self: &Self, sort_key: &SortKey) -> Cell {
+        match self {
+            ColumnRender::ICAO24 => Cell::from("icao24".to_string()),
+            ColumnRender::CALLSIGN => {
+                let mut c = Cell::from("callsign".to_string());
+                if *sort_key == SortKey::CALLSIGN {
+                    c = c.fg(tailwind::AMBER.c400);
+                }
+                c
+            }
+            ColumnRender::SQUAWK => Cell::from("sqwk".to_string()),
+            ColumnRender::LATITUDE => Cell::from("lat".to_string()),
+            ColumnRender::LONGITUDE => Cell::from("lon".to_string()),
+            ColumnRender::ALTITUDE => {
+                let mut c = Cell::from("alt".to_string());
+                if *sort_key == SortKey::ALTITUDE {
+                    c = c.fg(tailwind::AMBER.c400);
+                }
+                c
+            }
+            ColumnRender::SELALT => Cell::from("sel".to_string()),
+            ColumnRender::GROUNDSPEED => Cell::from("gs".to_string()),
+            ColumnRender::TAS => Cell::from("tas".to_string()),
+            ColumnRender::IAS => Cell::from("ias".to_string()),
+            ColumnRender::MACH => Cell::from("mach".to_string()),
+            ColumnRender::VRATE => {
+                let mut c = Cell::from("vrate".to_string());
+                if *sort_key == SortKey::VRATE {
+                    c = c.fg(tailwind::AMBER.c400);
+                }
+                c
+            }
+            ColumnRender::TRACK => Cell::from("trk".to_string()),
+            ColumnRender::HEADING => Cell::from("hdg".to_string()),
+            ColumnRender::ROLL => Cell::from("roll".to_string()),
+            ColumnRender::NACP => Cell::from("nac".to_string()),
+            ColumnRender::LAST => {
+                let mut c = Cell::from("last".to_string());
+                if *sort_key == SortKey::LAST {
+                    c = c.fg(tailwind::AMBER.c400);
+                }
+                c
+            }
+            ColumnRender::FIRST => {
+                let mut c = Cell::from("first".to_string());
+                if *sort_key == SortKey::FIRST {
+                    c = c.fg(tailwind::AMBER.c400);
+                }
+                c
+            }
+        }
+    }
+    fn constraint(self: &Self) -> Constraint {
+        match self {
+            ColumnRender::ICAO24 => Constraint::Length(6),
+            ColumnRender::CALLSIGN => Constraint::Length(8),
+            ColumnRender::SQUAWK => Constraint::Length(4),
+            ColumnRender::LATITUDE => Constraint::Length(6),
+            ColumnRender::LONGITUDE => Constraint::Length(6),
+            ColumnRender::ALTITUDE => Constraint::Length(5),
+            ColumnRender::SELALT => Constraint::Length(3),
+            ColumnRender::GROUNDSPEED => Constraint::Length(3),
+            ColumnRender::TAS => Constraint::Length(3),
+            ColumnRender::IAS => Constraint::Length(3),
+            ColumnRender::MACH => Constraint::Length(3),
+            ColumnRender::VRATE => Constraint::Length(5),
+            ColumnRender::TRACK => Constraint::Length(5),
+            ColumnRender::HEADING => Constraint::Length(5),
+            ColumnRender::ROLL => Constraint::Length(5),
+            ColumnRender::NACP => Constraint::Length(3),
+            ColumnRender::LAST => Constraint::Length(7),
+            ColumnRender::FIRST => Constraint::Length(5),
         }
     }
 }
