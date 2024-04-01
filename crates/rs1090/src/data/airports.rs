@@ -26,7 +26,7 @@ impl Display for Airport {
     }
 }
 
-const AIRPORTS_JSON: &str = include_str!("../data/airports.json");
+const AIRPORTS_JSON: &str = include_str!("../../data/airports.json");
 pub static AIRPORTS: Lazy<Vec<Airport>> =
     Lazy::new(|| serde_json::from_str(AIRPORTS_JSON).unwrap());
 

@@ -1,5 +1,5 @@
 use regex::Regex;
-use rs1090::airports::AIRPORTS;
+use rs1090::data::airports::AIRPORTS;
 
 pub fn main() {
     let args: Vec<Regex> = std::env::args()

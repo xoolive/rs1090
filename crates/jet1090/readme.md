@@ -1,6 +1,6 @@
 # jet1090
 
-jet1090 is an improved version of [dump1090]() designed to decode in parallel several sources (Beast feed in TCP/UDP, RTL-SDR) of Mode S and ADS-B data and serve the info in REST and ZMQ endpoints.
+jet1090 is an improved version of [dump1090](https://github.com/flightaware/dump1090/) in Rust designed to decode in parallel several sources of Mode S and ADS-B data (Beast feed in TCP/UDP, RTL-SDR) and serve the info in REST and ZMQ endpoints.
 
 ## Installation
 

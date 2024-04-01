@@ -111,9 +111,32 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
                     FIRST,
                 ]
             }
+            w if w <= 130 => {
+                vec![
+                    ICAO24,
+                    CALLSIGN,
+                    SQUAWK,
+                    LATITUDE,
+                    LONGITUDE,
+                    ALTITUDE,
+                    SELALT,
+                    GROUNDSPEED,
+                    TAS,
+                    IAS,
+                    MACH,
+                    VRATE,
+                    TRACK,
+                    HEADING,
+                    ROLL,
+                    NACP,
+                    LAST,
+                    FIRST,
+                ]
+            }
             _ => {
                 vec![
                     ICAO24,
+                    TAIL,
                     CALLSIGN,
                     SQUAWK,
                     LATITUDE,
@@ -252,6 +275,7 @@ trait Render {
 #[allow(clippy::upper_case_acronyms)]
 enum ColumnRender {
     ICAO24,
+    TAIL,
     CALLSIGN,
     SQUAWK,
     LATITUDE,
@@ -275,6 +299,10 @@ impl Render for ColumnRender {
     fn cell(&self, s: &Snapshot, now: u64) -> String {
         match self {
             Self::ICAO24 => s.icao24.to_string(),
+            Self::TAIL => {
+                let hexid = u32::from_str_radix(&s.icao24, 16).unwrap_or(0);
+                rs1090::data::tail::tail(hexid).unwrap_or("".to_string())
+            }
             Self::CALLSIGN => s.callsign.to_owned().unwrap_or("".to_string()),
             Self::SQUAWK => {
                 s.squawk.map(|s| s.to_string()).unwrap_or("".to_string())
@@ -348,6 +376,7 @@ impl Render for ColumnRender {
     fn header(&self, sort_key: &SortKey) -> Cell {
         match self {
             ColumnRender::ICAO24 => Cell::from("icao24".to_string()),
+            ColumnRender::TAIL => Cell::from("tail".to_string()),
             ColumnRender::CALLSIGN => {
                 let mut c = Cell::from("callsign".to_string());
                 if *sort_key == SortKey::CALLSIGN {
@@ -400,6 +429,7 @@ impl Render for ColumnRender {
     fn constraint(&self) -> Constraint {
         match self {
             ColumnRender::ICAO24 => Constraint::Length(6),
+            ColumnRender::TAIL => Constraint::Length(8),
             ColumnRender::CALLSIGN => Constraint::Length(8),
             ColumnRender::SQUAWK => Constraint::Length(4),
             ColumnRender::LATITUDE => Constraint::Length(6),

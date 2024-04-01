@@ -2,7 +2,7 @@ use super::adsb::ME;
 use super::bds::bds05::AirbornePosition;
 use super::bds::bds06::SurfacePosition;
 use super::{TimedMessage, DF, ICAO};
-use crate::airports::one_airport;
+use crate::data::airports::one_airport;
 use deku::prelude::*;
 use regex::Regex;
 use serde::Serialize;
