@@ -464,7 +464,7 @@ pub fn ja_reg(hexid: u32) -> Option<String> {
     if offset < 340 {
         let digit3 = offset / 34;
         reg.push_str(&digit3.to_string());
-        offset = offset % 34;
+        offset %= 34;
 
         if offset < 10 {
             return Some(reg + &offset.to_string());
