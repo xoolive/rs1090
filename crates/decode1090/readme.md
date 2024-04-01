@@ -2,20 +2,6 @@
 
 decode1090 is the companion application to the [rs1090](https://crates.io/crates/rs1090) Rust library, designed to decode Mode S and ADS-B messages.
 
-MacOS:
-
-brew install soapysdr
-brew install soapyrtlsdr
-
-Linux:
-
-apt install libsoapysdr-dev for building
-apt install soapysdr-module-rtlsdr for running
-
-Windows:
-
-The pre-built Windows Pothos SDR development environment ships the necessary DLLs necessary to decode from the RTL-SDR. Follow the [instructions](https://github.com/pothosware/PothosSDR/wiki/Tutorial) for "Download and Install" and use Zadig to recognise your USB dongle.
-
 ## Installation
 
 Run the following Cargo command:

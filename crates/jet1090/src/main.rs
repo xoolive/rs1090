@@ -75,20 +75,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    let mut reference = options.latlon;
-    let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
-
-    let app_tui = Arc::new(Mutex::new(Jet1090 {
-        items: Vec::new(),
-        state: TableState::default().with_selected(0),
-        scroll_state: ScrollbarState::new(0),
-        should_quit: false,
-        state_vectors: BTreeMap::new(),
-        sort_key: SortKey::default(),
-        sort_asc: true,
-    }));
-    let app_dec = app_tui.clone();
-
     let mut rx = if options.rtlsdr {
         #[cfg(not(feature = "rtlsdr"))]
         {
@@ -109,8 +95,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut terminal = tui::init()?;
-    let mut events = tui::EventHandler::new();
+    let width = terminal.size()?.width;
+    let mut events = tui::EventHandler::new(width);
 
+    let mut reference = options.latlon;
+    let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
+
+    let app_tui = Arc::new(Mutex::new(Jet1090 {
+        items: Vec::new(),
+        state: TableState::default().with_selected(0),
+        scroll_state: ScrollbarState::new(0),
+        should_quit: false,
+        state_vectors: BTreeMap::new(),
+        sort_key: SortKey::default(),
+        sort_asc: true,
+        width: width,
+    }));
+    let app_dec = app_tui.clone();
     tokio::spawn(async move {
         loop {
             if let Ok(event) = events.next().await {
@@ -181,6 +182,7 @@ pub struct Jet1090 {
     state_vectors: BTreeMap<String, snapshot::StateVectors>,
     sort_key: SortKey,
     sort_asc: bool,
+    width: u16,
 }
 
 #[derive(Debug, Default)]
@@ -197,30 +199,34 @@ fn update(
     jet1090: &mut tokio::sync::MutexGuard<Jet1090>,
     event: Event,
 ) -> std::io::Result<()> {
-    if let Event::Key(key) = event {
-        use KeyCode::*;
-        match key.code {
-            Char('j') | Down => jet1090.next(),
-            Char('k') | Up => jet1090.previous(),
-            Char('q') | Esc => jet1090.should_quit = true,
-            Char('a') => {
-                jet1090.sort_key = SortKey::ALTITUDE;
+    match event {
+        Event::Key(key) => {
+            use KeyCode::*;
+            match key.code {
+                Char('j') | Down => jet1090.next(),
+                Char('k') | Up => jet1090.previous(),
+                Char('q') | Esc => jet1090.should_quit = true,
+                Char('a') => {
+                    jet1090.sort_key = SortKey::ALTITUDE;
+                }
+                Char('c') => {
+                    jet1090.sort_key = SortKey::CALLSIGN;
+                }
+                Char('v') => {
+                    jet1090.sort_key = SortKey::VRATE;
+                }
+                Char('f') => {
+                    jet1090.sort_key = SortKey::FIRST;
+                }
+                Char('l') => {
+                    jet1090.sort_key = SortKey::LAST;
+                }
+                Char('-') => jet1090.sort_asc = !jet1090.sort_asc,
+                _ => {}
             }
-            Char('c') => {
-                jet1090.sort_key = SortKey::CALLSIGN;
-            }
-            Char('v') => {
-                jet1090.sort_key = SortKey::VRATE;
-            }
-            Char('f') => {
-                jet1090.sort_key = SortKey::FIRST;
-            }
-            Char('l') => {
-                jet1090.sort_key = SortKey::LAST;
-            }
-            Char('-') => jet1090.sort_asc = !jet1090.sort_asc,
-            _ => {}
         }
+        Event::Tick(size) => jet1090.width = size,
+        _ => {}
     }
     Ok(())
 }

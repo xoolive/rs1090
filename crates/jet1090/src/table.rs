@@ -172,7 +172,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
         Constraint::Length(5),
         Constraint::Length(5),
         Constraint::Length(4),
-        Constraint::Length(1),
+        Constraint::Length(3),
         Constraint::Length(7),
         Constraint::Length(5),
     ];
@@ -218,7 +218,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
         Cell::from("trk"),
         Cell::from("hdg"),
         Cell::from("roll"),
-        Cell::from("nacp"),
+        Cell::from("nac"),
         Cell::from("last").style(last_style),
         Cell::from("first").style(first_style),
     ];

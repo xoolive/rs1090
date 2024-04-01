@@ -27,7 +27,7 @@ pub fn restore() -> io::Result<()> {
 pub enum Event {
     Key(KeyEvent),
     Error,
-    Tick,
+    Tick(u16),
 }
 
 #[derive(Debug)]
@@ -38,11 +38,12 @@ pub struct EventHandler {
 }
 
 impl EventHandler {
-    pub fn new() -> Self {
+    pub fn new(width: u16) -> Self {
         let tick_rate = std::time::Duration::from_millis(250);
 
         let (tx, rx) = mpsc::unbounded_channel();
         let _tx = tx.clone();
+        let mut width = width;
 
         let _task = tokio::spawn(async move {
             let mut reader = crossterm::event::EventStream::new();
@@ -60,6 +61,7 @@ impl EventHandler {
                               tx.send(Event::Key(key)).unwrap();
                             }
                           },
+                          crossterm::event::Event::Resize(col,_) => {width = col},
                           crossterm::event::Event::Mouse(event) => {
                             if event.kind == crossterm::event::MouseEventKind::ScrollUp {
                               tx.send(Event::Key(KeyEvent::new(crossterm::event::KeyCode::Char('k'), event.modifiers))).unwrap();
@@ -78,7 +80,7 @@ impl EventHandler {
                     }
                   },
                   _ = delay => {
-                       tx.send(Event::Tick).unwrap_or(());
+                       tx.send(Event::Tick(width)).unwrap_or(());
                   },
                 }
             }

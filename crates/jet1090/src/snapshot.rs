@@ -211,6 +211,8 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
                         aircraft.cur.ias = bds60.indicated_airspeed;
                         aircraft.cur.mach = bds60.mach_number;
                         aircraft.cur.heading = bds60.magnetic_heading;
+                        aircraft.cur.vertical_rate =
+                            bds60.inertial_vertical_velocity;
                     }
                 }
                 CommBIdentityReply { bds, .. } => {
