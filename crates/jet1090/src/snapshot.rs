@@ -111,6 +111,7 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
                         aircraft.cur.longitude = bds06.longitude;
                         aircraft.cur.track = bds06.track;
                         aircraft.cur.groundspeed = bds06.groundspeed;
+                        aircraft.cur.altitude = None;
                     }
                     ME::BDS08(bds08) => {
                         aircraft.cur.callsign = Some(bds08.callsign.to_string())
@@ -180,6 +181,7 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
                         aircraft.cur.longitude = bds06.longitude;
                         aircraft.cur.track = bds06.track;
                         aircraft.cur.groundspeed = bds06.groundspeed;
+                        aircraft.cur.altitude = None;
                     }
                     ME::BDS08(bds08) => {
                         aircraft.cur.callsign = Some(bds08.callsign.to_string())
@@ -211,8 +213,10 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
                         aircraft.cur.ias = bds60.indicated_airspeed;
                         aircraft.cur.mach = bds60.mach_number;
                         aircraft.cur.heading = bds60.magnetic_heading;
-                        aircraft.cur.vertical_rate =
-                            bds60.inertial_vertical_velocity;
+                        if bds60.inertial_vertical_velocity.is_some() {
+                            aircraft.cur.vertical_rate =
+                                bds60.inertial_vertical_velocity;
+                        }
                     }
                 }
                 CommBIdentityReply { bds, .. } => {
@@ -240,6 +244,10 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
                         aircraft.cur.ias = bds60.indicated_airspeed;
                         aircraft.cur.mach = bds60.mach_number;
                         aircraft.cur.heading = bds60.magnetic_heading;
+                        if bds60.inertial_vertical_velocity.is_some() {
+                            aircraft.cur.vertical_rate =
+                                bds60.inertial_vertical_velocity;
+                        }
                     }
                 }
                 _ => {}

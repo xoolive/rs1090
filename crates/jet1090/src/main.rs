@@ -205,6 +205,7 @@ fn update(
             match key.code {
                 Char('j') | Down => jet1090.next(),
                 Char('k') | Up => jet1090.previous(),
+                Char('g') | PageUp | Home => jet1090.home(),
                 Char('q') | Esc => jet1090.should_quit = true,
                 Char('a') => {
                     jet1090.sort_key = SortKey::ALTITUDE;
@@ -260,5 +261,9 @@ impl Jet1090 {
         };
         self.state.select(Some(i));
         self.scroll_state = self.scroll_state.position(i);
+    }
+    pub fn home(&mut self) {
+        self.state.select(Some(0));
+        self.scroll_state = self.scroll_state.position(0);
     }
 }

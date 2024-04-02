@@ -7,7 +7,7 @@ use style::palette::tailwind;
 use crate::snapshot::Snapshot;
 use crate::{Jet1090, SortKey};
 
-const INFO_TEXT: &str = "(Esc/Q) quit | (↑/K) up | (↓/J) down ";
+const INFO_TEXT: &str = "(Esc/Q) quit | (↑/K) up | (↓/J) down | (⤒/G) top";
 
 pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     let now = SystemTime::now()
@@ -439,7 +439,7 @@ impl Render for ColumnRender {
             ColumnRender::GROUNDSPEED => Constraint::Length(3),
             ColumnRender::TAS => Constraint::Length(3),
             ColumnRender::IAS => Constraint::Length(3),
-            ColumnRender::MACH => Constraint::Length(3),
+            ColumnRender::MACH => Constraint::Length(4),
             ColumnRender::VRATE => Constraint::Length(5),
             ColumnRender::TRACK => Constraint::Length(5),
             ColumnRender::HEADING => Constraint::Length(5),
