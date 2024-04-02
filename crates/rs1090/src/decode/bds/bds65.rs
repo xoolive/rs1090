@@ -260,7 +260,7 @@ impl fmt::Display for OperationalMode {
 #[serde(tag = "version")]
 pub enum ADSBVersionAirborne {
     #[deku(id = "0")]
-    #[serde(skip)] // useless, never happens
+    #[serde(rename = "0")] // useless, never happens
     /// ADS-B version 0 (BDS 6,5 undefined, so these messages should not happen)
     DOC9871AppendixA(Empty),
     #[deku(id = "1")]
@@ -272,7 +272,7 @@ pub enum ADSBVersionAirborne {
     /// ADS-B version 2 (2012)
     DOC9871AppendixC(AirborneV2),
     #[deku(id_pat = "3..=7")]
-    #[serde(skip)]
+    #[serde(rename = "3to7")]
     Reserved(Empty),
 }
 
