@@ -110,7 +110,6 @@ fn read_geobaro(
 #[serde(untagged)]
 pub enum AirborneVelocitySubType {
     #[deku(id = "0")]
-    #[serde(skip)]
     Reserved0(#[deku(bits = "22")] u32),
 
     #[deku(id_pat = "1..=2")]
@@ -122,7 +121,6 @@ pub enum AirborneVelocitySubType {
     AirspeedSupersonic(AirspeedSupersonicDecoding),
 
     #[deku(id_pat = "5..=7")]
-    #[serde(skip)]
     Reserved1(#[deku(bits = "22")] u32),
 }
 
