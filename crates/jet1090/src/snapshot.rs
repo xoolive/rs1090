@@ -4,6 +4,7 @@ use rs1090::decode::bds::bds09::AirborneVelocitySubType::{
 use rs1090::decode::bds::bds09::AirspeedType::{IAS, TAS};
 use rs1090::decode::IdentityCode;
 use rs1090::prelude::*;
+use serde::Serialize;
 use tokio::sync::Mutex;
 
 use crate::Jet1090;
@@ -11,7 +12,7 @@ use crate::Jet1090;
 #[derive(Debug)]
 pub struct StateVectors {
     pub cur: Snapshot,
-    //pub hist: Vec<TimedMessage>,
+    pub hist: Vec<TimedMessage>,
 }
 
 impl StateVectors {
@@ -37,11 +38,14 @@ impl StateVectors {
             selected_heading: None,
             nacp: None,
         };
-        StateVectors { cur }
+        StateVectors {
+            cur,
+            hist: Vec::<TimedMessage>::new(),
+        }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Snapshot {
     pub icao24: String,
     pub first: u64,
@@ -252,6 +256,36 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
                 }
                 _ => {}
             };
+        }
+    }
+}
+
+pub async fn store_history(states: &Mutex<Jet1090>, msg: TimedMessage) {
+    if let TimedMessage {
+        timestamp,
+        message: Some(message),
+        ..
+    } = msg
+    {
+        if let Some(icao24) = icao24(&message) {
+            let states = &mut states.lock().await.state_vectors;
+            let aircraft = states
+                .entry(icao24.to_string())
+                .or_insert(StateVectors::new(timestamp as u64, icao24));
+
+            match message.df {
+                ExtendedSquitterADSB(_)
+                | ExtendedSquitterTisB { .. }
+                | CommBAltitudeReply { .. }
+                | CommBIdentityReply { .. } => {
+                    aircraft.hist.push(TimedMessage {
+                        timestamp,
+                        frame: "".to_string(),
+                        message: Some(message),
+                    })
+                }
+                _ => {}
+            }
         }
     }
 }

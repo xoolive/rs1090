@@ -3,6 +3,7 @@
 mod snapshot;
 mod table;
 mod tui;
+mod web;
 
 use clap::Parser;
 use crossterm::event::KeyCode;
@@ -15,6 +16,8 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tui::Event;
+use warp::Filter;
+use web::TrackQuery;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -54,9 +57,9 @@ struct Options {
     #[arg(short, long, default_value = "false")]
     interactive: bool,
 
-    /// How to serve the collected data (todo!())
+    /// Port for the API endpoint (on 0.0.0.0)
     #[arg(long, default_value=None)]
-    serve: Option<u8>,
+    serve_port: Option<u16>,
 }
 
 #[tokio::main]
@@ -112,6 +115,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         width,
     }));
     let app_dec = app_tui.clone();
+    let app_web = app_tui.clone();
+
     tokio::spawn(async move {
         loop {
             if let Ok(event) = events.next().await {
@@ -125,6 +130,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         tui::restore()
     });
+
+    if let Some(port) = options.serve_port {
+        tokio::spawn(async move {
+            let app_home = app_web.clone();
+            let home = warp::path::end()
+                .and(warp::any().map(move || app_home.clone()))
+                .and_then(|app: Arc<Mutex<Jet1090>>| async move {
+                    web::icao24(&app).await
+                });
+
+            let app_all = app_web.clone();
+            let all = warp::path("all")
+                .and(warp::any().map(move || app_all.clone()))
+                .and_then(|app: Arc<Mutex<Jet1090>>| async move {
+                    web::all(&app).await
+                });
+
+            let app_track = app_web.clone();
+            let track = warp::get()
+                .and(warp::path("track"))
+                .and(warp::any().map(move || app_track.clone()))
+                .and(warp::query::<TrackQuery>())
+                .and_then(
+                    |app: Arc<Mutex<Jet1090>>, q: TrackQuery| async move {
+                        web::track(&app, q).await
+                    },
+                );
+
+            let cors = warp::cors()
+                .allow_any_origin()
+                .allow_headers(vec!["*"])
+                .allow_methods(vec!["GET"]);
+
+            let routes = warp::get()
+                .and(home.or(all).or(track))
+                .recover(web::handle_rejection)
+                .with(cors);
+
+            warp::serve(routes).run(([0, 0, 0, 0], port)).await;
+        });
+    }
 
     while let Some(tmsg) = rx.recv().await {
         let frame = hex::decode(&tmsg.frame).unwrap();
@@ -165,6 +211,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 file.write_all(json.as_bytes()).await?;
                 file.write_all("\n".as_bytes()).await?;
             }
+
+            snapshot::store_history(&app_dec, msg).await;
         }
         if app_dec.lock().await.should_quit {
             break;
@@ -233,6 +281,14 @@ fn update(
 }
 
 impl Jet1090 {
+    pub fn keys(&self) -> Result<impl warp::Reply, std::convert::Infallible> {
+        let keys: Vec<_> = self
+            .state_vectors
+            .keys()
+            .map(|key| key.to_string())
+            .collect();
+        Ok(warp::reply::json(&keys))
+    }
     pub fn next(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
