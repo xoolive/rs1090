@@ -97,12 +97,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         radarcape::receiver(server_address).await
     };
 
-    let mut terminal = tui::init()?;
-    let width = terminal.size()?.width;
-    let mut events = tui::EventHandler::new(width);
-
     let mut reference = options.latlon;
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
+
+    let terminal = if options.interactive {
+        Some(tui::init()?)
+    } else {
+        None
+    };
+    let width = if let Some(terminal) = &terminal {
+        terminal.size()?.width
+    } else {
+        0
+    };
+
+    let mut events = tui::EventHandler::new(width);
 
     let app_tui = Arc::new(Mutex::new(Jet1090 {
         items: Vec::new(),
@@ -117,19 +126,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_dec = app_tui.clone();
     let app_web = app_tui.clone();
 
-    tokio::spawn(async move {
-        loop {
-            if let Ok(event) = events.next().await {
-                let _ = update(&mut app_tui.lock().await, event);
+    if let Some(mut terminal) = terminal {
+        tokio::spawn(async move {
+            loop {
+                if let Ok(event) = events.next().await {
+                    let _ = update(&mut app_tui.lock().await, event);
+                }
+                let mut app = app_tui.lock().await;
+                if app.should_quit {
+                    break;
+                }
+                terminal.draw(|frame| table::build_table(frame, &mut app))?;
             }
-            let mut app = app_tui.lock().await;
-            if app.should_quit {
-                break;
-            }
-            terminal.draw(|frame| table::build_table(frame, &mut app))?;
-        }
-        tui::restore()
-    });
+            tui::restore()
+        });
+    }
 
     if let Some(port) = options.serve_port {
         tokio::spawn(async move {

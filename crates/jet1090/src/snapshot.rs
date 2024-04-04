@@ -35,7 +35,6 @@ impl StateVectors {
             mach: None,
             roll: None,
             heading: None,
-            selected_heading: None,
             nacp: None,
         };
         StateVectors {
@@ -64,7 +63,6 @@ pub struct Snapshot {
     pub mach: Option<f64>,
     pub roll: Option<f64>,
     pub heading: Option<f64>,
-    pub selected_heading: Option<f32>,
     pub nacp: Option<u8>,
 }
 
@@ -144,7 +142,6 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
                     ME::BDS62(bds62) => {
                         aircraft.cur.selected_altitude =
                             bds62.selected_altitude;
-                        aircraft.cur.selected_heading = bds62.selected_heading;
                         aircraft.cur.nacp = Some(bds62.nac_p);
                     }
                     ME::BDS65(bds65) => match bds65 {
