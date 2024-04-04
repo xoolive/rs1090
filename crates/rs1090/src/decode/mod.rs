@@ -408,6 +408,8 @@ pub struct TimedMessage {
 
     #[serde(flatten)]
     pub message: Option<Message>,
+
+    pub idx: usize,
 }
 
 impl fmt::Display for TimedMessage {

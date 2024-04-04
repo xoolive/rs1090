@@ -1,5 +1,6 @@
 #![doc = include_str!("../readme.md")]
 
+mod cli;
 mod snapshot;
 mod table;
 mod tui;
@@ -24,21 +25,9 @@ use web::TrackQuery;
     name = "jet1090",
     version,
     author = "xoolive",
-    about = "Decode Mode S demodulated raw messages"
+    about = "Decode and serve Mode S demodulated raw messages"
 )]
 struct Options {
-    /// Address of the demodulating server (beast feed)
-    #[arg(long, default_value = "0.0.0.0")]
-    host: String,
-
-    /// Port of the demodulating server
-    #[arg(short, long, default_value = None)]
-    port: Option<u16>,
-
-    /// Demodulate data from a RTL-SDR dongle
-    #[arg(long, default_value = "false")]
-    rtlsdr: bool,
-
     /// Activate JSON output
     #[arg(short, long, default_value = "false")]
     verbose: bool,
@@ -47,12 +36,6 @@ struct Options {
     #[arg(short, long, default_value=None)]
     output: Option<String>,
 
-    /// Reference coordinates for the decoding (e.g.
-    //  --latlon LFPG for major airports,
-    /// --latlon 43.3,1.35 or --latlon ' -34,18.6' if negative)
-    #[arg(long, default_value=None)]
-    latlon: Option<Position>,
-
     /// Display a table in interactive mode (not compatible with verbose)
     #[arg(short, long, default_value = "false")]
     interactive: bool,
@@ -60,6 +43,13 @@ struct Options {
     /// Port for the API endpoint (on 0.0.0.0)
     #[arg(long, default_value=None)]
     serve_port: Option<u16>,
+
+    /// List the sources of data following the format [host:]port[@reference]
+    //
+    // - `host` can be a DNS name, an IP address or `rtlsdr` (for RTL-SDR dongles)
+    // - `port` must be a number
+    // - `reference` can be LFPG for major airports, `43.3,1.35` otherwise
+    sources: Vec<cli::Source>,
 }
 
 #[tokio::main]
@@ -78,26 +68,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    let mut rx = if options.rtlsdr {
-        #[cfg(not(feature = "rtlsdr"))]
-        {
-            eprintln!(
-                "Not compiled with RTL-SDR support, use the rtlsdr feature"
-            );
-            std::process::exit(127);
-        }
-        #[cfg(feature = "rtlsdr")]
-        {
-            rtlsdr::discover();
-            rtlsdr::receiver().await
-        }
-    } else {
-        let server_address =
-            format!("{}:{}", options.host, options.port.unwrap());
-        radarcape::receiver(server_address).await
-    };
-
-    let mut reference = options.latlon;
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
 
     let terminal = if options.interactive {
@@ -183,6 +153,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+    let references = options
+        .sources
+        .iter()
+        .map(|s| s.reference)
+        .collect::<Vec<Option<Position>>>();
+
+    for (idx, source) in options.sources.into_iter().enumerate() {
+        let tx_copy = tx.clone();
+        tokio::spawn(async move {
+            source.receiver(tx_copy, idx).await;
+        });
+    }
+
     while let Some(tmsg) = rx.recv().await {
         let frame = hex::decode(&tmsg.frame).unwrap();
         if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
@@ -190,7 +174,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 timestamp: tmsg.timestamp,
                 frame: tmsg.frame.to_string(),
                 message: Some(msg),
+                idx: tmsg.idx,
             };
+            let mut reference = references[tmsg.idx];
 
             if let Some(message) = &mut msg.message {
                 match &mut message.df {

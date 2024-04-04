@@ -261,6 +261,7 @@ pub async fn store_history(states: &Mutex<Jet1090>, msg: TimedMessage) {
     if let TimedMessage {
         timestamp,
         message: Some(message),
+        idx,
         ..
     } = msg
     {
@@ -279,6 +280,7 @@ pub async fn store_history(states: &Mutex<Jet1090>, msg: TimedMessage) {
                         timestamp,
                         frame: "".to_string(),
                         message: Some(message),
+                        idx,
                     })
                 }
                 _ => {}

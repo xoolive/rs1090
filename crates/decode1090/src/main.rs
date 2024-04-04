@@ -70,10 +70,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut reference = options.latlon;
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(100);
 
     if let Some(port) = options.port {
         let server_address = format!("{}:{}", options.host, port);
-        let mut rx = radarcape::receiver(server_address).await;
+        tokio::spawn(async move {
+            radarcape::receiver(server_address, tx, 0).await;
+        });
 
         while let Some(tmsg) = rx.recv().await {
             let frame = hex::decode(&tmsg.frame).unwrap();
@@ -82,6 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     timestamp: tmsg.timestamp,
                     frame: tmsg.frame.to_string(),
                     message: Some(msg),
+                    idx: tmsg.idx,
                 };
 
                 if let Some(message) = &mut msg.message {

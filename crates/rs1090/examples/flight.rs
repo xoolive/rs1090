@@ -66,6 +66,7 @@ fn main() -> io::Result<()> {
                     timestamp,
                     frame: hex.to_string(),
                     message: Some(msg),
+                    idx: 0,
                 });
             }
             res

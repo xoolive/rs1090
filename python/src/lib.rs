@@ -58,6 +58,7 @@ fn decode_1090t_vec(
                             timestamp,
                             frame: msg.to_string(),
                             message: Some(message),
+                            idx: 0,
                         })
                     } else {
                         None

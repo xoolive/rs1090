@@ -19,7 +19,7 @@ const MODES_SHORT_MSG_BYTES: usize = 7;
 const MODES_MAG_BUF_SAMPLES: usize = 131_072;
 const TRAILING_SAMPLES: usize = 326;
 
-pub async fn receiver() -> mpsc::Receiver<TimedMessage> {
+pub async fn receiver(tx: mpsc::Sender<TimedMessage>, idx: usize) {
     let device = match Device::new("rtlsdr") {
         Ok(d) => d,
         Err(e) => {
@@ -38,40 +38,37 @@ pub async fn receiver() -> mpsc::Receiver<TimedMessage> {
         .set_gain_element(DIRECTION, channel, "TUNER", RTLSDR_GAIN)
         .unwrap();
 
-    let (tx, rx) = mpsc::channel(100);
     let mut stream = device.rx_stream::<Complex<i16>>(&[channel]).unwrap();
 
     let mut buf = vec![Complex::new(0, 0); stream.mtu().unwrap()];
     stream.activate(None).unwrap();
 
     // Spawn a thread to send messages
-    tokio::spawn(async move {
-        loop {
-            match stream.read(&mut [&mut buf], 5_000_000) {
-                Ok(len) => {
-                    let buf = &buf[..len];
-                    let outbuf = magnitude(buf);
-                    let resulting_data = demodulate2400(&outbuf).unwrap();
-                    for data in resulting_data {
-                        let timestamp = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .expect("SystemTime before unix epoch")
-                            .as_secs_f64();
-                        let msg = TimedMessage {
-                            timestamp,
-                            frame: hex::encode(data),
-                            message: None,
-                        };
-                        tx.send(msg).await.expect("Failed to send message");
-                    }
-                }
-                Err(e) => {
-                    eprintln!("SoapySDR read error: {}", e);
+    loop {
+        match stream.read(&mut [&mut buf], 5_000_000) {
+            Ok(len) => {
+                let buf = &buf[..len];
+                let outbuf = magnitude(buf);
+                let resulting_data = demodulate2400(&outbuf).unwrap();
+                for data in resulting_data {
+                    let timestamp = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .expect("SystemTime before unix epoch")
+                        .as_secs_f64();
+                    let msg = TimedMessage {
+                        timestamp,
+                        frame: hex::encode(data),
+                        message: None,
+                        idx,
+                    };
+                    tx.send(msg).await.expect("Failed to send message");
                 }
             }
+            Err(e) => {
+                eprintln!("SoapySDR read error: {}", e);
+            }
         }
-    });
-    rx
+    }
 }
 
 pub fn magnitude(data: &[Complex<i16>]) -> MagnitudeBuffer {
