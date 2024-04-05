@@ -13,9 +13,11 @@ use rs1090::decode::cpr::{decode_position, AircraftState, Position};
 use rs1090::prelude::*;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::time::SystemTime;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
+use tokio::time::{sleep, Duration};
 use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
@@ -44,7 +46,11 @@ struct Options {
     #[arg(long, default_value=None)]
     serve_port: Option<u16>,
 
-    /// List the sources of data following the format [host:]port[@reference]
+    /// How much history to expire (in minutes)
+    #[arg(long, short = 'x')]
+    expire: Option<u64>,
+
+    /// List the sources of data following the format (host:)port[@reference]
     //
     // - `host` can be a DNS name, an IP address or `rtlsdr` (for RTL-SDR dongles)
     // - `port` must be a number
@@ -95,6 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }));
     let app_dec = app_tui.clone();
     let app_web = app_tui.clone();
+    let app_exp = app_tui.clone();
 
     if let Some(mut terminal) = terminal {
         tokio::spawn(async move {
@@ -109,6 +116,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 terminal.draw(|frame| table::build_table(frame, &mut app))?;
             }
             tui::restore()
+        });
+    }
+
+    if let Some(minutes) = options.expire {
+        tokio::spawn(async move {
+            let app_expire = app_exp.clone();
+            loop {
+                sleep(Duration::from_secs(60)).await;
+                {
+                    let mut app = app_expire.lock().await;
+                    let now = SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .expect("SystemTime before unix epoch")
+                        .as_secs();
+
+                    let remove_keys = app
+                        .state_vectors
+                        .iter()
+                        .filter(|(_key, value)| {
+                            now > value.cur.last + minutes * 60
+                        })
+                        .map(|(key, _)| key.to_string())
+                        .collect::<Vec<String>>();
+
+                    for key in remove_keys {
+                        app.state_vectors.remove(&key);
+                    }
+
+                    let _ = app
+                        .state_vectors
+                        .iter_mut()
+                        .map(|(_key, value)| {
+                            value.hist.retain(|elt| {
+                                now < (elt.timestamp as u64) + minutes * 60
+                            })
+                        })
+                        .collect::<Vec<()>>();
+                }
+            }
         });
     }
 
