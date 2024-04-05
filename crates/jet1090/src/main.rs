@@ -50,7 +50,7 @@ struct Options {
     #[arg(long, short = 'x')]
     expire: Option<u64>,
 
-    /// List the sources of data following the format (host:)port[@reference]
+    /// List the sources of data following the format \[host:\]port\[\@reference\]
     //
     // - `host` can be a DNS name, an IP address or `rtlsdr` (for RTL-SDR dongles)
     // - `port` must be a number

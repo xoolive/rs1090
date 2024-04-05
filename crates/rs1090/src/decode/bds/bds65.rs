@@ -23,7 +23,6 @@ pub enum AircraftOperationStatus {
     #[deku(id = "1")]
     Surface(OperationStatusSurface),
 
-    #[serde(skip)]
     #[deku(id_pat = "2..=7")]
     Reserved(#[deku(bits = "5")] u8, [u8; 5]),
 }
