@@ -246,13 +246,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             snapshot::update_snapshot(&app_dec, &mut msg).await;
 
-            let json = serde_json::to_string(&msg).unwrap();
-            if options.verbose {
-                println!("{}", json);
-            }
-            if let Some(file) = &mut file {
-                file.write_all(json.as_bytes()).await?;
-                file.write_all("\n".as_bytes()).await?;
+            if let Ok(json) = serde_json::to_string(&msg) {
+                if options.verbose {
+                    println!("{}", json);
+                }
+                if let Some(file) = &mut file {
+                    file.write_all(json.as_bytes()).await?;
+                    file.write_all("\n".as_bytes()).await?;
+                }
+            } else {
+                println!("Error with JSON serialisation: {:}", &msg.frame);
             }
 
             snapshot::store_history(&app_dec, msg).await;
