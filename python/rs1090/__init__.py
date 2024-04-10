@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pickle
-from typing import Sequence, overload
+from typing import Iterable, Sequence, TypeVar, overload
 
 import pandas as pd
 
@@ -41,9 +41,27 @@ from .stubs import (
     is_df21,
 )
 
+try:
+    # new in Python 3.12
+    from itertools import batched  # type: ignore
+except ImportError:
+    from itertools import islice
+
+    T = TypeVar("T")
+
+    def batched(iterable: Sequence[T], n: int) -> Iterable[tuple[T, ...]]:
+        # batched('ABCDEFG', 3) --> ABC DEF G
+        if n < 1:
+            raise ValueError("n must be at least one")
+        it = iter(iterable)
+        while batch := tuple(islice(it, n)):
+            yield batch
+
+
 __all__ = [
     "Flarm",
     "Message",
+    "batched",
     "decode",
     "flarm",
     "is_bds05",
@@ -72,26 +90,9 @@ __all__ = [
     "is_df5",
 ]
 
-try:
-    # new in Python 3.12
-    from itertools import batched  # type: ignore
-except ImportError:
-    from itertools import islice
-
-    def batched(iterable, n):  # type: ignore
-        # batched('ABCDEFG', 3) --> ABC DEF G
-        if n < 1:
-            raise ValueError("n must be at least one")
-        it = iter(iterable)
-        while batch := tuple(islice(it, n)):
-            yield batch
-
-
-__all__ = ["decode", "flarm"]
-
 
 @overload
-def decode(
+def decode(  # type: ignore
     msg: str,
     timestamp: None | float = None,
     *,
@@ -110,7 +111,7 @@ def decode(
 
 
 def decode(
-    msg: str | Sequence[str] | pd.Series,
+    msg: str | list[str] | pd.Series,
     timestamp: None | float | Sequence[float] | pd.Series = None,
     *,
     reference: None | tuple[float, float] = None,
