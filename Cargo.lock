@@ -566,7 +566,7 @@ checksum = "7e962a19be5cfc3f3bf6dd8f61eb50107f356ad6270fbb3ed41476571db78be5"
 
 [[package]]
 name = "decode1090"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "clap",
  "deku",
@@ -1034,7 +1034,7 @@ checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
 
 [[package]]
 name = "jet1090"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "clap",
@@ -1598,7 +1598,7 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
 name = "rs1090"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "ansi_term",
  "approx",
@@ -1622,7 +1622,7 @@ dependencies = [
 
 [[package]]
 name = "rs1090-python"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "hex",
  "pyo3",
