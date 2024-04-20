@@ -19,7 +19,7 @@ The rs1090 library comes with a companion application [decode1090](https://crate
 
 ## Performance
 
-Benchmarking performed on the decoding of a gate-to-gate [European flight](./crates/rs1090/data/long_flight.csv):
+Benchmarking performed on the decoding of a gate-to-gate [European flight](./data/long_flight.csv):
 
 - [pyModeS](https://github.com/junzis/pyModeS) in full Python mode;
 - [pyModeS](https://github.com/junzis/pyModeS) with Cython compiled functions;
