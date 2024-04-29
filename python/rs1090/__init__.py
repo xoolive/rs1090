@@ -6,6 +6,7 @@ from typing import Iterable, Sequence, TypeVar, overload
 import pandas as pd
 
 from ._rust import (
+    aircraft_information,
     decode_1090,
     decode_1090_vec,
     decode_1090t_vec,
@@ -49,7 +50,7 @@ except ImportError:
 
     T = TypeVar("T")
 
-    def batched(iterable: Sequence[T], n: int) -> Iterable[tuple[T, ...]]:
+    def batched(iterable: Sequence[T], n: int) -> Iterable[tuple[T, ...]]:  # type: ignore
         # batched('ABCDEFG', 3) --> ABC DEF G
         if n < 1:
             raise ValueError("n must be at least one")
@@ -88,6 +89,7 @@ __all__ = [
     "is_df21",
     "is_df4",
     "is_df5",
+    "aircraft_information",
 ]
 
 

@@ -1,7 +1,12 @@
 #![allow(rustdoc::missing_crate_level_docs)]
 
+use std::collections::HashMap;
+
 use pyo3::prelude::*;
 use rayon::prelude::*;
+use regex::Regex;
+use rs1090::data::patterns::PATTERNS;
+use rs1090::data::tail::tail;
 use rs1090::decode::cpr::{decode_positions, Position};
 use rs1090::decode::flarm::Flarm;
 use rs1090::prelude::*;
@@ -141,13 +146,85 @@ fn decode_flarm_vec(
     let pkl = serde_pickle::to_vec(&res, Default::default()).unwrap();
     Ok(pkl)
 }
+
+#[pyfunction]
+fn aircraft_information(
+    icao24: &str,
+    registration: Option<&str>,
+) -> PyResult<HashMap<String, String>> {
+    let mut reg = HashMap::<String, String>::new();
+    let hexid = u32::from_str_radix(icao24, 16)?;
+
+    reg.insert("icao24".to_string(), icao24.to_lowercase());
+
+    if let Some(tail) = tail(hexid) {
+        reg.insert("registration".to_string(), tail);
+    }
+    if let Some(tail) = registration {
+        reg.insert("registration".to_string(), tail.to_string());
+    }
+
+    if let Some(pattern) = &PATTERNS.registers.iter().find(|elt| {
+        if let Some(start) = &elt.start {
+            if let Some(end) = &elt.end {
+                let start = u32::from_str_radix(&start[2..], 16).unwrap();
+                let end = u32::from_str_radix(&end[2..], 16).unwrap();
+                return (hexid >= start) & (hexid <= end);
+            }
+        }
+        false
+    }) {
+        reg.insert("country".to_string(), pattern.country.to_string());
+        reg.insert("flag".to_string(), pattern.flag.to_string());
+        if let Some(p) = &pattern.pattern {
+            reg.insert("pattern".to_string(), p.to_string());
+        }
+        if let Some(comment) = &pattern.comment {
+            reg.insert("comment".to_string(), comment.to_string());
+        }
+
+        if let Some(tail) = reg.get("registration") {
+            if let Some(categories) = &pattern.categories {
+                if let Some(cat) = categories.iter().find(|elt| {
+                    let re = Regex::new(&elt.pattern).unwrap();
+                    re.is_match(tail)
+                }) {
+                    reg.insert("pattern".to_string(), cat.pattern.to_string());
+                    if let Some(category) = &cat.category {
+                        reg.insert(
+                            "category".to_string(),
+                            category.to_string(),
+                        );
+                    }
+                    if let Some(country) = &cat.country {
+                        reg.insert("country".to_string(), country.to_string());
+                    }
+                    if let Some(flag) = &cat.flag {
+                        reg.insert("flag".to_string(), flag.to_string());
+                    }
+                }
+            }
+        }
+    } else {
+        reg.insert("country".to_string(), "Unknown".to_string());
+        reg.insert("flag".to_string(), "🏳".to_string());
+    }
+
+    Ok(reg)
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _rust(_py: Python, m: &PyModule) -> PyResult<()> {
+    // Decoding functions
     m.add_function(wrap_pyfunction!(decode_1090, m)?)?;
     m.add_function(wrap_pyfunction!(decode_1090_vec, m)?)?;
     m.add_function(wrap_pyfunction!(decode_1090t_vec, m)?)?;
     m.add_function(wrap_pyfunction!(decode_flarm, m)?)?;
     m.add_function(wrap_pyfunction!(decode_flarm_vec, m)?)?;
+
+    // icao24 functions
+    m.add_function(wrap_pyfunction!(aircraft_information, m)?)?;
+
     Ok(())
 }
