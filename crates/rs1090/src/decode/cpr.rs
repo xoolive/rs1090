@@ -10,6 +10,24 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
 
+fn haversine(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    let d_lat = (lat2 - lat1).to_radians();
+    let d_lon = (lon2 - lon1).to_radians();
+    let a = (d_lat / 2.0).sin() * (d_lat / 2.0).sin()
+        + lat1.to_radians().cos()
+            * lat2.to_radians().cos()
+            * (d_lon / 2.0).sin()
+            * (d_lon / 2.0).sin();
+    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+    const R: f64 = 6371.0; // Earth's radius in kilometers
+    R * c // Distance in kilometers
+}
+
+fn dist_above_thr(pos1: &Position, pos2: &Position) -> bool {
+    haversine(pos1.latitude, pos1.longitude, pos2.latitude, pos2.longitude)
+        > 100. // kilometers
+}
+
 /**
 * The position information is encoded in a Compact Position Reporting (CPR)
 * format, which requires fewer bits to encode positions with higher resolution.
@@ -377,40 +395,73 @@ pub fn decode_position(
     match message {
         ME::BDS05(airborne) => {
             match (latest.timestamp, latest.msg, latest.pos) {
-                (t, _, Some(latest_pos)) if timestamp - t < 10. => {
-                    let pos = airborne_position_with_reference(
+                (t, oldest, Some(latest_pos)) if timestamp - t < 10. => {
+                    // Default behaviour is to decode using the latest known position
+                    let mut pos = Some(airborne_position_with_reference(
                         airborne,
                         latest_pos.latitude,
                         latest_pos.longitude,
-                    );
-                    // First update the message
-                    airborne.latitude = Some(pos.latitude);
-                    airborne.longitude = Some(pos.longitude);
-                    // Then update the reference in aircraft
-                    latest.pos = Some(pos);
-                    latest.msg = Some(*airborne);
-                    latest.timestamp = timestamp;
-                    // If necessary update the reference position
-                    if let Some(alt) = airborne.alt {
-                        if alt < 1000 {
-                            *reference = Some(Position {
-                                latitude: pos.latitude,
-                                longitude: pos.longitude,
-                            })
+                    ));
+                    // Then we check whether the new position is not too far away from the previous one
+                    if dist_above_thr(&pos.unwrap(), &latest_pos) {
+                        // Try to use the latest message instead
+                        if let Some(oldest) = oldest {
+                            // Decode and invalidate if that one is also too far away
+                            pos = airborne_position(&oldest, airborne);
+                            if let Some(new_pos) = pos {
+                                if dist_above_thr(&new_pos, &latest_pos) {
+                                    pos = None;
+                                }
+                            }
+                        } else {
+                            // invalidate the position
+                            pos = None;
                         }
                     }
+
+                    if let Some(pos) = pos {
+                        // First update the message
+                        airborne.latitude = Some(pos.latitude);
+                        airborne.longitude = Some(pos.longitude);
+                        // Then update the reference in aircraft
+                        latest.pos = Some(pos);
+                        // If necessary update the reference position
+                        if let Some(alt) = airborne.alt {
+                            if alt < 1000 {
+                                *reference = Some(Position {
+                                    latitude: pos.latitude,
+                                    longitude: pos.longitude,
+                                })
+                            }
+                        }
+                    } else {
+                        latest.pos = None;
+                    }
+                    latest.msg = Some(*airborne);
+                    latest.timestamp = timestamp;
                 }
                 (t, Some(oldest), None) if timestamp - t < 10. => {
                     let pos: Option<Position> =
                         airborne_position(&oldest, airborne);
 
-                    // First update the message
                     if let Some(pos) = pos {
+                        // First update the message
                         airborne.latitude = Some(pos.latitude);
                         airborne.longitude = Some(pos.longitude);
+                        // Then update the reference in aircraft
+                        latest.pos = Some(pos);
+                        // If necessary update the reference position
+                        if let Some(alt) = airborne.alt {
+                            if alt < 1000 {
+                                *reference = Some(Position {
+                                    latitude: pos.latitude,
+                                    longitude: pos.longitude,
+                                })
+                            }
+                        }
+                    } else {
+                        latest.pos = None;
                     }
-                    // Then update the reference in aircraft
-                    latest.pos = pos;
                     latest.msg = Some(*airborne);
                     latest.timestamp = timestamp;
                 }
