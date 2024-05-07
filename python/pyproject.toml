@@ -47,5 +47,8 @@ dev = [
   "ruff>=0.3.0"
 ]
 
+[tool.pytest.ini_options]
+addopts = "--log-level=INFO --color=yes"
+
 [project.urls]
 repository = "https://github.com/xoolive/rs1090"
