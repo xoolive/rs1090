@@ -17,11 +17,14 @@ pub struct StateVectors {
 
 impl StateVectors {
     fn new(ts: u64, icao24: String) -> StateVectors {
+        let hexid = u32::from_str_radix(&icao24, 16).unwrap_or(0);
         let cur = Snapshot {
             icao24,
             first: ts,
             last: ts,
             callsign: None,
+            registration: rs1090::data::tail::tail(hexid),
+            typecode: None,
             squawk: None,
             latitude: None,
             longitude: None,
@@ -50,6 +53,8 @@ pub struct Snapshot {
     pub first: u64,
     pub last: u64,
     pub callsign: Option<String>,
+    pub registration: Option<String>,
+    pub typecode: Option<String>,
     pub squawk: Option<IdentityCode>,
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
@@ -171,24 +176,28 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
                     },
                     _ => {}
                 },
-                ExtendedSquitterTisB { cf, .. } => match &cf.me {
-                    ME::BDS05(bds05) => {
-                        aircraft.cur.latitude = bds05.latitude;
-                        aircraft.cur.longitude = bds05.longitude;
-                        aircraft.cur.altitude = bds05.alt;
+                ExtendedSquitterTisB { cf, .. } => {
+                    aircraft.cur.typecode = Some("GRND".to_string());
+                    match &cf.me {
+                        ME::BDS05(bds05) => {
+                            aircraft.cur.latitude = bds05.latitude;
+                            aircraft.cur.longitude = bds05.longitude;
+                            aircraft.cur.altitude = bds05.alt;
+                        }
+                        ME::BDS06(bds06) => {
+                            aircraft.cur.latitude = bds06.latitude;
+                            aircraft.cur.longitude = bds06.longitude;
+                            aircraft.cur.track = bds06.track;
+                            aircraft.cur.groundspeed = bds06.groundspeed;
+                            aircraft.cur.altitude = None;
+                        }
+                        ME::BDS08(bds08) => {
+                            aircraft.cur.callsign =
+                                Some(bds08.callsign.to_string())
+                        }
+                        _ => {}
                     }
-                    ME::BDS06(bds06) => {
-                        aircraft.cur.latitude = bds06.latitude;
-                        aircraft.cur.longitude = bds06.longitude;
-                        aircraft.cur.track = bds06.track;
-                        aircraft.cur.groundspeed = bds06.groundspeed;
-                        aircraft.cur.altitude = None;
-                    }
-                    ME::BDS08(bds08) => {
-                        aircraft.cur.callsign = Some(bds08.callsign.to_string())
-                    }
-                    _ => {}
-                },
+                }
                 CommBAltitudeReply { bds, .. } => {
                     // Invalidate data if marked as both BDS50 and BDS60
                     if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {

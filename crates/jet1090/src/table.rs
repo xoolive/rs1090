@@ -115,6 +115,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
                 vec![
                     ICAO24,
                     CALLSIGN,
+                    TYPECODE,
                     SQUAWK,
                     LATITUDE,
                     LONGITUDE,
@@ -138,6 +139,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
                     ICAO24,
                     TAIL,
                     CALLSIGN,
+                    TYPECODE,
                     SQUAWK,
                     LATITUDE,
                     LONGITUDE,
@@ -277,6 +279,7 @@ enum ColumnRender {
     ICAO24,
     TAIL,
     CALLSIGN,
+    TYPECODE,
     SQUAWK,
     LATITUDE,
     LONGITUDE,
@@ -299,11 +302,9 @@ impl Render for ColumnRender {
     fn cell(&self, s: &Snapshot, now: u64) -> String {
         match self {
             Self::ICAO24 => s.icao24.to_string(),
-            Self::TAIL => {
-                let hexid = u32::from_str_radix(&s.icao24, 16).unwrap_or(0);
-                rs1090::data::tail::tail(hexid).unwrap_or("".to_string())
-            }
+            Self::TAIL => s.registration.to_owned().unwrap_or("".to_string()),
             Self::CALLSIGN => s.callsign.to_owned().unwrap_or("".to_string()),
+            Self::TYPECODE => s.typecode.to_owned().unwrap_or("".to_string()),
             Self::SQUAWK => {
                 s.squawk.map(|s| s.to_string()).unwrap_or("".to_string())
             }
@@ -384,6 +385,7 @@ impl Render for ColumnRender {
                 }
                 c
             }
+            ColumnRender::TYPECODE => Cell::from("type".to_string()),
             ColumnRender::SQUAWK => Cell::from("sqwk".to_string()),
             ColumnRender::LATITUDE => Cell::from("lat".to_string()),
             ColumnRender::LONGITUDE => Cell::from("lon".to_string()),
@@ -431,6 +433,7 @@ impl Render for ColumnRender {
             ColumnRender::ICAO24 => Constraint::Length(6),
             ColumnRender::TAIL => Constraint::Length(8),
             ColumnRender::CALLSIGN => Constraint::Length(8),
+            ColumnRender::TYPECODE => Constraint::Length(4),
             ColumnRender::SQUAWK => Constraint::Length(4),
             ColumnRender::LATITUDE => Constraint::Length(6),
             ColumnRender::LONGITUDE => Constraint::Length(6),
