@@ -254,8 +254,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     file.write_all(json.as_bytes()).await?;
                     file.write_all("\n".as_bytes()).await?;
                 }
-            } else {
-                println!("Error with JSON serialisation: {:}", &msg.frame);
             }
 
             snapshot::store_history(&app_dec, msg).await;
