@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use rs1090::decode::bds::bds09::AirborneVelocitySubType::{
     AirspeedSubsonic, GroundSpeedDecoding,
 };
@@ -7,7 +9,7 @@ use rs1090::prelude::*;
 use serde::Serialize;
 use tokio::sync::Mutex;
 
-use crate::Jet1090;
+use crate::{aircraftdb, Jet1090};
 
 #[derive(Debug)]
 pub struct StateVectors {
@@ -16,15 +18,33 @@ pub struct StateVectors {
 }
 
 impl StateVectors {
-    fn new(ts: u64, icao24: String) -> StateVectors {
+    fn new(
+        ts: u64,
+        icao24: String,
+        aircraftdb: &BTreeMap<String, aircraftdb::Aircraft>,
+    ) -> StateVectors {
         let hexid = u32::from_str_radix(&icao24, 16).unwrap_or(0);
+        let ac = aircraftdb.get(&icao24);
+        let typecode = match ac {
+            Some(ac) => ac.typecode.to_owned(),
+            None => None,
+        };
+        let mut registration = match ac {
+            Some(ac) => ac.registration.to_owned(),
+            None => None,
+        };
+        if registration.is_none() {
+            // Heuristics to decode the tail number
+            registration = rs1090::data::tail::tail(hexid);
+        }
+
         let cur = Snapshot {
             icao24,
             first: ts,
             last: ts,
             callsign: None,
-            registration: rs1090::data::tail::tail(hexid),
-            typecode: None,
+            registration,
+            typecode,
             squawk: None,
             latitude: None,
             longitude: None,
@@ -86,7 +106,11 @@ fn icao24(msg: &Message) -> Option<String> {
     }
 }
 
-pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
+pub async fn update_snapshot(
+    states: &Mutex<Jet1090>,
+    msg: &mut TimedMessage,
+    aircraftdb: &BTreeMap<String, aircraftdb::Aircraft>,
+) {
     if let TimedMessage {
         timestamp,
         message: Some(message),
@@ -95,9 +119,14 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
     {
         if let Some(icao24) = icao24(message) {
             let states = &mut states.lock().await.state_vectors;
-            let aircraft = states
-                .entry(icao24.to_string())
-                .or_insert(StateVectors::new(*timestamp as u64, icao24));
+            let aircraft =
+                states
+                    .entry(icao24.to_string())
+                    .or_insert(StateVectors::new(
+                        *timestamp as u64,
+                        icao24,
+                        aircraftdb,
+                    ));
             aircraft.cur.last = *timestamp as u64;
 
             match &mut message.df {
@@ -266,7 +295,11 @@ pub async fn update_snapshot(states: &Mutex<Jet1090>, msg: &mut TimedMessage) {
     }
 }
 
-pub async fn store_history(states: &Mutex<Jet1090>, msg: TimedMessage) {
+pub async fn store_history(
+    states: &Mutex<Jet1090>,
+    msg: TimedMessage,
+    aircraftdb: &BTreeMap<String, aircraftdb::Aircraft>,
+) {
     if let TimedMessage {
         timestamp,
         message: Some(message),
@@ -276,9 +309,14 @@ pub async fn store_history(states: &Mutex<Jet1090>, msg: TimedMessage) {
     {
         if let Some(icao24) = icao24(&message) {
             let states = &mut states.lock().await.state_vectors;
-            let aircraft = states
-                .entry(icao24.to_string())
-                .or_insert(StateVectors::new(timestamp as u64, icao24));
+            let aircraft =
+                states
+                    .entry(icao24.to_string())
+                    .or_insert(StateVectors::new(
+                        timestamp as u64,
+                        icao24,
+                        aircraftdb,
+                    ));
 
             match message.df {
                 ExtendedSquitterADSB(_)

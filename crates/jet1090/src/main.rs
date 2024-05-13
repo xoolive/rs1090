@@ -1,5 +1,6 @@
 #![doc = include_str!("../readme.md")]
 
+mod aircraftdb;
 mod cli;
 mod snapshot;
 mod table;
@@ -73,6 +74,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
+
+    let aircraftdb = aircraftdb::aircraft().await;
 
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
 
@@ -244,7 +247,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            snapshot::update_snapshot(&app_dec, &mut msg).await;
+            snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
 
             if let Ok(json) = serde_json::to_string(&msg) {
                 if options.verbose {
@@ -256,7 +259,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            snapshot::store_history(&app_dec, msg).await;
+            snapshot::store_history(&app_dec, msg, &aircraftdb).await;
         }
         if app_dec.lock().await.should_quit {
             break;
