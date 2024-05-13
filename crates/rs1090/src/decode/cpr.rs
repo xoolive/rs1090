@@ -23,9 +23,8 @@ fn haversine(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     R * c // Distance in kilometers
 }
 
-fn dist_above_thr(pos1: &Position, pos2: &Position) -> bool {
+fn dist_haversine(pos1: &Position, pos2: &Position) -> f64 {
     haversine(pos1.latitude, pos1.longitude, pos2.latitude, pos2.longitude)
-        > 100. // kilometers
 }
 
 /**
@@ -394,46 +393,53 @@ pub fn decode_position(
     });
     match message {
         ME::BDS05(airborne) => {
+            let mut pos: Option<Position> = None;
+
             if (timestamp - latest.timestamp) < 10. {
                 // First decoding based on odd/even
-                let mut pos = match latest.msg {
+                pos = match latest.msg {
                     Some(oldest) => airborne_position(&oldest, airborne),
                     None => None,
                 };
+            }
 
-                // If failed try to use previous reference
-                if pos.is_none() {
-                    if let Some(latest_pos) = latest.pos {
-                        pos = Some(airborne_position_with_reference(
-                            airborne,
-                            latest_pos.latitude,
-                            latest_pos.longitude,
-                        ))
+            // If failed try to use previous reference
+            if pos.is_none() & ((timestamp - latest.timestamp) < 180.) {
+                if let Some(latest_pos) = latest.pos {
+                    pos = Some(airborne_position_with_reference(
+                        airborne,
+                        latest_pos.latitude,
+                        latest_pos.longitude,
+                    ))
+                }
+            }
+
+            if let Some(new_pos) = pos {
+                if let Some(latest_pos) = latest.pos {
+                    // Invalidate if new position is not reasonable
+                    if dist_haversine(&new_pos, &latest_pos) > 100. {
+                        pos = None
                     }
                 }
-
-                if let Some(new_pos) = pos {
-                    if let Some(latest_pos) = latest.pos {
-                        // Invalidate if new position is not reasonable
-                        if dist_above_thr(&new_pos, &latest_pos) {
-                            pos = None
-                        }
+                if let Some(ref_pos) = *reference {
+                    if dist_haversine(&new_pos, &ref_pos) > 500. {
+                        pos = None
                     }
                 }
-                if let Some(pos) = pos {
-                    // First update the message
-                    airborne.latitude = Some(pos.latitude);
-                    airborne.longitude = Some(pos.longitude);
-                    // Then update the reference in aircraft
-                    latest.pos = Some(pos);
-                    // If necessary update the reference position
-                    if let Some(alt) = airborne.alt {
-                        if alt < 1000 {
-                            *reference = Some(Position {
-                                latitude: pos.latitude,
-                                longitude: pos.longitude,
-                            })
-                        }
+            }
+            if let Some(pos) = pos {
+                // First update the message
+                airborne.latitude = Some(pos.latitude);
+                airborne.longitude = Some(pos.longitude);
+                // Then update the reference in aircraft
+                latest.pos = Some(pos);
+                // If necessary update the reference position
+                if let Some(alt) = airborne.alt {
+                    if alt < 1000 {
+                        *reference = Some(Position {
+                            latitude: pos.latitude,
+                            longitude: pos.longitude,
+                        })
                     }
                 }
             }
