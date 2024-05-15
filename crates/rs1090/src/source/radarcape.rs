@@ -45,13 +45,15 @@ pub async fn receiver(
     }
 }
 
+fn now() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("SystemTime before unix epoch")
+        .as_secs() as i64
+}
+
 fn today() -> i64 {
-    86_400
-        * (SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("SystemTime before unix epoch")
-            .as_secs() as i64
-            / 86_400)
+    86_400 * (now() / 86_400)
 }
 
 fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
@@ -69,8 +71,16 @@ fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
         .collect::<Vec<String>>()
         .join("");
 
+    let timestamp = today() as f64 + ts;
+    // In some cases, the timestamp is just the one of dump1090, so forget it!
+    let timestamp = if (now() as f64 - timestamp).abs() < 5. {
+        timestamp
+    } else {
+        now() as f64
+    };
+
     TimedMessage {
-        timestamp: today() as f64 + ts,
+        timestamp,
         frame,
         message: None,
         idx,
