@@ -417,7 +417,7 @@ pub fn decode_position(
             if let Some(new_pos) = pos {
                 if let Some(latest_pos) = latest.pos {
                     // Invalidate if new position is not reasonable
-                    if dist_haversine(&new_pos, &latest_pos) > 100. {
+                    if dist_haversine(&new_pos, &latest_pos) > 50. {
                         pos = None
                     }
                 }
@@ -447,19 +447,26 @@ pub fn decode_position(
             latest.timestamp = timestamp;
         }
         ME::BDS06(surface) => {
-            let pos = match (latest.pos, reference) {
-                (Some(pos), _) => Some(surface_position_with_reference(
+            let mut pos = None;
+            if let Some(latest_pos) = latest.pos {
+                let surface_pos = surface_position_with_reference(
                     surface,
-                    pos.latitude,
-                    pos.longitude,
-                )),
-                (_, Some(reference)) => Some(surface_position_with_reference(
-                    surface,
-                    reference.latitude,
-                    reference.longitude,
-                )),
-                _ => None,
-            };
+                    latest_pos.latitude,
+                    latest_pos.longitude,
+                );
+                if dist_haversine(&latest_pos, &surface_pos) < 1. {
+                    pos = Some(surface_pos);
+                }
+            }
+            if let Some(reference) = reference {
+                if pos.is_none() {
+                    pos = Some(surface_position_with_reference(
+                        surface,
+                        reference.latitude,
+                        reference.longitude,
+                    ))
+                }
+            }
             if let Some(pos) = pos {
                 // First update the message
                 surface.latitude = Some(pos.latitude);
