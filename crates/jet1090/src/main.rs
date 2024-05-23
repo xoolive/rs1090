@@ -8,9 +8,10 @@ mod tui;
 mod web;
 
 use clap::Parser;
+use cli::Source;
 use crossterm::event::KeyCode;
 use ratatui::widgets::*;
-use rs1090::decode::cpr::{decode_position, AircraftState, Position};
+use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::prelude::*;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -93,6 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut events = tui::EventHandler::new(width);
 
     let app_tui = Arc::new(Mutex::new(Jet1090 {
+        sources: options.sources.clone(),
         items: Vec::new(),
         state: TableState::default().with_selected(0),
         scroll_state: ScrollbarState::new(0),
@@ -188,13 +190,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                 );
 
+            let app_receivers = app_web.clone();
+            let receivers = warp::path("receivers")
+                .and(warp::any().map(move || app_receivers.clone()))
+                .and_then(|app: Arc<Mutex<Jet1090>>| async move {
+                    web::receivers(&app).await
+                });
+
             let cors = warp::cors()
                 .allow_any_origin()
                 .allow_headers(vec!["*"])
                 .allow_methods(vec!["GET"]);
 
             let routes = warp::get()
-                .and(home.or(all).or(track))
+                .and(home.or(all).or(track).or(receivers))
                 .recover(web::handle_rejection)
                 .with(cors);
 
@@ -203,11 +212,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
-    let references = options
-        .sources
-        .iter()
-        .map(|s| s.reference)
-        .collect::<Vec<Option<Position>>>();
 
     for (idx, source) in options.sources.into_iter().enumerate() {
         let tx_copy = tx.clone();
@@ -225,7 +229,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 message: Some(msg),
                 idx: tmsg.idx,
             };
-            let mut reference = references[tmsg.idx];
+            let mut reference =
+                app_dec.lock().await.sources[tmsg.idx].reference;
 
             if let Some(message) = &mut msg.message {
                 match &mut message.df {
@@ -270,6 +275,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Debug, Default)]
 pub struct Jet1090 {
+    sources: Vec<Source>,
     state: TableState,
     items: Vec<String>,
     scroll_state: ScrollbarState,
@@ -328,6 +334,18 @@ fn update(
 }
 
 impl Jet1090 {
+    pub fn receivers(&mut self) {
+        for source in &mut self.sources {
+            source.count = 0;
+        }
+        for vector in self.state_vectors.values_mut() {
+            vector.cur.airport = self.sources[vector.cur.idx].airport.clone();
+            self.sources[vector.cur.idx].count += 1;
+            if self.sources[vector.cur.idx].last < vector.cur.last {
+                self.sources[vector.cur.idx].last = vector.cur.last
+            }
+        }
+    }
     pub fn keys(&self) -> Result<impl warp::Reply, std::convert::Infallible> {
         let keys: Vec<_> = self
             .state_vectors

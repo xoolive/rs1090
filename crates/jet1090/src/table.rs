@@ -15,6 +15,9 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
         .expect("SystemTime before unix epoch")
         .as_secs();
 
+    // Update airport names
+    app.receivers();
+
     let states = &app.state_vectors;
 
     app.items = states
@@ -154,6 +157,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
                     HEADING,
                     ROLL,
                     NACP,
+                    REFERENCE,
                     LAST,
                     FIRST,
                 ]
@@ -294,6 +298,7 @@ enum ColumnRender {
     HEADING,
     ROLL,
     NACP,
+    REFERENCE,
     LAST,
     FIRST,
 }
@@ -359,6 +364,8 @@ impl Render for ColumnRender {
             Self::NACP => {
                 s.nacp.map(|v| format!("{}", v)).unwrap_or("".to_string())
             }
+            Self::REFERENCE => s.airport.clone().unwrap_or("".to_string()),
+            // s.reference.to_string(),
             Self::LAST => {
                 if now > s.last + 5 {
                     format!("{}s ago", now - s.last)
@@ -412,6 +419,7 @@ impl Render for ColumnRender {
             ColumnRender::HEADING => Cell::from("hdg".to_string()),
             ColumnRender::ROLL => Cell::from("roll".to_string()),
             ColumnRender::NACP => Cell::from("nac".to_string()),
+            ColumnRender::REFERENCE => Cell::from("ref".to_string()),
             ColumnRender::LAST => {
                 let mut c = Cell::from("last".to_string());
                 if *sort_key == SortKey::LAST {
@@ -448,6 +456,7 @@ impl Render for ColumnRender {
             ColumnRender::HEADING => Constraint::Length(5),
             ColumnRender::ROLL => Constraint::Length(5),
             ColumnRender::NACP => Constraint::Length(3),
+            ColumnRender::REFERENCE => Constraint::Length(4),
             ColumnRender::LAST => Constraint::Length(7),
             ColumnRender::FIRST => Constraint::Length(5),
         }

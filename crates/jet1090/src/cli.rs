@@ -2,14 +2,18 @@ use std::str::FromStr;
 
 use rs1090::decode::{cpr::Position, TimedMessage};
 use rs1090::prelude::*;
+use serde::Serialize;
 use tokio::sync::mpsc::Sender;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Source {
     host: String,
     port: u16,
     rtlsdr: bool,
+    pub airport: Option<String>,
     pub reference: Option<Position>,
+    pub count: u64,
+    pub last: u64,
 }
 
 impl FromStr for Source {
@@ -20,6 +24,9 @@ impl FromStr for Source {
 
         let mut source = Source::default();
         if parts.len() == 2 {
+            if !parts[1].contains(',') {
+                source.airport = Some(parts[1].to_string());
+            }
             source.reference = Position::from_str(parts[1]).ok()
         };
 
@@ -84,26 +91,21 @@ mod test {
     fn test_source() {
         let source = Source::from_str("rtlsdr");
         assert!(source.is_ok());
-        if let Ok(Source {
-            host: _,
-            port: _,
-            rtlsdr,
-            reference: Some(_pos),
-        }) = source
-        {
+        if let Ok(Source { rtlsdr, .. }) = source {
             assert!(rtlsdr);
         }
 
         let source = Source::from_str("rtlsdr@LFBO");
         assert!(source.is_ok());
         if let Ok(Source {
-            host: _,
-            port: _,
             rtlsdr,
+            airport,
             reference: Some(pos),
+            ..
         }) = source
         {
             assert!(rtlsdr);
+            assert_eq!(airport, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
@@ -116,12 +118,15 @@ mod test {
             host,
             port,
             rtlsdr,
+            airport,
             reference,
+            ..
         }) = source
         {
             assert!(!rtlsdr);
             assert_eq!(host, "0.0.0.0");
             assert_eq!(port, 4003);
+            assert_eq!(airport, Some("LFBO".to_string()));
             assert_eq!(reference, None);
         }
 
@@ -131,12 +136,15 @@ mod test {
             host,
             port,
             rtlsdr,
+            airport,
             reference: Some(pos),
+            ..
         }) = source
         {
             assert!(!rtlsdr);
             assert_eq!(host, "0.0.0.0");
             assert_eq!(port, 4003);
+            assert_eq!(airport, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
@@ -147,12 +155,15 @@ mod test {
             host,
             port,
             rtlsdr,
+            airport,
             reference: Some(pos),
+            ..
         }) = source
         {
             assert!(!rtlsdr);
             assert_eq!(host, "1.2.3.4");
             assert_eq!(port, 4003);
+            assert_eq!(airport, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
