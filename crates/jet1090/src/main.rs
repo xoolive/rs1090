@@ -339,7 +339,9 @@ impl Jet1090 {
             source.count = 0;
         }
         for vector in self.state_vectors.values_mut() {
-            vector.cur.airport = self.sources[vector.cur.idx].airport.clone();
+            self.sources[vector.cur.idx]
+                .airport
+                .clone_into(&mut vector.cur.airport);
             self.sources[vector.cur.idx].count += 1;
             if self.sources[vector.cur.idx].last < vector.cur.last {
                 self.sources[vector.cur.idx].last = vector.cur.last
