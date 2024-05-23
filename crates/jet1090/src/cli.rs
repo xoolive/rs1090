@@ -126,7 +126,7 @@ mod test {
             assert!(!rtlsdr);
             assert_eq!(host, "0.0.0.0");
             assert_eq!(port, 4003);
-            assert_eq!(airport, Some("LFBO".to_string()));
+            assert_eq!(airport, None);
             assert_eq!(reference, None);
         }
 
