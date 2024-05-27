@@ -44,7 +44,7 @@ pub async fn receiver(tx: mpsc::Sender<TimedMessage>, idx: usize) {
     stream.activate(None).unwrap();
 
     // Spawn a thread to send messages
-    loop {
+    'receive: loop {
         match stream.read(&mut [&mut buf], 5_000_000) {
             Ok(len) => {
                 let buf = &buf[..len];
@@ -61,7 +61,9 @@ pub async fn receiver(tx: mpsc::Sender<TimedMessage>, idx: usize) {
                         message: None,
                         idx,
                     };
-                    tx.send(msg).await.expect("Failed to send message");
+                    if tx.send(msg).await.is_err() {
+                        break 'receive;
+                    }
                 }
             }
             Err(e) => {

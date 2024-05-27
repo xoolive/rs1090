@@ -14,10 +14,12 @@ pub async fn receiver(
         Ok(stream) => {
             let msg_stream = beast::next_msg(DataSource::Tcp(stream)).await;
             pin_mut!(msg_stream); // needed for iteration
-            loop {
+            'receive: loop {
                 while let Some(msg) = msg_stream.next().await {
                     let msg = process_radarcape(&msg, idx);
-                    tx.send(msg).await.expect("Connection closed");
+                    if tx.send(msg).await.is_err() {
+                        break 'receive;
+                    }
                 }
             }
         }
@@ -27,10 +29,12 @@ pub async fn receiver(
                     let msg_stream =
                         beast::next_msg(DataSource::Udp(socket)).await;
                     pin_mut!(msg_stream); // needed for iteration
-                    loop {
+                    'receive: loop {
                         while let Some(msg) = msg_stream.next().await {
                             let msg = process_radarcape(&msg, idx);
-                            tx.send(msg).await.expect("Connection closed");
+                            if tx.send(msg).await.is_err() {
+                                break 'receive;
+                            }
                         }
                     }
                 }
