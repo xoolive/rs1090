@@ -9,6 +9,7 @@ use rs1090::data::patterns::PATTERNS;
 use rs1090::data::tail::tail;
 use rs1090::decode::cpr::{decode_positions, Position};
 use rs1090::decode::flarm::Flarm;
+use rs1090::decode::TimeSource;
 use rs1090::prelude::*;
 
 #[pyfunction]
@@ -61,6 +62,7 @@ fn decode_1090t_vec(
                     if let Ok((_, message)) = Message::from_bytes((&bytes, 0)) {
                         Some(TimedMessage {
                             timestamp,
+                            timesource: TimeSource::External,
                             frame: msg.to_string(),
                             message: Some(message),
                             idx: 0,
@@ -215,7 +217,7 @@ fn aircraft_information(
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn _rust(_py: Python, m: &PyModule) -> PyResult<()> {
+fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Decoding functions
     m.add_function(wrap_pyfunction!(decode_1090, m)?)?;
     m.add_function(wrap_pyfunction!(decode_1090_vec, m)?)?;
