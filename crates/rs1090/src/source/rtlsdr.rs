@@ -54,9 +54,9 @@ pub async fn receiver(tx: mpsc::Sender<TimedMessage>, idx: usize) {
                     let timestamp = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .expect("SystemTime before unix epoch")
-                        .as_secs_f64();
+                        .as_micros();
                     let msg = TimedMessage {
-                        timestamp,
+                        timestamp: timestamp as f64 * 1e-6,
                         timesource: TimeSource::System,
                         frame: hex::encode(data),
                         message: None,
