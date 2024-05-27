@@ -10,7 +10,7 @@ license.workspace = true
 edition.workspace = true
 
 [features]
-rtlsdr = ['soapysdr']
+rtlsdr = ['rs1090/rtlsdr']
 
 [dependencies]
 chrono = "0.4.37"
