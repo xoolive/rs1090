@@ -308,6 +308,7 @@ pub async fn store_history(
 ) {
     if let TimedMessage {
         timestamp,
+        timesource,
         message: Some(message),
         idx,
         ..
@@ -331,6 +332,7 @@ pub async fn store_history(
                 | CommBIdentityReply { .. } => {
                     aircraft.hist.push(TimedMessage {
                         timestamp,
+                        timesource,
                         frame: "".to_string(),
                         message: Some(message),
                         idx,

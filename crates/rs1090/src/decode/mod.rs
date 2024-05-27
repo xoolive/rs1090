@@ -401,8 +401,21 @@ impl fmt::Display for Message {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TimeSource {
+    /// The timestamp is provided by the system when it receives the message
+    System,
+    /// The timestamp is provided by the GPS in the header of the message
+    Radarcape,
+    /// The timestamp is provided by the user asking to decode the message
+    External,
+}
+
+#[derive(Serialize)]
 pub struct TimedMessage {
     pub timestamp: f64,
+
+    pub timesource: TimeSource,
 
     pub frame: String,
 

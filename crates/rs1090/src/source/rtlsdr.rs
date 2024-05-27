@@ -6,7 +6,7 @@ use soapysdr::{Device, Direction};
 use tokio::sync::mpsc;
 
 use crate::decode::crc::modes_checksum;
-use crate::decode::TimedMessage;
+use crate::decode::{TimeSource, TimedMessage};
 use std::fmt::{self, Display, Formatter};
 
 const DIRECTION: Direction = Direction::Rx;
@@ -57,6 +57,7 @@ pub async fn receiver(tx: mpsc::Sender<TimedMessage>, idx: usize) {
                         .as_secs_f64();
                     let msg = TimedMessage {
                         timestamp,
+                        timesource: TimeSource::System,
                         frame: hex::encode(data),
                         message: None,
                         idx,

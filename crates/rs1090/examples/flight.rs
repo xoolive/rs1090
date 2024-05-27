@@ -1,5 +1,6 @@
 use rayon::prelude::*;
 use rs1090::decode::cpr::{decode_positions, Position};
+use rs1090::decode::TimeSource;
 use rs1090::prelude::*;
 
 use std::env;
@@ -64,6 +65,7 @@ fn main() -> io::Result<()> {
                 let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
                 res.push(TimedMessage {
                     timestamp,
+                    timesource: TimeSource::External,
                     frame: hex.to_string(),
                     message: Some(msg),
                     idx: 0,

@@ -225,6 +225,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
             let mut msg = TimedMessage {
                 timestamp: tmsg.timestamp,
+                timesource: tmsg.timesource,
                 frame: tmsg.frame.to_string(),
                 message: Some(msg),
                 idx: tmsg.idx,

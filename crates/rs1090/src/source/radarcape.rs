@@ -1,3 +1,4 @@
+use crate::decode::TimeSource;
 use crate::prelude::*;
 use crate::source::beast::DataSource;
 use futures_util::pin_mut;
@@ -76,15 +77,20 @@ fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
         .join("");
 
     let timestamp = today() as f64 + ts;
+    let timesource = match (now() as f64 - timestamp).abs() {
+        value if value < 5. => TimeSource::Radarcape,
+        _ => TimeSource::System,
+    };
     // In some cases, the timestamp is just the one of dump1090, so forget it!
-    let timestamp = if (now() as f64 - timestamp).abs() < 5. {
-        timestamp
-    } else {
-        now() as f64
+    let timestamp = match timesource {
+        TimeSource::Radarcape => timestamp,
+        TimeSource::System => now() as f64,
+        TimeSource::External => panic!(), // impossible here
     };
 
     TimedMessage {
         timestamp,
+        timesource,
         frame,
         message: None,
         idx,
