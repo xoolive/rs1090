@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         should_quit: false,
         state_vectors: BTreeMap::new(),
         sort_key: SortKey::default(),
-        sort_asc: true,
+        sort_asc: false,
         width,
     }));
     let app_dec = app_tui.clone();
@@ -290,9 +290,10 @@ pub struct Jet1090 {
 #[derive(Debug, Default, PartialEq)]
 pub enum SortKey {
     CALLSIGN,
-    #[default]
     ALTITUDE,
     VRATE,
+    #[default]
+    COUNT,
     FIRST,
     LAST,
 }
@@ -317,6 +318,9 @@ fn update(
                 }
                 Char('v') => {
                     jet1090.sort_key = SortKey::VRATE;
+                }
+                Char('.') => {
+                    jet1090.sort_key = SortKey::COUNT;
                 }
                 Char('f') => {
                     jet1090.sort_key = SortKey::FIRST;

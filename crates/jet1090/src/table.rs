@@ -22,7 +22,9 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
 
     app.items = states
         .values()
-        .filter(|sv| (now as i64 - sv.cur.last as i64) < 30)
+        .filter(|sv| {
+            (sv.cur.count > 1) && (now as i64 - sv.cur.last as i64) < 30
+        })
         .map(|sv| sv.cur.icao24.to_string())
         .collect();
 
@@ -33,7 +35,12 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     let colors = TableColors::new(&tailwind::CYAN);
 
     use crate::snapshot::StateVectors;
-    let mut sorted_elts = states.values().collect::<Vec<&StateVectors>>();
+    let mut sorted_elts = states
+        .values()
+        .filter(|sv| {
+            (sv.cur.count > 1) && (now as i64 - sv.cur.last as i64) < 30
+        })
+        .collect::<Vec<&StateVectors>>();
 
     let sort_by = match &app.sort_key {
         SortKey::ALTITUDE => |a: &&StateVectors, b: &&StateVectors| {
@@ -45,6 +52,9 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
         SortKey::VRATE => |a: &&StateVectors, b: &&StateVectors| {
             a.cur.vertical_rate.cmp(&b.cur.vertical_rate)
         },
+        SortKey::COUNT => {
+            |a: &&StateVectors, b: &&StateVectors| a.cur.count.cmp(&b.cur.count)
+        }
         SortKey::FIRST => {
             |a: &&StateVectors, b: &&StateVectors| a.cur.first.cmp(&b.cur.first)
         }
@@ -157,6 +167,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
                     HEADING,
                     ROLL,
                     NACP,
+                    COUNT,
                     REFERENCE,
                     LAST,
                     FIRST,
@@ -298,6 +309,7 @@ enum ColumnRender {
     HEADING,
     ROLL,
     NACP,
+    COUNT,
     REFERENCE,
     LAST,
     FIRST,
@@ -364,6 +376,7 @@ impl Render for ColumnRender {
             Self::NACP => {
                 s.nacp.map(|v| format!("{}", v)).unwrap_or("".to_string())
             }
+            Self::COUNT => s.count.to_string(),
             Self::REFERENCE => s.airport.clone().unwrap_or("".to_string()),
             // s.reference.to_string(),
             Self::LAST => {
@@ -419,6 +432,7 @@ impl Render for ColumnRender {
             ColumnRender::HEADING => Cell::from("hdg".to_string()),
             ColumnRender::ROLL => Cell::from("roll".to_string()),
             ColumnRender::NACP => Cell::from("nac".to_string()),
+            ColumnRender::COUNT => Cell::from("count".to_string()),
             ColumnRender::REFERENCE => Cell::from("ref".to_string()),
             ColumnRender::LAST => {
                 let mut c = Cell::from("last".to_string());
@@ -456,6 +470,7 @@ impl Render for ColumnRender {
             ColumnRender::HEADING => Constraint::Length(5),
             ColumnRender::ROLL => Constraint::Length(5),
             ColumnRender::NACP => Constraint::Length(3),
+            ColumnRender::COUNT => Constraint::Length(8),
             ColumnRender::REFERENCE => Constraint::Length(4),
             ColumnRender::LAST => Constraint::Length(7),
             ColumnRender::FIRST => Constraint::Length(5),

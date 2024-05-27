@@ -61,6 +61,7 @@ impl StateVectors {
             nacp: None,
             idx: 0,
             airport: None,
+            count: 0,
         };
         StateVectors {
             cur,
@@ -93,6 +94,7 @@ pub struct Snapshot {
     pub nacp: Option<u8>,
     pub idx: usize,
     pub airport: Option<String>,
+    pub count: usize,
 }
 
 fn icao24(msg: &Message) -> Option<String> {
@@ -134,6 +136,7 @@ pub async fn update_snapshot(
                     ));
             aircraft.cur.last = *timestamp as u64;
             aircraft.cur.idx = *idx;
+            aircraft.cur.count += 1;
 
             match &mut message.df {
                 SurveillanceIdentityReply { id, .. } => {
