@@ -63,7 +63,7 @@
 
           packages =
             {
-              default =  craneLib.buildPackage (commonArgs // {
+              default =  craneLib.buildPackage (commonArgs // {  # TODO  this does not build for now
                 pname = "jet1090";
                 cargoExtraFlags = "-p jet1090";
                 meta.mainProgram = "jet1090";
