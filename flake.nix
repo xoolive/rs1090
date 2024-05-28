@@ -43,11 +43,9 @@
 
           commonArgs = {
             src = craneLib.cleanCargoSource ./.;
-
-            pname = "nix-rust-template";
-            version = "v0.1.0";
-
-            nativeBuildInputs = with pkgs; [ pkg-config clang mold ];
+            pname = "rs1090";
+            version = "v0.2.2";
+            nativeBuildInputs = with pkgs; [ pkg-config openssl clang mold python3];
             buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin [
               pkgs.libiconv
             ];
@@ -60,26 +58,19 @@
         {
           devShells.default = pkgs.mkShell {
             inputsFrom = builtins.attrValues self.checks;
-            buildInputs = [ rustToolchain ];
+            buildInputs = [ rustToolchain pkgs.pkg-config pkgs.openssl ];
           };
 
           packages =
             {
-              server =  craneLib.buildPackage (commonArgs // {
-                pname = "server";
-                cargoExtraFlags = "--bin server";
-                meta.mainProgram = "server";
+              default =  craneLib.buildPackage (commonArgs // {
+                pname = "jet1090";
+                cargoExtraFlags = "-p jet1090";
+                meta.mainProgram = "jet1090";
                 inherit cargoArtifacts;
               });
 
-              client = craneLib.buildPackage (commonArgs // {
-                pname = "client";
-                cargoExtraFlags = "--bin client";
-                meta.mainProgram = "client";
-                inherit cargoArtifacts;
-              });
-
-              docs = pkgs.callPackage ./docs {};
+              # docs = pkgs.callPackage ./docs {};
             };
 
           checks =
