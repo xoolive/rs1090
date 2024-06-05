@@ -10,7 +10,7 @@ use commb::DataSelector;
 use crc::modes_checksum;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /**
@@ -400,7 +400,7 @@ impl fmt::Display for Message {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TimeSource {
     /// The timestamp is provided by the system when it receives the message
