@@ -52,6 +52,10 @@ struct Options {
     #[arg(long, short = 'x')]
     expire: Option<u64>,
 
+    /// Should we update the reference positions (if the receiver is moving)
+    #[arg(short, long, default_value = "false")]
+    update_position: bool,
+
     /// List the sources of data following the format \[host:\]port\[\@reference\]
     //
     // - `host` can be a DNS name, an IP address or `rtlsdr` (for RTL-SDR dongles)
@@ -252,6 +256,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 }
             };
+
+            // References may have been modified.
+            // With static receivers, we don't care; for dynamic ones, we may
+            // want to update the reference position.
+            if options.update_position {
+                app_dec.lock().await.sources[tmsg.idx].reference = reference;
+            }
 
             snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
 
