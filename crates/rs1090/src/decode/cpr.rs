@@ -421,11 +421,6 @@ pub fn decode_position(
                         pos = None
                     }
                 }
-                if let Some(ref_pos) = *reference {
-                    if dist_haversine(&new_pos, &ref_pos) > 500. {
-                        pos = None
-                    }
-                }
             }
             if let Some(pos) = pos {
                 // First update the message
