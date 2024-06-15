@@ -7,6 +7,9 @@ mod table;
 mod tui;
 mod web;
 
+mod websocket;
+mod channels;
+
 use clap::Parser;
 use cli::Source;
 use crossterm::event::KeyCode;
@@ -20,9 +23,11 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
+use websocket::axum_websocket_server;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -62,10 +67,16 @@ struct Options {
     // - `port` must be a number
     // - `reference` can be LFPG for major airports, `43.3,1.35` otherwise
     sources: Vec<cli::Source>,
+
+    #[arg(long, default_value = "false")]
+    websocket: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // initialize env_logger based logging
+    env_logger::init();
+
     let options = Options::parse();
 
     let mut file = if let Some(output_path) = options.output {
@@ -215,6 +226,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    let (websocket_tx, mut websocket_rx) = tokio::sync::mpsc::unbounded_channel();
+    let websocket_rx = UnboundedReceiverStream::new(websocket_rx);
+    if options.websocket {
+        tokio::spawn(axum_websocket_server(websocket_rx));
+    }
+
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
 
     for (idx, source) in options.sources.into_iter().enumerate() {
@@ -265,6 +282,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
+            if options.websocket {
+                websocket_tx.send(msg.clone())?;
+            }
 
             if let Ok(json) = serde_json::to_string(&msg) {
                 if options.verbose {
