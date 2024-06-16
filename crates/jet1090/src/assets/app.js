@@ -38,8 +38,8 @@ systemChannel
 /// jet1090 channel
 let jet1090ChannelName = 'jet1090';
 let jet1090Channel = socket.channel(jet1090ChannelName, { token: 'jet1090-token' });
-jet1090Channel.on('data', ({ status, response }) => {
-  // console.log(`status: ${status}`, response);
+jet1090Channel.on('data', ({ status, response: { timed_message: { timestamp } } }) => {
+  document.getElementById('jet1090-latest-ts').innerHTML = timestamp;
 })
 
 jet1090Channel

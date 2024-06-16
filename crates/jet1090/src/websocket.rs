@@ -209,10 +209,13 @@ async fn rs1090_data_task(
                 counter += 1;
                 debug!("{} > {}", event_name, text);
             }
-            Err(e) => error!(
-                "fail to send, channel: {}, event: {}, err: {}",
-                channel_name, event_name, e
-            ),
+            Err(e) => {
+                // it throws error if there's no client
+                // error!(
+                //     "fail to send, channel: {}, event: {}, err: {}",
+                //     channel_name, event_name, e
+                // );
+            }
         }
     }
 }
