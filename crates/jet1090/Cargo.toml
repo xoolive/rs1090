@@ -42,7 +42,7 @@ axum = { version = "0.7.5", features = ["default", "ws"] }
 axum-extra = { version = "0.9.3" }
 serde_tuple = "0.5.0"
 uuid = { version = "1.8.0", features = ["v4"] }
-tokio-tungstenite = "0.13.0"
+tokio-tungstenite = "0.23.0"
 
 
 [[bin]]

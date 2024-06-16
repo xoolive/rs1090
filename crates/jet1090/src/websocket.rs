@@ -15,11 +15,11 @@ use serde_tuple::{Deserialize_tuple, Serialize_tuple};
 use tokio::sync::Mutex;
 use tower_http::services::ServeDir;
 
-use log::{debug, info, error};
+use log::{debug, error, info};
+use rs1090::prelude::TimedMessage;
 use tokio::sync::mpsc::{Receiver, UnboundedReceiver};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
-use rs1090::prelude::TimedMessage;
 
 use crate::channels::ChannelManager;
 
@@ -110,9 +110,11 @@ struct RequestMessage {
     payload: RequestPayload,
 }
 
-
 impl Display for RequestMessage {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> Result<(), Error> {
+    fn fmt(
+        &self,
+        formatter: &mut std::fmt::Formatter<'_>,
+    ) -> Result<(), Error> {
         write!(
             formatter,
             "<ChannelMessage: join_ref={:?}, ref={}, topic={}, event={}>",
@@ -134,16 +136,15 @@ struct State {
     channels: Mutex<ChannelManager<String>>, // String: message type, TODO customize this
 }
 
-
-pub async fn axum_websocket_server(mut data_source: UnboundedReceiverStream<TimedMessage>) {
+pub async fn axum_websocket_server(
+    mut data_source: UnboundedReceiverStream<TimedMessage>,
+) {
     info!("launch websocket server ...");
 
-    let channel_name = "system";
-    let event_name = "jet1090-data";
-
     let channels = ChannelManager::new();
-    channels.new_channel("phoenix".into(), None).await; // channel for server to publish heartbeat
-    channels.new_channel("system".into(), None).await;
+    channels.new_channel("phoenix".into(), None).await; // heartbeat
+    channels.new_channel("system".into(), None).await; // system channel, datetime
+    channels.new_channel("jet1090".into(), None).await; // data
 
     let assets_dir = [env!("CARGO_MANIFEST_DIR"), "src", "assets"]
         .iter()
@@ -154,13 +155,21 @@ pub async fn axum_websocket_server(mut data_source: UnboundedReceiverStream<Time
     });
 
     let app = Router::new()
-        .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
+        .fallback_service(
+            ServeDir::new(assets_dir).append_index_html_on_directories(true),
+        )
         .route("/websocket", get(websocket_handler))
         .layer(Extension(state.clone()));
 
-    tokio::spawn(timestamp_task(state.clone(), channel_name));
-    tokio::spawn(rs1090_data_task(state.clone(), data_source, channel_name, event_name));
+    tokio::spawn(timestamp_task(state.clone(), "system"));
+    tokio::spawn(rs1090_data_task(
+        state.clone(),
+        data_source,
+        "jet1090",
+        "data",
+    ));
 
+    info!("starting websocket server at 0.0.0.0:5000 ...");
     let listener = tokio::net::TcpListener::bind("0.0.0.0:5000").await.unwrap();
     axum::serve(
         listener,
@@ -170,12 +179,17 @@ pub async fn axum_websocket_server(mut data_source: UnboundedReceiverStream<Time
     .unwrap();
 }
 
-async fn rs1090_data_task(local_state: Arc<State>, mut data_source: UnboundedReceiverStream<TimedMessage>,
-                          channel_name: &str, event_name: &str) {
+async fn rs1090_data_task(
+    local_state: Arc<State>,
+    mut data_source: UnboundedReceiverStream<TimedMessage>,
+    channel_name: &str,
+    event_name: &str,
+) {
+    let mut counter = 0;
     while let Some(timed_message) = data_source.next().await {
         let message = ReplyMessage {
             join_reference: None,
-            reference: "0".to_string(),
+            reference: counter.to_string(),
             topic: channel_name.to_string(),
             event: event_name.to_string(),
             payload: ReplyPayload {
@@ -191,8 +205,14 @@ async fn rs1090_data_task(local_state: Arc<State>, mut data_source: UnboundedRec
             .broadcast(channel_name.to_string(), text.clone())
             .await
         {
-            Ok(_) => debug!("{} > {}", event_name, text),
-            Err(e) => error!("fail to send `{}` to `{}`, {}", event_name, channel_name, e),
+            Ok(_) => {
+                counter += 1;
+                debug!("{} > {}", event_name, text);
+            }
+            Err(e) => error!(
+                "fail to send, channel: {}, event: {}, err: {}",
+                channel_name, event_name, e
+            ),
         }
     }
 }
@@ -213,7 +233,8 @@ async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
             payload: ReplyPayload {
                 status: "ok".to_string(),
                 response: Response::DatetimeResponse {
-                    datetime: now.to_rfc3339_opts(chrono::SecondsFormat::Millis, false),
+                    datetime: now
+                        .to_rfc3339_opts(chrono::SecondsFormat::Millis, false),
                     counter,
                 },
             },
@@ -227,7 +248,9 @@ async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
             .await
         {
             Ok(_) => debug!("datetime > {}", text),
-            Err(e) => error!("fail to send `datetime` event to `system` channel, {}", e),
+            Err(e) => {
+                error!("fail to send, err: {}", e)
+            }
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -271,10 +294,15 @@ async fn send_ok(
     debug!("> {}", text);
 }
 
-async fn handle_incoming_messages(received_text: String, state: Arc<State>, user_id: &str) {
+async fn handle_incoming_messages(
+    received_text: String,
+    state: Arc<State>,
+    user_id: &str,
+) {
     debug!("< {}", received_text);
 
-    let received_message: RequestMessage = serde_json::from_str(&received_text).unwrap();
+    let received_message: RequestMessage =
+        serde_json::from_str(&received_text).unwrap();
     debug!("{}", received_message);
 
     let reference = &received_message.reference;
@@ -303,7 +331,8 @@ async fn handle_incoming_messages(received_text: String, state: Arc<State>, user
             .join_channel(channel.clone(), user_id.to_string())
             .await
             .unwrap(); // join user to system channel
-        send_ok(join_reference.clone(), reference, channel, state.clone()).await;
+        send_ok(join_reference.clone(), reference, channel, state.clone())
+            .await;
     }
 
     if event == "phx_leave" {
@@ -314,7 +343,8 @@ async fn handle_incoming_messages(received_text: String, state: Arc<State>, user
             .leave_channel(channel.clone(), user_id.to_string())
             .await
             .unwrap();
-        send_ok(join_reference.clone(), reference, channel, state.clone()).await;
+        send_ok(join_reference.clone(), reference, channel, state.clone())
+            .await;
     }
 
     if channel == "phoenix" && event == "heartbeat" {
@@ -359,7 +389,12 @@ async fn websocket(ws: WebSocket, state: Arc<State>) {
     let rec_state = state.clone();
     let mut rx_task = tokio::spawn(async move {
         while let Some(Ok(Message::Text(received_text))) = rx.next().await {
-            handle_incoming_messages(received_text, rec_state.clone(), &user.user_id.clone()).await;
+            handle_incoming_messages(
+                received_text,
+                rec_state.clone(),
+                &user.user_id.clone(),
+            )
+            .await;
         }
     });
 
