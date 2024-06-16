@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::fmt::{Display, Error};
 use std::net::SocketAddr;
 use std::path::PathBuf;

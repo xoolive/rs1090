@@ -7,12 +7,13 @@ mod table;
 mod tui;
 mod web;
 
-mod websocket;
 mod channels;
+mod websocket;
 
 use clap::Parser;
 use cli::Source;
 use crossterm::event::KeyCode;
+use log::{debug, info};
 use ratatui::widgets::*;
 use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::prelude::*;
@@ -21,9 +22,11 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_tungstenite::connect_async;
 use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
@@ -70,6 +73,37 @@ struct Options {
 
     #[arg(long, default_value = "false")]
     websocket: bool,
+}
+
+async fn websocket_client(websocket_url: &str, local_udp: &str) {
+    loop {
+        let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
+        match socket.connect(local_udp).await {
+            Ok(_) => {}
+            Err(err) => {
+                info!(
+                    "failed to connect to udp://{}, {:?}, retry in 1 second(s)",
+                    local_udp, err
+                );
+                sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+        }
+
+        let (websocket_stream, _) = connect_async(websocket_url)
+            .await
+            .expect("fail to connect to websocket endpoint");
+        info!("connected to {}", websocket_url);
+
+        let (_, websocket_rx) = websocket_stream.split();
+        websocket_rx
+            .for_each(|message| async {
+                let raw_bytes = message.unwrap().into_data();
+                socket.send(&raw_bytes).await.unwrap();
+                // debug!("raw data sent, size: {:?}", raw_bytes.len());
+            })
+            .await;
+    }
 }
 
 #[tokio::main]
@@ -226,7 +260,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    let (websocket_tx, mut websocket_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (websocket_tx, websocket_rx) = tokio::sync::mpsc::unbounded_channel();
     let websocket_rx = UnboundedReceiverStream::new(websocket_rx);
     if options.websocket {
         tokio::spawn(axum_websocket_server(websocket_rx));
@@ -240,6 +274,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             source.receiver(tx_copy, idx).await;
         });
     }
+
+    // assume local udp server is listening
+    let websocket_url = "ws://51.158.72.24:1234/42125@LFBO";
+    let local_udp = "127.0.0.1:42125";
+    tokio::spawn(websocket_client(websocket_url, local_udp));
 
     while let Some(tmsg) = rx.recv().await {
         let frame = hex::decode(&tmsg.frame).unwrap();
