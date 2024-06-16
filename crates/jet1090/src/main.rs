@@ -260,6 +260,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // https://stackoverflow.com/questions/67602278/rust-tokio-trait-bounds-were-not-satisfied-on-forward-method
     let (websocket_tx, websocket_rx) = tokio::sync::mpsc::unbounded_channel();
     let websocket_rx = UnboundedReceiverStream::new(websocket_rx);
     if options.websocket {
