@@ -4,6 +4,7 @@ use super::bds::bds06::SurfacePosition;
 use super::{TimedMessage, DF, ICAO};
 use crate::data::airports::one_airport;
 use deku::prelude::*;
+use libm::fabs;
 use regex::Regex;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -256,6 +257,13 @@ pub fn airborne_position(
         lat_odd -= 360.0;
     }
 
+    if !(-90. ..=90.).contains(&lat_even) || !(-90. ..=90.).contains(&lat_odd) {
+        return None;
+    }
+    if nl(lat_even) != nl(lat_odd) {
+        return None;
+    }
+
     let lat = if latest == even_frame {
         lat_even
     } else {
@@ -298,7 +306,7 @@ pub fn airborne_position_with_reference(
     msg: &AirbornePosition,
     latitude_ref: f64,
     longitude_ref: f64,
-) -> Position {
+) -> Option<Position> {
     let cpr_lat = f64::from(msg.lat_cpr) / CPR_MAX;
     let cpr_lon = f64::from(msg.lon_cpr) / CPR_MAX;
 
@@ -312,6 +320,15 @@ pub fn airborne_position_with_reference(
         + libm::floor(0.5 + modulo(latitude_ref, d_lat) / d_lat - cpr_lat);
 
     let lat = d_lat * (j + cpr_lat);
+
+    if !(-90. ..=90.).contains(&lat) {
+        return None;
+    }
+    // Check that the answer is not more than half a cell away
+    if fabs(lat - latitude_ref) > d_lat / 2. {
+        return None;
+    }
+
     let ni = if msg.parity == CPRFormat::Even {
         nl(lat)
     } else {
@@ -322,10 +339,15 @@ pub fn airborne_position_with_reference(
         + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);
     let lon = d_lon * (m + cpr_lon);
 
-    Position {
+    // Check that the answer is not more than half a cell away
+    if fabs(lon - longitude_ref) > d_lon / 2. {
+        return None;
+    }
+
+    Some(Position {
         latitude: lat,
         longitude: lon,
-    }
+    })
 }
 
 /**
@@ -339,7 +361,7 @@ pub fn surface_position_with_reference(
     msg: &SurfacePosition,
     latitude_ref: f64,
     longitude_ref: f64,
-) -> Position {
+) -> Option<Position> {
     let cpr_lat = f64::from(msg.lat_cpr) / CPR_MAX;
     let cpr_lon = f64::from(msg.lon_cpr) / CPR_MAX;
 
@@ -353,6 +375,15 @@ pub fn surface_position_with_reference(
         + libm::floor(0.5 + modulo(latitude_ref, d_lat) / d_lat - cpr_lat);
 
     let lat = d_lat * (j + cpr_lat);
+
+    if !(-90. ..=90.).contains(&lat) {
+        return None;
+    }
+    // Check that the answer is not more than half a cell away
+    if fabs(lat - latitude_ref) > d_lat / 2. {
+        return None;
+    }
+
     let ni = if msg.parity == CPRFormat::Even {
         nl(lat)
     } else {
@@ -363,10 +394,15 @@ pub fn surface_position_with_reference(
         + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);
     let lon = d_lon * (m + cpr_lon);
 
-    Position {
+    // Check that the answer is not more than half a cell away
+    if fabs(lon - longitude_ref) > d_lon / 2. {
+        return None;
+    }
+
+    Some(Position {
         latitude: lat,
         longitude: lon,
-    }
+    })
 }
 
 /**
@@ -396,21 +432,22 @@ pub fn decode_position(
             let mut pos: Option<Position> = None;
 
             if (timestamp - latest.timestamp) < 10. {
-                // First decoding based on odd/even
+                // First decoding based on odd/even (global)
                 pos = match latest.msg {
                     Some(oldest) => airborne_position(&oldest, airborne),
                     None => None,
                 };
+                // TODO if check with static reference, pick 300 nautical miles
             }
 
             // If failed try to use previous reference
             if pos.is_none() & ((timestamp - latest.timestamp) < 180.) {
                 if let Some(latest_pos) = latest.pos {
-                    pos = Some(airborne_position_with_reference(
+                    pos = airborne_position_with_reference(
                         airborne,
                         latest_pos.latitude,
                         latest_pos.longitude,
-                    ))
+                    )
                 }
             }
 
@@ -421,6 +458,7 @@ pub fn decode_position(
                         pos = None
                     }
                 }
+                // TODO if check with static reference, pick 180 nautical miles
             }
             if let Some(pos) = pos {
                 // First update the message
@@ -449,17 +487,19 @@ pub fn decode_position(
                     latest_pos.latitude,
                     latest_pos.longitude,
                 );
-                if dist_haversine(&latest_pos, &surface_pos) < 1. {
-                    pos = Some(surface_pos);
+                if surface_pos.is_some()
+                    && dist_haversine(&latest_pos, &surface_pos.unwrap()) < 1.
+                {
+                    pos = surface_pos;
                 }
             }
             if let Some(reference) = reference {
                 if pos.is_none() {
-                    pos = Some(surface_position_with_reference(
+                    pos = surface_position_with_reference(
                         surface,
                         reference.latitude,
                         reference.longitude,
-                    ))
+                    )
                 }
             }
             if let Some(pos) = pos {
@@ -581,7 +621,7 @@ mod tests {
         let Position {
             latitude,
             longitude,
-        } = airborne_position_with_reference(&msg, 49.0, 6.0);
+        } = airborne_position_with_reference(&msg, 49.0, 6.0).unwrap();
 
         assert_relative_eq!(latitude, 49.82410, max_relative = 1e-3);
         assert_relative_eq!(longitude, 6.06785, max_relative = 1e-3);
@@ -600,7 +640,7 @@ mod tests {
         let Position {
             latitude,
             longitude,
-        } = airborne_position_with_reference(&msg, 49.0, 6.0);
+        } = airborne_position_with_reference(&msg, 49.0, 6.0).unwrap();
 
         assert_relative_eq!(latitude, 49.81755, max_relative = 1e-3);
         assert_relative_eq!(longitude, 6.08442, max_relative = 1e-3);
@@ -622,7 +662,7 @@ mod tests {
         let Position {
             latitude,
             longitude,
-        } = surface_position_with_reference(&msg, 51.99, 4.375);
+        } = surface_position_with_reference(&msg, 51.99, 4.375).unwrap();
 
         assert_relative_eq!(latitude, 52.32061, max_relative = 1e-3);
         assert_relative_eq!(longitude, 4.73473, max_relative = 1e-3);
