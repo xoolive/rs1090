@@ -137,6 +137,8 @@ struct State {
 }
 
 pub async fn axum_websocket_server(
+    websocket_host: String,
+    websocket_port: u16,
     mut data_source: UnboundedReceiverStream<TimedMessage>,
 ) {
     info!("launch websocket server ...");
@@ -169,8 +171,16 @@ pub async fn axum_websocket_server(
         "data",
     ));
 
-    info!("starting websocket server at 0.0.0.0:5000 ...");
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:5000").await.unwrap();
+    info!(
+        "starting websocket server at {}:{}...",
+        websocket_host, websocket_port
+    );
+    let listener = tokio::net::TcpListener::bind(format!(
+        "{}:{}",
+        websocket_host, websocket_port
+    ))
+    .await
+    .unwrap();
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

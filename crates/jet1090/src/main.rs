@@ -71,12 +71,33 @@ struct Options {
     // - `reference` can be LFPG for major airports, `43.3,1.35` otherwise
     sources: Vec<cli::Source>,
 
+    /// Use websocket data source
+    /// This is workaround to use binary data source from another websocket server
+    /// To use this, you will also need a source `127.0.0.1:42125@LFBO`
+    #[arg(long, default_value = "false")]
+    use_websocket_source: bool,
+
+    #[arg(long, default_value = "127.0.0.1")]
+    websocket_host: String,
+
+    /// Port for the websocket serve_port
+    /// Specifying the port also imply that the websocket server is enabled
+    #[arg(long, default_value = None)]
+    websocket_port: Option<u16>,
+
     #[arg(long, default_value = "false")]
     websocket: bool,
 }
 
-async fn websocket_client(websocket_url: &str, local_udp: &str) {
+/// this subscribe to binary data from a websocket and send it to a local udp server
+/// we could just implement this int `Source::receiver`
+async fn websocket_client() {
+    let websocket_url = "ws://51.158.72.24:1234/42125@LFBO";
+    let local_udp = "127.0.0.1:42125"; // you have to specify a source like 127.0.0.1:42125@LFBO
+
     loop {
+        // create a UDP client socket
+        // put all things in a loop to retry in case of failure
         let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
         match socket.connect(local_udp).await {
             Ok(_) => {}
@@ -90,11 +111,13 @@ async fn websocket_client(websocket_url: &str, local_udp: &str) {
             }
         }
 
+        // connect to the websocket data source
         let (websocket_stream, _) = connect_async(websocket_url)
             .await
             .expect("fail to connect to websocket endpoint");
         info!("connected to {}", websocket_url);
 
+        // just receive data from the websocket and send it to the udp server
         let (_, websocket_rx) = websocket_stream.split();
         websocket_rx
             .for_each(|message| async {
@@ -263,8 +286,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // https://stackoverflow.com/questions/67602278/rust-tokio-trait-bounds-were-not-satisfied-on-forward-method
     let (websocket_tx, websocket_rx) = tokio::sync::mpsc::unbounded_channel();
     let websocket_rx = UnboundedReceiverStream::new(websocket_rx);
-    if options.websocket {
-        tokio::spawn(axum_websocket_server(websocket_rx));
+    if options.websocket_port.is_some() {
+        tokio::spawn(axum_websocket_server(
+            options.websocket_host.clone(),
+            options.websocket_port.unwrap(),
+            websocket_rx,
+        ));
     }
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
@@ -276,10 +303,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // assume local udp server is listening
-    let websocket_url = "ws://51.158.72.24:1234/42125@LFBO";
-    let local_udp = "127.0.0.1:42125";
-    tokio::spawn(websocket_client(websocket_url, local_udp));
+    if options.use_websocket_source {
+        info!("useing websocket data source, do make sure you have source 127.0.0.1:42125@LFBO !");
+        tokio::spawn(websocket_client());
+    }
 
     while let Some(tmsg) = rx.recv().await {
         let frame = hex::decode(&tmsg.frame).unwrap();
@@ -322,7 +349,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
-            if options.websocket {
+
+            // send the message to the websocket server
+            if options.websocket_port.is_some() {
                 websocket_tx.send(msg.clone())?;
             }
 
