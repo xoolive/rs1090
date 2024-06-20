@@ -31,20 +31,18 @@
 
       perSystem = { lib, config, self', inputs', pkgs, system, ... }:
         let
-          rustToolchain = fenix.packages.${system}.stable.withComponents [
-            "rustc"
-            "cargo"
-            "rustfmt"
-            "clippy"
-            "rust-src"
-          ];
-
+          rustToolchain = fenix.packages.${system}.fromToolchainFile {
+            file = ./rust-toolchain.toml;
+            sha256 = "sha256-e4mlaJehWBymYxJGgnbuCObVlqMlQSilZ8FljG9zPHY=";
+          };
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+
+          version = (builtins.sfromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
 
           commonArgs = {
             src = craneLib.cleanCargoSource ./.;
             pname = "rs1090";
-            version = "v0.2.2";
+            version = version;
             nativeBuildInputs = with pkgs; [ pkg-config openssl clang mold python3];
             buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin [
               pkgs.libiconv
