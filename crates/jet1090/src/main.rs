@@ -248,19 +248,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // https://stackoverflow.com/questions/67602278/rust-tokio-trait-bounds-were-not-satisfied-on-forward-method
-    // rs1090 data items (TimeedMessage) are sent to tx, a thread reads rx and relay them to channels
+    // rs1090 data items (TimeedMessage) are sent to timed_message_tx
+    // a thread reads from timed_message_stream and relay them to channels
     let (timed_message_tx, timed_message_rx) =
         tokio::sync::mpsc::unbounded_channel();
     let timed_message_stream = UnboundedReceiverStream::new(timed_message_rx);
 
-    let channels = ChannelControl::new();
-    channels.new_channel("phoenix".into(), None).await; // channel for server to publish heartbeat
-    channels.new_channel("system".into(), None).await;
-    channels.new_channel("jet1090".into(), None).await;
+    let channel_control = ChannelControl::new();
+    channel_control.new_channel("phoenix".into(), None).await; // channel for server to publish heartbeat
+    channel_control.new_channel("system".into(), None).await;
+    channel_control.new_channel("jet1090".into(), None).await;
 
     let state = Arc::new(State {
-        channels: Mutex::new(channels),
+        channels: Mutex::new(channel_control),
     });
     if options.serve_port.is_some() {
         tokio::spawn(timestamp_task(state.clone(), "system"));
@@ -395,7 +395,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
 
             if options.serve_port.is_some() {
-                // http server is enabled, send the message to the websocket server
+                // http server is enabled
+                // send the message to channel `jet1090` event `data`
+                // on the other side, thread `rs1090_data_task` receives and publishes the message to all clients
                 timed_message_tx.send(msg.clone())?;
             }
 
