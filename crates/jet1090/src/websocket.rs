@@ -1,70 +1,26 @@
-use std::fmt::{Display, Error};
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::{
+    fmt::{Display, Error},
+    net::SocketAddr,
+};
 
-use futures::{sink::SinkExt, stream::StreamExt};
-use serde::{Deserialize, Serialize};
-use serde_tuple::{Deserialize_tuple, Serialize_tuple};
-use tokio::sync::Mutex;
-use tower_http::services::ServeDir;
-
+use futures::stream::StreamExt;
 use log::{debug, error, info};
 use rs1090::prelude::TimedMessage;
-use tokio::sync::mpsc::{Receiver, UnboundedReceiver};
+use serde::{Deserialize, Serialize};
+use serde_tuple::{Deserialize_tuple, Serialize_tuple};
+use tokio::sync::{
+    mpsc::{Receiver, UnboundedReceiver},
+    Mutex,
+};
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use tower_http::services::ServeDir;
 use uuid::Uuid;
 
-use crate::channels::ChannelManager;
+use crate::channels::ChannelControl;
 
-// Channel
-//
-// - join
-// > [join_ref, ref, topic, 'phx_join', payload]
-// < [join_ref, ref, topic, 'phx_reply', {"status": "ok"}]
-//
-// - leave
-// > [join_ref, ref, topic, 'phx_leave', payload]
-// < [join_ref, ref, topic, 'phx_reply', {"status": "ok"}]
-//
-// - heartbeat
-// > [join_ref, ref, 'phoenix', 'heartbeat', payload]
-// < [join_ref, ref, topic, 'phx_reply', payload]
-//
-
-/// request data structures
-#[derive(Debug, Serialize)]
-struct JoinResponse {}
-
-#[derive(Debug, Serialize)]
-struct HeartbeatResponse {}
-
-#[derive(Debug, Serialize)]
-struct DatetimeResponse {
-    datetime: String,
-    counter: u32,
-}
-
-#[derive(Debug, Serialize)]
-struct Jet1090Response {
-    timed_message: TimedMessage,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(untagged)]
-enum Response {
-    JoinResponse {},
-    HeartbeatResponse {},
-    DatetimeResponse { datetime: String, counter: u32 },
-    Jet1090Response { timed_message: TimedMessage },
-}
-
-#[derive(Debug, Serialize)]
-struct ReplyPayload {
-    status: String,
-    response: Response,
-}
-
+/// reply data structures
 #[derive(Debug, Serialize_tuple)]
 struct ReplyMessage {
     join_reference: Option<String>, // null when it's heartbeat
@@ -74,27 +30,26 @@ struct ReplyMessage {
     payload: ReplyPayload,
 }
 
+#[derive(Debug, Serialize)]
+struct ReplyPayload {
+    status: String,
+    response: Response,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum Response {
+    Empty {},
+    Join {},
+    Heartbeat {},
+    Datetime { datetime: String, counter: u32 },
+    Jet1090 { timed_message: TimedMessage },
+}
+
 /// request data structures
 
-#[derive(Debug, Deserialize)]
-struct JoinRequest {
-    token: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct LeaveRequest {}
-
-#[derive(Debug, Deserialize)]
-struct HeartbeatRequest {}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum RequestPayload {
-    JoinRequest { token: String },
-    LeaveRequest {},
-    HeartbeatRequest {},
-}
-
+/// RequestMessage is a message from client through websocket
+/// it's deserialized from a JSON array
 #[derive(Debug, Deserialize_tuple)]
 struct RequestMessage {
     join_reference: Option<String>, // null when it's heartbeat
@@ -111,10 +66,18 @@ impl Display for RequestMessage {
     ) -> Result<(), Error> {
         write!(
             formatter,
-            "<ChannelMessage: join_ref={:?}, ref={}, topic={}, event={}>",
+            "<RequestMessage: join_ref={:?}, ref={}, topic={}, event={}, payload=...>",
             self.join_reference, self.reference, self.topic, self.event
         )
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum RequestPayload {
+    Join { token: String },
+    Leave {},
+    Heartbeat {},
 }
 
 pub struct User {
@@ -136,7 +99,7 @@ impl Default for User {
 // }
 
 pub struct State {
-    pub channels: Mutex<ChannelManager<String>>, // String: message type, TODO customize this
+    pub channels: Mutex<ChannelControl<String>>, // String: message type, TODO: customize this
 }
 
 pub async fn rs1090_data_task(
@@ -154,7 +117,7 @@ pub async fn rs1090_data_task(
             event: event_name.to_string(),
             payload: ReplyPayload {
                 status: "ok".to_string(),
-                response: Response::Jet1090Response { timed_message },
+                response: Response::Jet1090 { timed_message },
             },
         };
         let text = serde_json::to_string(&message).unwrap();
@@ -195,7 +158,7 @@ pub async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
             event: event.to_string(),
             payload: ReplyPayload {
                 status: "ok".to_string(),
-                response: Response::DatetimeResponse {
+                response: Response::Datetime {
                     datetime: now
                         .to_rfc3339_opts(chrono::SecondsFormat::Millis, false),
                     counter,
@@ -210,6 +173,7 @@ pub async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
             .broadcast(channel_name.to_string(), text.clone())
             .await
         {
+            Ok(0) => {}, // no client
             Ok(_) => debug!("datetime > {}", text),
             Err(e) => {
                 error!("fail to send, err: {}", e)
@@ -221,7 +185,7 @@ pub async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
     }
 }
 
-async fn send_ok(
+async fn reply_ok_with_empty_response(
     join_reference: Option<String>,
     reference: &str,
     channel: &str,
@@ -234,7 +198,7 @@ async fn send_ok(
         event: "phx_reply".to_string(),
         payload: ReplyPayload {
             status: "ok".to_string(),
-            response: Response::JoinResponse {},
+            response: Response::Empty {},
         },
     };
     let text = serde_json::to_string(&join_reply).unwrap();
@@ -285,8 +249,7 @@ pub async fn handle_incoming_messages(
             .join_channel(channel.clone(), user_id.to_string())
             .await
             .unwrap(); // join user to system channel
-        send_ok(join_reference.clone(), reference, channel, state.clone())
-            .await;
+        reply_ok_with_empty_response(join_reference.clone(), reference, channel, state.clone()).await;
     }
 
     if event == "phx_leave" {
@@ -297,12 +260,11 @@ pub async fn handle_incoming_messages(
             .leave_channel(channel.clone(), user_id.to_string())
             .await
             .unwrap();
-        send_ok(join_reference.clone(), reference, channel, state.clone())
-            .await;
+        reply_ok_with_empty_response(join_reference.clone(), reference, channel, state.clone()).await;
     }
 
     if channel == "phoenix" && event == "heartbeat" {
-        info!("heartbeat message");
-        send_ok(Option::None, reference, "phoenix", state.clone()).await;
+        debug!("heartbeat message");
+        reply_ok_with_empty_response(Option::None, reference, "phoenix", state.clone()).await;
     }
 }

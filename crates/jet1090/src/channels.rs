@@ -27,7 +27,7 @@ pub struct Channel<T> {
 }
 
 /// manages all channels
-pub struct ChannelManager<T> {
+pub struct ChannelControl<T> {
     channel_map: Mutex<HashMap<String, Channel<T>>>, // name -> channel
     user_task_map: Mutex<HashMap<String, Vec<UserTask>>>,
     user_sender_map: Mutex<HashMap<String, broadcast::Sender<T>>>,
@@ -113,6 +113,7 @@ where
     }
 
     /// broadcast messages to the channel
+    /// it returns the number of users who received the message
     pub fn send(&self, data: T) -> Result<usize, broadcast::error::SendError<T>> {
         self.sender.send(data)
     }
@@ -140,12 +141,12 @@ where
     }
 }
 
-impl<T> ChannelManager<T>
+impl<T> ChannelControl<T>
 where
     T: Clone + Send + 'static,
 {
     pub fn new() -> Self {
-        ChannelManager {
+        ChannelControl {
             channel_map: Mutex::new(HashMap::new()),
             user_task_map: Mutex::new(HashMap::new()),
             user_sender_map: Mutex::new(HashMap::new()),
@@ -186,11 +187,13 @@ where
     }
 
     /// broadcast message to the channel
+    /// it returns the number of users who received the message
     pub async fn broadcast(&self, channel_name: String, message: T) -> Result<usize, ChannelError> {
-        let channel_map = self.channel_map.lock().await;
-        channel_map
+        self.channel_map
+            .lock()
+            .await
             .get(&channel_name)
-            .ok_or(ChannelError::ChannelNotFound)? // chanel not found error
+            .ok_or(ChannelError::ChannelNotFound)? // channel not found error
             .send(message)
             .map_err(|_| ChannelError::MessageSendFail) // message send fail error
     }
@@ -209,7 +212,6 @@ where
 
     /// Add user to the channel manager
     /// capacity is the maximum number of messages that can be stored in the channel, default is 100
-    ///
     pub async fn add_user(&self, user: String, capacity: Option<usize>) {
         let mut user_senders = self.user_sender_map.lock().await;
         match user_senders.entry(user) {
@@ -338,7 +340,7 @@ where
     }
 }
 
-impl<T> Default for ChannelManager<T>
+impl<T> Default for ChannelControl<T>
 where
     T: Clone + Send + 'static,
 {

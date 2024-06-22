@@ -11,7 +11,7 @@ mod web;
 mod channels;
 mod websocket;
 
-use crate::channels::ChannelManager;
+use crate::channels::ChannelControl;
 use crate::websocket::{
     handle_incoming_messages, rs1090_data_task, timestamp_task, State, User,
 };
@@ -254,7 +254,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::sync::mpsc::unbounded_channel();
     let timed_message_stream = UnboundedReceiverStream::new(timed_message_rx);
 
-    let channels = ChannelManager::new();
+    let channels = ChannelControl::new();
     channels.new_channel("phoenix".into(), None).await; // channel for server to publish heartbeat
     channels.new_channel("system".into(), None).await;
     channels.new_channel("jet1090".into(), None).await;
