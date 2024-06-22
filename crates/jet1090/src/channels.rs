@@ -5,11 +5,11 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
+use log::debug;
 use tokio::{
     sync::{broadcast, Mutex},
     task::JoinHandle,
 };
-use log::debug;
 
 /// ChannelCast is a type alias for broadcast::Sender. It broadcast messages in the channel.
 // type Broadcast<T> = broadcast::Sender<T>;
@@ -107,37 +107,21 @@ where
         }
     }
 
-    /// receive messages from the channel
-    pub async fn receive(&self, user: String) -> broadcast::Receiver<T> {
-        self.join(user).await.subscribe()
-    }
-
     /// broadcast messages to the channel
     /// it returns the number of users who received the message
-    pub fn send(&self, data: T) -> Result<usize, broadcast::error::SendError<T>> {
+    pub fn send(
+        &self,
+        data: T,
+    ) -> Result<usize, broadcast::error::SendError<T>> {
         self.sender.send(data)
-    }
-
-    pub async fn contains_user(&self, user: &String) -> bool {
-        let inner = self.users.lock().await;
-        inner.contains(user)
     }
 
     pub fn empty(&self) -> bool {
         self.count.load(Ordering::SeqCst) == 0
     }
 
-    pub fn get_sender(&self) -> broadcast::Sender<T> {
-        self.sender.clone()
-    }
-
-    /// NOTICE drop it when you don't need it
     pub async fn users(&self) -> tokio::sync::MutexGuard<Vec<String>> {
         self.users.lock().await
-    }
-
-    pub async fn user_count(&self) -> u32 {
-        self.count.load(Ordering::SeqCst)
     }
 }
 
@@ -170,7 +154,9 @@ where
             Entry::Vacant(_) => {}
             Entry::Occupied(el) => {
                 for user in el.get().users().await.iter() {
-                    if let Entry::Occupied(mut user_task) = users.entry(user.into()) {
+                    if let Entry::Occupied(mut user_task) =
+                        users.entry(user.into())
+                    {
                         let vecotr = user_task.get_mut();
                         vecotr.retain(|task| {
                             if task.channel_name == channel {
@@ -188,7 +174,11 @@ where
 
     /// broadcast message to the channel
     /// it returns the number of users who received the message
-    pub async fn broadcast(&self, channel_name: String, message: T) -> Result<usize, ChannelError> {
+    pub async fn broadcast(
+        &self,
+        channel_name: String,
+        message: T,
+    ) -> Result<usize, ChannelError> {
         self.channel_map
             .lock()
             .await
@@ -296,7 +286,11 @@ where
         Ok(channel_sender)
     }
 
-    pub async fn leave_channel(&self, name: String, user: String) -> Result<(), ChannelError> {
+    pub async fn leave_channel(
+        &self,
+        name: String,
+        user: String,
+    ) -> Result<(), ChannelError> {
         let channels = self.channel_map.lock().await;
         let mut users = self.user_task_map.lock().await;
 
@@ -319,24 +313,6 @@ where
             Entry::Vacant(_) => {}
         }
         Ok(())
-    }
-
-    pub async fn is_channel_empty(&self, name: String) -> Result<bool, ChannelError> {
-        let channels = self.channel_map.lock().await;
-        Ok(channels
-            .get(&name)
-            .ok_or(ChannelError::ChannelNotFound)?
-            .empty())
-    }
-
-    pub async fn channels_count(&self) -> usize {
-        let channels = self.channel_map.lock().await;
-        channels.len()
-    }
-
-    pub async fn channel_sender(&self, name: &str) -> broadcast::Sender<T> {
-        let channel_map = self.channel_map.lock().await;
-        channel_map.get(name).unwrap().get_sender()
     }
 }
 

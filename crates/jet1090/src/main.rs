@@ -321,8 +321,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     })
                 });
 
-            let channels_assets =
-                warp::path("channels").and(warp::fs::dir("./src/assets"));
+            let channels_assets = warp::path("channels")
+                .and(warp::fs::dir("./crates/jet1090/src/assets"));
 
             let routes = warp::get()
                 .and(
