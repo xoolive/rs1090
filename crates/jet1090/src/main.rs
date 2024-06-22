@@ -1,4 +1,5 @@
 #![doc = include_str!("../readme.md")]
+#![allow(unused)]
 
 mod aircraftdb;
 mod cli;
@@ -9,6 +10,11 @@ mod web;
 
 mod channels;
 mod websocket;
+
+use crate::channels::ChannelManager;
+use crate::websocket::{
+    handle_incoming_messages, rs1090_data_task, timestamp_task, State, User,
+};
 
 use clap::Parser;
 use cli::Source;
@@ -30,7 +36,15 @@ use tokio_tungstenite::connect_async;
 use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
-use websocket::axum_websocket_server;
+
+use futures::SinkExt;
+use futures::StreamExt;
+use serde::{Deserialize, Serialize};
+use serde_tuple::{Deserialize_tuple, Serialize_tuple};
+use std::fmt::{Display, Error};
+
+use uuid::Uuid;
+use warp::ws::WebSocket;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -98,8 +112,8 @@ async fn websocket_client() {
     loop {
         // create a UDP client socket
         // put all things in a loop to retry in case of failure
-        let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
-        match socket.connect(local_udp).await {
+        let udp_socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
+        match udp_socket.connect(local_udp).await {
             Ok(_) => {}
             Err(err) => {
                 info!(
@@ -122,7 +136,7 @@ async fn websocket_client() {
         websocket_rx
             .for_each(|message| async {
                 let raw_bytes = message.unwrap().into_data();
-                socket.send(&raw_bytes).await.unwrap();
+                udp_socket.send(&raw_bytes).await.unwrap();
                 // debug!("raw data sent, size: {:?}", raw_bytes.len());
             })
             .await;
@@ -131,8 +145,7 @@ async fn websocket_client() {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // initialize env_logger based logging
-    env_logger::init();
+    pretty_env_logger::init();
 
     let options = Options::parse();
 
@@ -235,6 +248,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // https://stackoverflow.com/questions/67602278/rust-tokio-trait-bounds-were-not-satisfied-on-forward-method
+    // rs1090 data items (TimeedMessage) are sent to tx, a thread reads rx and relay them to channels
+    let (timed_message_tx, timed_message_rx) =
+        tokio::sync::mpsc::unbounded_channel();
+    let timed_message_stream = UnboundedReceiverStream::new(timed_message_rx);
+
+    let channels = ChannelManager::new();
+    channels.new_channel("phoenix".into(), None).await; // channel for server to publish heartbeat
+    channels.new_channel("system".into(), None).await;
+    channels.new_channel("jet1090".into(), None).await;
+
+    let state = Arc::new(State {
+        channels: Mutex::new(channels),
+    });
+    if options.serve_port.is_some() {
+        tokio::spawn(timestamp_task(state.clone(), "system"));
+        tokio::spawn(rs1090_data_task(
+            state.clone(),
+            timed_message_stream,
+            "jet1090",
+            "data",
+        ));
+    }
+
     if let Some(port) = options.serve_port {
         tokio::spawn(async move {
             let app_home = app_web.clone();
@@ -274,24 +311,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .allow_headers(vec!["*"])
                 .allow_methods(vec!["GET"]);
 
+            let state = warp::any().map(move || state.clone());
+            let ws_route = warp::path("websocket")
+                .and(warp::ws())
+                .and(state)
+                .map(|ws: warp::ws::Ws, state| {
+                    ws.on_upgrade(move |websocket| {
+                        on_connected(websocket, state)
+                    })
+                });
+
+            let channels_assets =
+                warp::path("channels").and(warp::fs::dir("./src/assets"));
+
             let routes = warp::get()
-                .and(home.or(all).or(track).or(receivers))
+                .and(
+                    home.or(all)
+                        .or(track)
+                        .or(receivers)
+                        .or(channels_assets)
+                        .or(ws_route),
+                )
                 .recover(web::handle_rejection)
                 .with(cors);
 
             warp::serve(routes).run(([0, 0, 0, 0], port)).await;
         });
-    }
-
-    // https://stackoverflow.com/questions/67602278/rust-tokio-trait-bounds-were-not-satisfied-on-forward-method
-    let (websocket_tx, websocket_rx) = tokio::sync::mpsc::unbounded_channel();
-    let websocket_rx = UnboundedReceiverStream::new(websocket_rx);
-    if options.websocket_port.is_some() {
-        tokio::spawn(axum_websocket_server(
-            options.websocket_host.clone(),
-            options.websocket_port.unwrap(),
-            websocket_rx,
-        ));
     }
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
@@ -304,7 +349,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if options.use_websocket_source {
-        info!("useing websocket data source, do make sure you have source 127.0.0.1:42125@LFBO !");
         tokio::spawn(websocket_client());
     }
 
@@ -350,9 +394,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
 
-            // send the message to the websocket server
-            if options.websocket_port.is_some() {
-                websocket_tx.send(msg.clone())?;
+            if options.serve_port.is_some() {
+                // http server is enabled, send the message to the websocket server
+                timed_message_tx.send(msg.clone())?;
             }
 
             if let Ok(json) = serde_json::to_string(&msg) {
@@ -372,6 +416,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+pub async fn on_connected(ws: WebSocket, state: Arc<State>) {
+    let (mut tx, mut rx) = ws.split();
+
+    let user = User::default();
+    info!("user: {} connected", user.user_id);
+
+    state
+        .channels
+        .lock()
+        .await
+        .add_user(user.user_id.to_string(), None)
+        .await;
+
+    // get receiver for user that get message from all channels
+    let mut user_receiver = state
+        .channels
+        .lock()
+        .await
+        .get_user_receiver(user.user_id.to_string())
+        .await
+        .unwrap();
+
+    // channels => websocket client
+    let mut tx_task = tokio::spawn(async move {
+        while let Ok(my_message) = user_receiver.recv().await {
+            tx.send(warp::ws::Message::text(my_message)).await.unwrap();
+        }
+    });
+
+    // spawn a task to get message from user and handle things
+    let rec_state = state.clone();
+    let mut rx_task = tokio::spawn(async move {
+        while let Some(result) = rx.next().await {
+            if let Ok(message) = result {
+                if message.is_text() {
+                    handle_incoming_messages(
+                        message.to_str().unwrap().to_string(),
+                        rec_state.clone(),
+                        &user.user_id.clone(),
+                    )
+                    .await;
+                }
+            };
+        }
+    });
+
+    tokio::select! {
+        _ = (&mut tx_task) => rx_task.abort(),
+        _ = (&mut rx_task) => tx_task.abort(),
+    }
+
+    state
+        .channels
+        .lock()
+        .await
+        .remove_user(user.session_id.to_string())
+        .await;
+    info!("client connection closed");
 }
 
 #[derive(Debug, Default)]

@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use std::{
     collections::{hash_map::Entry, HashMap},
     error::Error,

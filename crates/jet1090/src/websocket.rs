@@ -1,14 +1,8 @@
-#![allow(unused)]
-
 use std::fmt::{Display, Error};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::response::IntoResponse;
-use axum::routing::get;
-use axum::{Extension, Router};
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
@@ -123,73 +117,29 @@ impl Display for RequestMessage {
     }
 }
 
-struct User {
-    user_id: String,
-    session_id: i32,
+pub struct User {
+    pub user_id: String,
+    pub session_id: i32,
+}
+
+impl Default for User {
+    fn default() -> Self {
+        User {
+            user_id: Uuid::new_v4().to_string(),
+            session_id: 0,
+        }
+    }
 }
 
 // enum MyMessage {
 //     String,
 // }
 
-struct State {
-    channels: Mutex<ChannelManager<String>>, // String: message type, TODO customize this
+pub struct State {
+    pub channels: Mutex<ChannelManager<String>>, // String: message type, TODO customize this
 }
 
-pub async fn axum_websocket_server(
-    websocket_host: String,
-    websocket_port: u16,
-    mut data_source: UnboundedReceiverStream<TimedMessage>,
-) {
-    info!("launch websocket server ...");
-
-    let channels = ChannelManager::new();
-    channels.new_channel("phoenix".into(), None).await; // heartbeat
-    channels.new_channel("system".into(), None).await; // system channel, datetime
-    channels.new_channel("jet1090".into(), None).await; // data
-
-    let assets_dir = [env!("CARGO_MANIFEST_DIR"), "src", "assets"]
-        .iter()
-        .collect::<PathBuf>();
-
-    let state = Arc::new(State {
-        channels: Mutex::new(channels),
-    });
-
-    let app = Router::new()
-        .fallback_service(
-            ServeDir::new(assets_dir).append_index_html_on_directories(true),
-        )
-        .route("/websocket", get(websocket_handler))
-        .layer(Extension(state.clone()));
-
-    tokio::spawn(timestamp_task(state.clone(), "system"));
-    tokio::spawn(rs1090_data_task(
-        state.clone(),
-        data_source,
-        "jet1090",
-        "data",
-    ));
-
-    info!(
-        "starting websocket server at {}:{}...",
-        websocket_host, websocket_port
-    );
-    let listener = tokio::net::TcpListener::bind(format!(
-        "{}:{}",
-        websocket_host, websocket_port
-    ))
-    .await
-    .unwrap();
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await
-    .unwrap();
-}
-
-async fn rs1090_data_task(
+pub async fn rs1090_data_task(
     local_state: Arc<State>,
     mut data_source: UnboundedReceiverStream<TimedMessage>,
     channel_name: &str,
@@ -230,7 +180,7 @@ async fn rs1090_data_task(
     }
 }
 
-async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
+pub async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
     info!("launch datetime thread ...");
@@ -271,15 +221,6 @@ async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
     }
 }
 
-// TODO handle header
-async fn websocket_handler(
-    ws: WebSocketUpgrade,
-    Extension(state): Extension<Arc<State>>,
-) -> impl IntoResponse {
-    // TODO drop the connection if `userToken` in query string is not valid
-    ws.on_upgrade(|socket| websocket(socket, state))
-}
-
 async fn send_ok(
     join_reference: Option<String>,
     reference: &str,
@@ -307,7 +248,7 @@ async fn send_ok(
     debug!("> {}", text);
 }
 
-async fn handle_incoming_messages(
+pub async fn handle_incoming_messages(
     received_text: String,
     state: Arc<State>,
     user_id: &str,
@@ -364,63 +305,4 @@ async fn handle_incoming_messages(
         info!("heartbeat message");
         send_ok(Option::None, reference, "phoenix", state.clone()).await;
     }
-}
-
-async fn websocket(ws: WebSocket, state: Arc<State>) {
-    let (mut tx, mut rx) = ws.split();
-
-    let user = User {
-        user_id: Uuid::new_v4().to_string(),
-        session_id: 0,
-    };
-    info!("user: {}", user.user_id);
-
-    state
-        .channels
-        .lock()
-        .await
-        .add_user(user.user_id.to_string(), None)
-        .await;
-
-    // get receiver for user that get message from all channels
-    let mut user_receiver = state
-        .channels
-        .lock()
-        .await
-        .get_user_receiver(user.user_id.to_string())
-        .await
-        .unwrap();
-
-    // channels => websocket client
-    let mut tx_task = tokio::spawn(async move {
-        while let Ok(my_message) = user_receiver.recv().await {
-            tx.send(Message::Text(my_message)).await.unwrap();
-        }
-    });
-
-    // spawn a task to get message from user and handle things
-    let rec_state = state.clone();
-    let mut rx_task = tokio::spawn(async move {
-        while let Some(Ok(Message::Text(received_text))) = rx.next().await {
-            handle_incoming_messages(
-                received_text,
-                rec_state.clone(),
-                &user.user_id.clone(),
-            )
-            .await;
-        }
-    });
-
-    tokio::select! {
-        _ = (&mut tx_task) => rx_task.abort(),
-        _ = (&mut rx_task) => tx_task.abort(),
-    }
-
-    state
-        .channels
-        .lock()
-        .await
-        .remove_user(user.session_id.to_string())
-        .await;
-    info!("client connection closed");
 }
