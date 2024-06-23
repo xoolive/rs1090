@@ -37,13 +37,13 @@
           };
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
-          version = (builtins.sfromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
+          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
 
           commonArgs = {
             src = craneLib.cleanCargoSource ./.;
             pname = "rs1090";
             version = version;
-            nativeBuildInputs = with pkgs; [ pkg-config openssl clang mold python3];
+            nativeBuildInputs = with pkgs; [ pkg-config openssl clang mold python3 bzip2];
             buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin [
               pkgs.libiconv
             ];
