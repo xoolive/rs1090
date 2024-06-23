@@ -21,24 +21,24 @@ use uuid::Uuid;
 use crate::channels::ChannelControl;
 
 /// reply data structures
-#[derive(Debug, Serialize_tuple)]
-struct ReplyMessage {
+#[derive(Clone, Debug, Serialize_tuple)]
+pub struct ReplyMessage {
     join_reference: Option<String>, // null when it's heartbeat
     reference: String,
     topic: String, // `channel`
     event: String,
-    payload: ReplyPayload,
+    pub payload: ReplyPayload,
 }
 
-#[derive(Debug, Serialize)]
-struct ReplyPayload {
-    status: String,
-    response: Response,
+#[derive(Clone, Debug, Serialize)]
+pub struct ReplyPayload {
+    pub status: String,
+    pub response: Response,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
-enum Response {
+pub enum Response {
     Empty {},
     Join {},
     Heartbeat {},
@@ -99,7 +99,7 @@ impl Default for User {
 // }
 
 pub struct State {
-    pub channels: Mutex<ChannelControl<String>>, // String: message type, TODO: customize this
+    pub channels: Mutex<ChannelControl>, // String: message type, TODO: customize this
 }
 
 pub async fn rs1090_data_task(
@@ -110,7 +110,7 @@ pub async fn rs1090_data_task(
 ) {
     let mut counter = 0;
     while let Some(timed_message) = data_source.next().await {
-        let message = ReplyMessage {
+        let reply_message = ReplyMessage {
             join_reference: None,
             reference: counter.to_string(),
             topic: channel_name.to_string(),
@@ -120,12 +120,12 @@ pub async fn rs1090_data_task(
                 response: Response::Jet1090 { timed_message },
             },
         };
-        let text = serde_json::to_string(&message).unwrap();
+        let text = serde_json::to_string(&reply_message).unwrap();
         match local_state
             .channels
             .lock()
             .await
-            .broadcast(channel_name.to_string(), text.clone())
+            .broadcast(channel_name.to_string(), reply_message)
             .await
         {
             Ok(_) => {
@@ -170,10 +170,10 @@ pub async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
             .channels
             .lock()
             .await
-            .broadcast(channel_name.to_string(), text.clone())
+            .broadcast(channel_name.to_string(), message)
             .await
         {
-            Ok(0) => {}, // no client
+            Ok(0) => {} // no client
             Ok(_) => debug!("datetime > {}", text),
             Err(e) => {
                 error!("fail to send, err: {}", e)
@@ -191,7 +191,7 @@ async fn reply_ok_with_empty_response(
     channel: &str,
     state: Arc<State>,
 ) {
-    let join_reply = ReplyMessage {
+    let join_reply_message = ReplyMessage {
         join_reference: join_reference.clone(),
         reference: reference.to_string(),
         topic: channel.to_string(),
@@ -201,12 +201,12 @@ async fn reply_ok_with_empty_response(
             response: Response::Empty {},
         },
     };
-    let text = serde_json::to_string(&join_reply).unwrap();
+    let text = serde_json::to_string(&join_reply_message).unwrap();
     state
         .channels
         .lock()
         .await
-        .broadcast(channel.to_string(), text.clone())
+        .broadcast(channel.to_string(), join_reply_message)
         .await
         .unwrap();
     debug!("> {}", text);
@@ -249,7 +249,13 @@ pub async fn handle_incoming_messages(
             .join_channel(channel.clone(), user_id.to_string())
             .await
             .unwrap(); // join user to system channel
-        reply_ok_with_empty_response(join_reference.clone(), reference, channel, state.clone()).await;
+        reply_ok_with_empty_response(
+            join_reference.clone(),
+            reference,
+            channel,
+            state.clone(),
+        )
+        .await;
     }
 
     if event == "phx_leave" {
@@ -260,11 +266,23 @@ pub async fn handle_incoming_messages(
             .leave_channel(channel.clone(), user_id.to_string())
             .await
             .unwrap();
-        reply_ok_with_empty_response(join_reference.clone(), reference, channel, state.clone()).await;
+        reply_ok_with_empty_response(
+            join_reference.clone(),
+            reference,
+            channel,
+            state.clone(),
+        )
+        .await;
     }
 
     if channel == "phoenix" && event == "heartbeat" {
         debug!("heartbeat message");
-        reply_ok_with_empty_response(Option::None, reference, "phoenix", state.clone()).await;
+        reply_ok_with_empty_response(
+            Option::None,
+            reference,
+            "phoenix",
+            state.clone(),
+        )
+        .await;
     }
 }

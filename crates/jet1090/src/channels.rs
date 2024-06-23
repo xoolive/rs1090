@@ -11,15 +11,21 @@ use tokio::{
     task::JoinHandle,
 };
 
-/// ChannelCast is a type alias for broadcast::Sender. It broadcast messages in the channel.
-// type Broadcast<T> = broadcast::Sender<T>;
+use evalexpr::{
+    build_operator_tree, context_map, Context, ContextWithMutableVariables,
+    HashMapContext,
+};
+
+use crate::websocket::{ReplyMessage, Response};
+use rs1090::decode::TimeSource;
+use rs1090::decode::DF;
 
 /// user channel, can broadcast to every user in the channel
-pub struct Channel<T> {
+pub struct Channel {
     /// channel name
     pub name: String,
     /// broadcast in channels
-    sender: broadcast::Sender<T>,
+    sender: broadcast::Sender<ReplyMessage>,
     /// channel users
     users: Mutex<Vec<String>>,
     /// channel user count
@@ -27,10 +33,10 @@ pub struct Channel<T> {
 }
 
 /// manages all channels
-pub struct ChannelControl<T> {
-    channel_map: Mutex<HashMap<String, Channel<T>>>, // name -> channel
+pub struct ChannelControl {
+    channel_map: Mutex<HashMap<String, Channel>>, // name -> channel
     user_task_map: Mutex<HashMap<String, Vec<UserTask>>>,
-    user_sender_map: Mutex<HashMap<String, broadcast::Sender<T>>>,
+    user_sender_map: Mutex<HashMap<String, broadcast::Sender<ReplyMessage>>>,
 }
 
 #[derive(Debug)]
@@ -40,7 +46,7 @@ pub enum ChannelError {
     /// can not send message to channel
     MessageSendFail,
     /// you have not called init_user
-    NotInitiated,
+    UserNotInitiated,
 }
 
 impl Error for ChannelError {}
@@ -49,13 +55,13 @@ impl fmt::Display for ChannelError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ChannelError::ChannelNotFound => {
-                write!(f, "target channel not found")
+                write!(f, "channel not found")
             }
-            ChannelError::NotInitiated => {
-                write!(f, "user is not initiated")
+            ChannelError::UserNotInitiated => {
+                write!(f, "user not initiated")
             }
             ChannelError::MessageSendFail => {
-                write!(f, "failed to send message to the channel")
+                write!(f, "failed to send a message to the channel")
             }
         }
     }
@@ -76,11 +82,8 @@ impl Display for UserTask {
     }
 }
 
-impl<T> Channel<T>
-where
-    T: Clone + Send + 'static,
-{
-    pub fn new(name: String, capacity: Option<usize>) -> Channel<T> {
+impl Channel {
+    pub fn new(name: String, capacity: Option<usize>) -> Channel {
         let (tx, _rx) = broadcast::channel(capacity.unwrap_or(100));
         Channel {
             name,
@@ -90,7 +93,7 @@ where
         }
     }
 
-    pub async fn join(&self, user: String) -> broadcast::Sender<T> {
+    pub async fn join(&self, user: String) -> broadcast::Sender<ReplyMessage> {
         let mut users = self.users.lock().await;
         if !users.contains(&user) {
             users.push(user);
@@ -111,8 +114,8 @@ where
     /// it returns the number of users who received the message
     pub fn send(
         &self,
-        data: T,
-    ) -> Result<usize, broadcast::error::SendError<T>> {
+        data: ReplyMessage,
+    ) -> Result<usize, broadcast::error::SendError<ReplyMessage>> {
         self.sender.send(data)
     }
 
@@ -125,10 +128,7 @@ where
     }
 }
 
-impl<T> ChannelControl<T>
-where
-    T: Clone + Send + 'static,
-{
+impl ChannelControl {
     pub fn new() -> Self {
         ChannelControl {
             channel_map: Mutex::new(HashMap::new()),
@@ -177,7 +177,7 @@ where
     pub async fn broadcast(
         &self,
         channel_name: String,
-        message: T,
+        message: ReplyMessage,
     ) -> Result<usize, ChannelError> {
         self.channel_map
             .lock()
@@ -191,11 +191,11 @@ where
     pub async fn get_user_receiver(
         &self,
         user: String,
-    ) -> Result<broadcast::Receiver<T>, ChannelError> {
+    ) -> Result<broadcast::Receiver<ReplyMessage>, ChannelError> {
         let user_senders = self.user_sender_map.lock().await;
         let receiver = user_senders
             .get(&user)
-            .ok_or(ChannelError::NotInitiated)?
+            .ok_or(ChannelError::UserNotInitiated)?
             .subscribe();
         Ok(receiver)
     }
@@ -250,7 +250,7 @@ where
         &self,
         channel_name: String,
         user: String,
-    ) -> Result<broadcast::Sender<T>, ChannelError> {
+    ) -> Result<broadcast::Sender<ReplyMessage>, ChannelError> {
         let channel_map = self.channel_map.lock().await;
         let mut user_task_map = self.user_task_map.lock().await;
         let user_sender_map = self.user_sender_map.lock().await;
@@ -263,12 +263,50 @@ where
         let mut channel_subscription_receiver = channel_sender.subscribe();
         let user_sender = user_sender_map
             .get(&user)
-            .ok_or(ChannelError::NotInitiated)?
+            .ok_or(ChannelError::UserNotInitiated)?
             .clone();
+
         let task = tokio::spawn(async move {
             // data: channel => user
+            let pred = |m: &ReplyMessage| -> bool {
+                // TODO: per user per channel configurable
+                let code = r#"timesource == "system" && df == "0""#;
+                let precompiled_bytecodes = build_operator_tree(code).unwrap();
+
+                let mut ctx = HashMapContext::new();
+                if let Response::Jet1090 { timed_message } = &m.payload.response
+                {
+                    let value: &str = match timed_message.timesource {
+                        TimeSource::System => "system",
+                        TimeSource::Radarcape => "radercape",
+                        TimeSource::External => "external",
+                    };
+                    ctx.set_value("timesource".into(), value.into());
+
+                    let message =
+                        &<Option<rs1090::decode::Message> as Clone>::clone(
+                            &timed_message.message,
+                        )
+                        .unwrap();
+                    let df = match message.df {
+                        DF::ShortAirAirSurveillance { .. } => "0",
+                        _ => "",
+                    };
+                    ctx.set_value("df".into(), df.into());
+                }
+
+                match precompiled_bytecodes.eval_with_context(&ctx) {
+                    Ok(result) => result.as_boolean().unwrap(),
+                    Err(e) => {
+                        debug!("fail to evaluate: {}", e);
+                        true
+                    }
+                }
+            };
             while let Ok(data) = channel_subscription_receiver.recv().await {
-                let _ = user_sender.send(data);
+                if pred(&data) {
+                    let _ = user_sender.send(data);
+                }
             }
         });
 
@@ -316,10 +354,7 @@ where
     }
 }
 
-impl<T> Default for ChannelControl<T>
-where
-    T: Clone + Send + 'static,
-{
+impl Default for ChannelControl {
     fn default() -> Self {
         Self::new()
     }

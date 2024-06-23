@@ -444,8 +444,9 @@ pub async fn on_connected(ws: WebSocket, state: Arc<State>) {
 
     // channels => websocket client
     let mut tx_task = tokio::spawn(async move {
-        while let Ok(my_message) = user_receiver.recv().await {
-            tx.send(warp::ws::Message::text(my_message)).await.unwrap();
+        while let Ok(timed_message) = user_receiver.recv().await {
+            let text = serde_json::to_string(&timed_message).unwrap();
+            tx.send(warp::ws::Message::text(text)).await.unwrap();
         }
     });
 
