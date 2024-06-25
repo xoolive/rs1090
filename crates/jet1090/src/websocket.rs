@@ -18,7 +18,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use tower_http::services::ServeDir;
 use uuid::Uuid;
 
-use crate::channels::ChannelControl;
+use crate::channels::{ChannelControl, ChannelMessage};
 
 /// reply data structures
 #[derive(Clone, Debug, Serialize_tuple)]
@@ -88,7 +88,7 @@ pub struct User {
 impl Default for User {
     fn default() -> Self {
         User {
-            user_id: Uuid::new_v4().to_string(),
+            user_id: "0".to_string(), // Uuid::new_v4().to_string(),
             session_id: 0,
         }
     }
@@ -125,7 +125,10 @@ pub async fn rs1090_data_task(
             .channels
             .lock()
             .await
-            .broadcast(channel_name.to_string(), reply_message)
+            .broadcast(
+                channel_name.to_string(),
+                ChannelMessage::Reply(reply_message),
+            )
             .await
         {
             Ok(_) => {
@@ -170,7 +173,7 @@ pub async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
             .channels
             .lock()
             .await
-            .broadcast(channel_name.to_string(), message)
+            .broadcast(channel_name.to_string(), ChannelMessage::Reply(message))
             .await
         {
             Ok(0) => {} // no client
@@ -206,7 +209,10 @@ async fn reply_ok_with_empty_response(
         .channels
         .lock()
         .await
-        .broadcast(channel.to_string(), join_reply_message)
+        .broadcast(
+            channel.to_string(),
+            ChannelMessage::Reply(join_reply_message),
+        )
         .await
         .unwrap();
     debug!("> {}", text);

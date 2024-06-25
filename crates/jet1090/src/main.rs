@@ -16,6 +16,7 @@ use crate::websocket::{
     handle_incoming_messages, rs1090_data_task, timestamp_task, State, User,
 };
 
+use channels::ChannelMessage;
 use clap::Parser;
 use cli::Source;
 use crossterm::event::KeyCode;
@@ -309,12 +310,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let cors = warp::cors()
                 .allow_any_origin()
                 .allow_headers(vec!["*"])
-                .allow_methods(vec!["GET"]);
+                .allow_methods(vec!["GET", "POST"]);
 
-            let state = warp::any().map(move || state.clone());
+            let ws_state = state.clone();
             let ws_route = warp::path("websocket")
                 .and(warp::ws())
-                .and(state)
+                .and(warp::any().map(move || ws_state.clone()))
                 .map(|ws: warp::ws::Ws, state| {
                     ws.on_upgrade(move |websocket| {
                         on_connected(websocket, state)
@@ -324,18 +325,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let channels_assets = warp::path("channels")
                 .and(warp::fs::dir("./crates/jet1090/src/assets"));
 
+            let channel_control_state = state.clone();
+            let update_filter_route = warp::path!("filter")
+                .and(warp::post())
+                .and(warp::body::json())
+                .and(warp::any().map(move || channel_control_state.clone()))
+                .and_then(|code: String, state: Arc<State>| async move {
+                    state
+                        .channels
+                        .lock()
+                        .await
+                        .channel_map
+                        .lock()
+                        .await
+                        .get("jet1090")
+                        .unwrap()
+                        .send(ChannelMessage::ReloadFilter(code.clone()))
+                        .unwrap();
+                    Ok::<_, std::convert::Infallible>(warp::reply::json(&0))
+                });
+
             let routes = warp::get()
-                .and(
-                    home.or(all)
-                        .or(track)
-                        .or(receivers)
-                        .or(channels_assets)
-                        .or(ws_route),
-                )
+                .and(home.or(all).or(track).or(receivers).or(channels_assets))
                 .recover(web::handle_rejection)
                 .with(cors);
 
-            warp::serve(routes).run(([0, 0, 0, 0], port)).await;
+            let updated_routes = ws_route.or(update_filter_route); // .or(routes);
+
+            warp::serve(updated_routes).run(([0, 0, 0, 0], port)).await;
+            // warp::serve(routes).run(([0, 0, 0, 0], port)).await;
         });
     }
 
@@ -444,9 +462,11 @@ pub async fn on_connected(ws: WebSocket, state: Arc<State>) {
 
     // channels => websocket client
     let mut tx_task = tokio::spawn(async move {
-        while let Ok(timed_message) = user_receiver.recv().await {
-            let text = serde_json::to_string(&timed_message).unwrap();
-            tx.send(warp::ws::Message::text(text)).await.unwrap();
+        while let Ok(channel_message) = user_receiver.recv().await {
+            if let ChannelMessage::Reply(reply_message) = channel_message {
+                let text = serde_json::to_string(&reply_message).unwrap();
+                tx.send(warp::ws::Message::text(text)).await.unwrap();
+            }
         }
     });
 

@@ -5,7 +5,8 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use log::debug;
+use log::{debug, error, info};
+use serde::Serialize;
 use tokio::{
     sync::{broadcast, Mutex},
     task::JoinHandle,
@@ -13,19 +14,25 @@ use tokio::{
 
 use evalexpr::{
     build_operator_tree, context_map, Context, ContextWithMutableVariables,
-    HashMapContext,
+    HashMapContext, Value,
 };
 
 use crate::websocket::{ReplyMessage, Response};
-use rs1090::decode::TimeSource;
 use rs1090::decode::DF;
+use rs1090::decode::{TimeSource, TimedMessage};
+
+#[derive(Clone, Debug, Serialize)]
+pub enum ChannelMessage {
+    Reply(ReplyMessage),
+    ReloadFilter(String),
+}
 
 /// user channel, can broadcast to every user in the channel
 pub struct Channel {
     /// channel name
     pub name: String,
     /// broadcast in channels
-    sender: broadcast::Sender<ReplyMessage>,
+    sender: broadcast::Sender<ChannelMessage>,
     /// channel users
     users: Mutex<Vec<String>>,
     /// channel user count
@@ -34,9 +41,9 @@ pub struct Channel {
 
 /// manages all channels
 pub struct ChannelControl {
-    channel_map: Mutex<HashMap<String, Channel>>, // channel name -> Channel
+    pub channel_map: Mutex<HashMap<String, Channel>>, // channel name -> Channel
     user_task_map: Mutex<HashMap<String, Vec<UserTask>>>, // user_id -> threads
-    user_sender_map: Mutex<HashMap<String, broadcast::Sender<ReplyMessage>>>, // user_id -> Sender
+    user_sender_map: Mutex<HashMap<String, broadcast::Sender<ChannelMessage>>>, // user_id -> Sender
 }
 
 #[derive(Debug)]
@@ -93,7 +100,10 @@ impl Channel {
         }
     }
 
-    pub async fn join(&self, user: String) -> broadcast::Sender<ReplyMessage> {
+    pub async fn join(
+        &self,
+        user: String,
+    ) -> broadcast::Sender<ChannelMessage> {
         let mut users = self.users.lock().await;
         if !users.contains(&user) {
             users.push(user);
@@ -114,8 +124,8 @@ impl Channel {
     /// it returns the number of users who received the message
     pub fn send(
         &self,
-        data: ReplyMessage,
-    ) -> Result<usize, broadcast::error::SendError<ReplyMessage>> {
+        data: ChannelMessage,
+    ) -> Result<usize, broadcast::error::SendError<ChannelMessage>> {
         self.sender.send(data)
     }
 
@@ -177,7 +187,7 @@ impl ChannelControl {
     pub async fn broadcast(
         &self,
         channel_name: String,
-        message: ReplyMessage,
+        message: ChannelMessage,
     ) -> Result<usize, ChannelError> {
         self.channel_map
             .lock()
@@ -188,10 +198,19 @@ impl ChannelControl {
             .map_err(|_| ChannelError::MessageSendError) // message send fail error
     }
 
+    pub async fn get_user_sender(
+        &self,
+        user: String,
+    ) -> Result<broadcast::Sender<ChannelMessage>, ChannelError> {
+        info!("get user {} sender", user);
+        let user_senders = self.user_sender_map.lock().await;
+        Ok(user_senders.get(&user).unwrap().clone())
+    }
+
     pub async fn get_user_receiver(
         &self,
         user: String,
-    ) -> Result<broadcast::Receiver<ReplyMessage>, ChannelError> {
+    ) -> Result<broadcast::Receiver<ChannelMessage>, ChannelError> {
         let user_senders = self.user_sender_map.lock().await;
         let receiver = user_senders
             .get(&user)
@@ -250,7 +269,7 @@ impl ChannelControl {
         &self,
         channel_name: String,
         user: String,
-    ) -> Result<broadcast::Sender<ReplyMessage>, ChannelError> {
+    ) -> Result<broadcast::Sender<ChannelMessage>, ChannelError> {
         let channel_map = self.channel_map.lock().await;
         let mut user_task_map = self.user_task_map.lock().await;
         let user_sender_map = self.user_sender_map.lock().await;
@@ -266,51 +285,10 @@ impl ChannelControl {
             .ok_or(ChannelError::UserNotInitiated)?
             .clone();
 
-        let task = tokio::spawn(async move {
-            let pred = |m: &ReplyMessage| -> bool {
-                // TODO: per user per channel configurable
-                let code = r#"timesource == "system" && df == "0""#;
-                let operator_node = build_operator_tree(code).unwrap();
-
-                // context is built based on current TimedMessage
-                let mut ctx = HashMapContext::new();
-                if let Response::Jet1090 { timed_message } = &m.payload.response
-                {
-                    let value: &str = match timed_message.timesource {
-                        TimeSource::System => "system",
-                        TimeSource::Radarcape => "radercape",
-                        TimeSource::External => "external",
-                    };
-                    ctx.set_value("timesource".into(), value.into());
-
-                    let message =
-                        &<Option<rs1090::decode::Message> as Clone>::clone(
-                            &timed_message.message,
-                        )
-                        .unwrap();
-                    let df = match message.df {
-                        DF::ShortAirAirSurveillance { .. } => "0",
-                        _ => "",
-                    };
-                    ctx.set_value("df".into(), df.into());
-                }
-
-                // evaluate expr in context
-                match operator_node.eval_with_context(&ctx) {
-                    Ok(result) => result.as_boolean().unwrap(),
-                    Err(e) => {
-                        debug!("failed to evaluate: {}", e);
-                        true
-                    }
-                }
-            };
-            // into a loop
-            while let Ok(data) = channel_subscription_receiver.recv().await {
-                if pred(&data) {
-                    let _ = user_sender.send(data);
-                }
-            }
-        });
+        let task = tokio::spawn(user_receiver_to_websocket_sender(
+            channel_subscription_receiver,
+            user_sender,
+        ));
 
         match user_task_map.entry(user.clone()) {
             Entry::Occupied(mut entry) => {
@@ -359,5 +337,121 @@ impl ChannelControl {
 impl Default for ChannelControl {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn build_eval_context(m: &ReplyMessage) -> HashMapContext {
+    // context is built based on current TimedMessage
+    let mut ctx = HashMapContext::new();
+    if let Response::Jet1090 { timed_message } = &m.payload.response {
+        // timesource
+        let value: &str = match timed_message.timesource {
+            TimeSource::System => "system",
+            TimeSource::Radarcape => "radercape",
+            TimeSource::External => "external",
+        };
+        ctx.set_value("timesource".into(), value.into());
+
+        let message = &<Option<rs1090::decode::Message> as Clone>::clone(
+            &timed_message.message,
+        )
+        .unwrap();
+
+        // df
+        let mut df: u16 = 0;
+        let mut altitude: u16 = 0;
+        match message.df {
+            DF::ShortAirAirSurveillance { ac, .. } => {
+                df = 0;
+                altitude = ac.0;
+            }
+            DF::SurveillanceAltitudeReply { ac, .. } => {
+                df = 4;
+                altitude = ac.0;
+            }
+            DF::SurveillanceIdentityReply { .. } => {
+                df = 5;
+                altitude = 0;
+            }
+            DF::AllCallReply { .. } => {
+                df = 11;
+                altitude = 0;
+            }
+            DF::LongAirAirSurveillance { ac, .. } => {
+                df = 16;
+                altitude = ac.0;
+            }
+            DF::ExtendedSquitterADSB { .. } => {
+                df = 17;
+                altitude = 0;
+            }
+            DF::ExtendedSquitterTisB { .. } => {
+                df = 18;
+                altitude = 0;
+            }
+            DF::ExtendedSquitterMilitary { .. } => {
+                df = 19;
+                altitude = 0;
+            }
+            DF::CommBAltitudeReply { ac, .. } => {
+                df = 20;
+                altitude = ac.0;
+            }
+            DF::CommBIdentityReply { .. } => {
+                df = 21;
+                altitude = 0;
+            }
+            DF::CommDExtended { .. } => {
+                df = 24;
+                altitude = 0;
+            }
+        };
+        ctx.set_value("df".into(), Value::Int(df.into()));
+        ctx.set_value("altitude".into(), Value::Int(altitude.into()));
+    }
+    ctx
+}
+
+async fn user_receiver_to_websocket_sender(
+    mut channel_subscription_receiver: broadcast::Receiver<ChannelMessage>,
+    user_sender: broadcast::Sender<ChannelMessage>,
+) {
+    // TODO: per user per channel configurable
+    // let code = r#"timesource == "system" && df == "0""#;
+    let mut code = r#"
+        true
+        // (df == 0 || df == 4) && 
+        // (altitude >= 30000)
+        // (altitude >= 30000 && altitude <= 32000)
+    "#;
+    let mut operator_node = build_operator_tree(code).unwrap();
+
+    while let Ok(channel_message) = channel_subscription_receiver.recv().await {
+        match &channel_message {
+            ChannelMessage::ReloadFilter(code) => {
+                info!("reloading filter ...");
+                match build_operator_tree(code) {
+                    Ok(node) => {
+                        operator_node = node;
+                        info!("filter reloaded");
+                    }
+                    Err(e) => {
+                        error!("failed to reload filter: {}", e);
+                    }
+                }
+            }
+            ChannelMessage::Reply(reply_message) => {
+                let ctx = build_eval_context(&reply_message);
+                match operator_node.eval_with_context(&ctx) {
+                    Ok(Value::Boolean(true)) => {
+                        user_sender.send(channel_message);
+                    }
+                    Ok(_) => continue,
+                    Err(e) => {
+                        error!("failed to evaluate: {}", e);
+                    }
+                }
+            }
+        }
     }
 }
