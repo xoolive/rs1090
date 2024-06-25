@@ -34,9 +34,9 @@ pub struct Channel {
 
 /// manages all channels
 pub struct ChannelControl {
-    channel_map: Mutex<HashMap<String, Channel>>, // name -> channel
-    user_task_map: Mutex<HashMap<String, Vec<UserTask>>>,
-    user_sender_map: Mutex<HashMap<String, broadcast::Sender<ReplyMessage>>>,
+    channel_map: Mutex<HashMap<String, Channel>>, // channel name -> Channel
+    user_task_map: Mutex<HashMap<String, Vec<UserTask>>>, // user_id -> threads
+    user_sender_map: Mutex<HashMap<String, broadcast::Sender<ReplyMessage>>>, // user_id -> Sender
 }
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ pub enum ChannelError {
     /// channel does not exist
     ChannelNotFound,
     /// can not send message to channel
-    MessageSendFail,
+    MessageSendError,
     /// you have not called init_user
     UserNotInitiated,
 }
@@ -60,7 +60,7 @@ impl fmt::Display for ChannelError {
             ChannelError::UserNotInitiated => {
                 write!(f, "user not initiated")
             }
-            ChannelError::MessageSendFail => {
+            ChannelError::MessageSendError => {
                 write!(f, "failed to send a message to the channel")
             }
         }
@@ -185,7 +185,7 @@ impl ChannelControl {
             .get(&channel_name)
             .ok_or(ChannelError::ChannelNotFound)? // channel not found error
             .send(message)
-            .map_err(|_| ChannelError::MessageSendFail) // message send fail error
+            .map_err(|_| ChannelError::MessageSendError) // message send fail error
     }
 
     pub async fn get_user_receiver(
@@ -267,12 +267,12 @@ impl ChannelControl {
             .clone();
 
         let task = tokio::spawn(async move {
-            // data: channel => user
             let pred = |m: &ReplyMessage| -> bool {
                 // TODO: per user per channel configurable
                 let code = r#"timesource == "system" && df == "0""#;
-                let precompiled_bytecodes = build_operator_tree(code).unwrap();
+                let operator_node = build_operator_tree(code).unwrap();
 
+                // context is built based on current TimedMessage
                 let mut ctx = HashMapContext::new();
                 if let Response::Jet1090 { timed_message } = &m.payload.response
                 {
@@ -295,14 +295,16 @@ impl ChannelControl {
                     ctx.set_value("df".into(), df.into());
                 }
 
-                match precompiled_bytecodes.eval_with_context(&ctx) {
+                // evaluate expr in context
+                match operator_node.eval_with_context(&ctx) {
                     Ok(result) => result.as_boolean().unwrap(),
                     Err(e) => {
-                        debug!("fail to evaluate: {}", e);
+                        debug!("failed to evaluate: {}", e);
                         true
                     }
                 }
             };
+            // into a loop
             while let Ok(data) = channel_subscription_receiver.recv().await {
                 if pred(&data) {
                     let _ = user_sender.send(data);

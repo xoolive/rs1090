@@ -99,7 +99,7 @@ impl Default for User {
 // }
 
 pub struct State {
-    pub channels: Mutex<ChannelControl>, // String: message type, TODO: customize this
+    pub channels: Mutex<ChannelControl>,
 }
 
 pub async fn rs1090_data_task(
