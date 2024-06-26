@@ -133,3 +133,9 @@ Usage is available with the help command.
 ```sh
 decode1090 --help
 ```
+
+## development
+
+By default, `direnv` will try to use `nix flake` for development environment.
+You can `nix develop` to drop into a bash, and build by `cargo build -p jet1090` for development.
+
