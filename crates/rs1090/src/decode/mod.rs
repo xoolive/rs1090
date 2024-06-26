@@ -400,7 +400,7 @@ impl fmt::Display for Message {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TimeSource {
     /// The timestamp is provided by the system when it receives the message
@@ -411,7 +411,7 @@ pub enum TimeSource {
     External,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct TimedMessage {
     pub timestamp: f64,
 
