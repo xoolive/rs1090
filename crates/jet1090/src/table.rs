@@ -241,7 +241,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
         Scrollbar::new(ScrollbarOrientation::VerticalRight)
             .begin_symbol(None)
             .end_symbol(None),
-        area.inner(&Margin {
+        area.inner(Margin {
             vertical: 1,
             horizontal: 0,
         }),

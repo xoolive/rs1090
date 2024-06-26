@@ -1,4 +1,5 @@
 #![allow(rustdoc::broken_intra_doc_links)]
+#![allow(clippy::needless_doctest_main)]
 #![doc = include_str!("../readme.md")]
 pub mod data;
 pub mod decode;

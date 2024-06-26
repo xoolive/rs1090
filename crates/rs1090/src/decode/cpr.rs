@@ -1,3 +1,18 @@
+/**
+* The position information is encoded in a Compact Position Reporting (CPR)
+* format, which requires fewer bits to encode positions with higher resolution.
+* The CPR offers a trade-off between global position ambiguity and local
+* position accuracy. Two types of position messages (identified by the odd and
+* even frame bit) are broadcast alternately.
+*
+* There are two different ways to decode an airborne position:
+*
+*  - globally unambiguous position decoding: Without a known position to start
+*    with, using both types of messages to decode the position.
+*  - locally unambiguous position decoding: Knowing a reference position from
+*    previous sets of messages, using only one message for the decoding.
+*
+*/
 use super::adsb::ME;
 use super::bds::bds05::AirbornePosition;
 use super::bds::bds06::SurfacePosition;
@@ -27,22 +42,6 @@ fn haversine(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 fn dist_haversine(pos1: &Position, pos2: &Position) -> f64 {
     haversine(pos1.latitude, pos1.longitude, pos2.latitude, pos2.longitude)
 }
-
-/**
-* The position information is encoded in a Compact Position Reporting (CPR)
-* format, which requires fewer bits to encode positions with higher resolution.
-* The CPR offers a trade-off between global position ambiguity and local
-* position accuracy. Two types of position messages (identified by the odd and
-* even frame bit) are broadcast alternately.
-*
-* There are two different ways to decode an airborne position:
-*
-*  - globally unambiguous position decoding: Without a known position to start
-* with, using both types of messages to decode the position.
-*  - locally unambiguous position decoding: Knowing a reference position from
-*  previous sets of messages, using only one message for the decoding.
-*
-*/
 
 /// A flag to qualify a CPR position as odd or even
 #[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
