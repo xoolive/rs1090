@@ -2,17 +2,19 @@ use std::str::FromStr;
 
 use rs1090::decode::{cpr::Position, TimedMessage};
 use rs1090::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Source {
     host: String,
     port: u16,
     rtlsdr: bool,
     pub airport: Option<String>,
     pub reference: Option<Position>,
+    #[serde(skip)]
     pub count: u64,
+    #[serde(skip)]
     pub last: u64,
 }
 

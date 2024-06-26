@@ -6,7 +6,7 @@ use crate::data::airports::one_airport;
 use deku::prelude::*;
 use libm::fabs;
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
@@ -66,7 +66,7 @@ impl fmt::Display for CPRFormat {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Clone, Copy)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub struct Position {
     pub latitude: f64,
     pub longitude: f64,

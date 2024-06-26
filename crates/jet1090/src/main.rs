@@ -13,6 +13,7 @@ use crossterm::event::KeyCode;
 use ratatui::widgets::*;
 use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::prelude::*;
+use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -24,7 +25,7 @@ use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Default, Deserialize, Parser)]
 #[command(
     name = "jet1090",
     version,
@@ -66,7 +67,45 @@ struct Options {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let options = Options::parse();
+    // Load environment variables from a .env file
+    dotenv::dotenv().ok();
+
+    let mut options = Options::default();
+
+    let mut cfg_path = dirs::config_dir().unwrap_or_default();
+    cfg_path.push("jet1090");
+    cfg_path.push("config.toml");
+
+    if cfg_path.exists() {
+        let string = fs::read_to_string(cfg_path).await.ok().unwrap();
+        options = toml::from_str(&string).unwrap();
+    }
+
+    if let Ok(config_file) = std::env::var("JET1090_CONFIG") {
+        let string = fs::read_to_string(config_file).await.ok().unwrap();
+        options = toml::from_str(&string).unwrap();
+    }
+
+    let mut cli_options = Options::parse();
+    if cli_options.verbose {
+        options.verbose = true;
+    }
+    if cli_options.output.is_some() {
+        options.output = cli_options.output;
+    }
+    if cli_options.interactive {
+        options.interactive = true;
+    }
+    if cli_options.serve_port.is_some() {
+        options.serve_port = cli_options.serve_port;
+    }
+    if cli_options.expire.is_some() {
+        options.expire = cli_options.expire;
+    }
+    if cli_options.update_position {
+        options.update_position = cli_options.update_position;
+    }
+    options.sources.append(&mut cli_options.sources);
 
     let mut file = if let Some(output_path) = options.output {
         Some(
@@ -404,5 +443,42 @@ impl Jet1090 {
     pub fn home(&mut self) {
         self.state.select(Some(0));
         self.scroll_state = self.scroll_state.position(0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::Options;
+
+    #[test]
+    fn test_config() {
+        let options: Options = toml::from_str(
+            r#"
+            verbose = false
+            interactive = true
+            serve_port = 8080
+            expire = 1
+            update_position = false
+
+            [[sources]]
+            host = '0.0.0.0'
+            port = 1234
+            rtlsdr = false
+            airport = 'LFBO'
+
+            [[sources]]
+            host = '0.0.0.0'
+            port = 3456
+            rtlsdr = false
+            [reference]
+            latitude = 48.723
+            longitude = 2.379
+            "#,
+        )
+        .unwrap();
+
+        assert!(options.interactive);
+        assert_eq!(options.sources.len(), 2);
     }
 }

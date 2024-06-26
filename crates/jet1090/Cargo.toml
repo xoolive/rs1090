@@ -17,6 +17,8 @@ chrono = "0.4.37"
 clap = { version = "4.5.7", features = ["color", "derive", "wrap_help"] }
 crossterm = { version = "0.27.0", features = ["event-stream"] }
 deku = "0.16.0"
+dirs = "5.0.1"
+dotenv = "0.15.0"
 futures = "0.3.30"
 futures-util = "0.3.30"
 hex = "0.4.3"
@@ -28,6 +30,7 @@ serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
 soapysdr = { version = "0.4.0", optional = true }
 tokio = { version = "1.38.0", features = ["full"] }
+toml = "0.8.14"
 warp = "0.3.6"
 zip = "2.1.3"
 
