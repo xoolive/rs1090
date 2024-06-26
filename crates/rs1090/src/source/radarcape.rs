@@ -57,8 +57,8 @@ fn now() -> u128 {
         .as_micros()
 }
 
-fn today() -> u128 {
-    86_400 * (now() / 86_400_000_000)
+fn today(now: u128) -> u128 {
+    86_400 * (now / 86_400)
 }
 
 fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
@@ -66,18 +66,20 @@ fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
     let mut array = [0u8; 8];
     array[2..8].copy_from_slice(&msg[2..8]);
 
-    let ts = u64::from_be_bytes(array);
-    let seconds = ts >> 30;
-    let nanos = ts & 0x00003FFFFFFF;
+    let ts_u64 = u64::from_be_bytes(array);
+    let seconds = ts_u64 >> 30;
+    let nanos = ts_u64 & 0x00003FFFFFFF;
     let ts = seconds as f64 + nanos as f64 * 1e-9;
     let frame = msg[9..]
         .iter()
         .map(|&b| format!("{:02x}", b))
         .collect::<Vec<String>>()
         .join("");
-    let now = now() as f64 * 1e-6;
 
-    let timestamp = today() as f64 + ts;
+    let now_u128 = now();
+    let now = now_u128 as f64 * 1e-6;
+    let timestamp = today(now_u128 / 1_000_000) as f64 + ts;
+
     let timesource = match (now - timestamp).abs() {
         value if value < 5. => TimeSource::Radarcape,
         _ => TimeSource::System,
