@@ -351,61 +351,74 @@ fn build_eval_context(m: &ReplyMessage) -> HashMapContext {
             TimeSource::External => "external",
         };
         ctx.set_value("timesource".into(), value.into());
+        ctx.set_value("idx".into(), Value::Int(timed_message.idx as i64));
 
         let message = &<Option<rs1090::decode::Message> as Clone>::clone(
             &timed_message.message,
         )
         .unwrap();
 
-        // df
+        let mut icao24: String = "".to_string();
         let mut df: u16 = 0;
         let mut altitude: u16 = 0;
-        match message.df {
-            DF::ShortAirAirSurveillance { ac, .. } => {
+        match &message.df {
+            DF::ShortAirAirSurveillance { ac, ap, .. } => {
+                icao24 = format!("{}", ap);
                 df = 0;
                 altitude = ac.0;
             }
-            DF::SurveillanceAltitudeReply { ac, .. } => {
+            DF::SurveillanceAltitudeReply { ac, ap, .. } => {
+                icao24 = format!("{}", ap);
                 df = 4;
                 altitude = ac.0;
             }
-            DF::SurveillanceIdentityReply { .. } => {
+            DF::SurveillanceIdentityReply { ap, .. } => {
+                icao24 = format!("{}", ap);
                 df = 5;
                 altitude = 0;
             }
-            DF::AllCallReply { .. } => {
+            DF::AllCallReply { icao, .. } => {
+                icao24 = format!("{}", icao);
                 df = 11;
                 altitude = 0;
             }
-            DF::LongAirAirSurveillance { ac, .. } => {
+            DF::LongAirAirSurveillance { ac, ap, .. } => {
+                icao24 = format!("{}", ap);
                 df = 16;
                 altitude = ac.0;
             }
-            DF::ExtendedSquitterADSB { .. } => {
+            DF::ExtendedSquitterADSB(adsb) => {
+                icao24 = format!("{}", &adsb.icao24);
                 df = 17;
                 altitude = 0;
             }
-            DF::ExtendedSquitterTisB { .. } => {
+            DF::ExtendedSquitterTisB { cf, .. } => {
+                icao24 = format!("{}", cf.aa);
                 df = 18;
                 altitude = 0;
             }
             DF::ExtendedSquitterMilitary { .. } => {
+                icao24 = "".to_string();
                 df = 19;
                 altitude = 0;
             }
-            DF::CommBAltitudeReply { ac, .. } => {
+            DF::CommBAltitudeReply { ac, ap, .. } => {
+                icao24 = format!("{}", ap);
                 df = 20;
                 altitude = ac.0;
             }
-            DF::CommBIdentityReply { .. } => {
+            DF::CommBIdentityReply { ap, .. } => {
+                icao24 = format!("{}", ap);
                 df = 21;
                 altitude = 0;
             }
-            DF::CommDExtended { .. } => {
+            DF::CommDExtended { parity, .. } => {
+                icao24 = format!("{}", parity);
                 df = 24;
                 altitude = 0;
             }
         };
+        ctx.set_value("icao24".into(), icao24.into());
         ctx.set_value("df".into(), Value::Int(df.into()));
         ctx.set_value("altitude".into(), Value::Int(altitude.into()));
     }
