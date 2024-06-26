@@ -1,8 +1,7 @@
 use rusqlite::Connection;
 use std::collections::BTreeMap;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{copy, BufReader, Cursor};
-use std::path::Path;
 use zip::read::ZipArchive;
 
 #[derive(Debug)]
@@ -24,22 +23,35 @@ async fn download_file(url: &str, destination: &str) -> Result<()> {
 }
 
 pub async fn aircraft() -> BTreeMap<String, Aircraft> {
+    let mut cache_path = dirs::cache_dir().unwrap_or_default();
+    cache_path.push("jet1090");
+    if !cache_path.exists() {
+        let msg =
+            format!("failed to create {:?}", cache_path.to_str().unwrap());
+        fs::create_dir_all(&cache_path).expect(&msg);
+    }
+
     let zip_url =
         "https://jetvision.de/resources/sqb_databases/basestation.zip";
     let zip_file_path = "basestation.zip";
+    cache_path.push(zip_file_path);
 
     // Check if the zip file exists
-    if !Path::new(zip_file_path).exists() {
+    if !cache_path.exists() {
         println!("Downloading basestation.zip...");
-        let _ = download_file(zip_url, zip_file_path).await;
+        let _ = download_file(zip_url, cache_path.to_str().unwrap()).await;
     }
 
     // Open the zip file
-    let file = File::open(zip_file_path).unwrap();
+    let file = File::open(&cache_path).unwrap();
     let reader = BufReader::new(file);
     let mut archive = ZipArchive::new(reader).unwrap();
     let mut sqlite_in_archive = archive.by_index(0).unwrap();
-    let sqlite_path = sqlite_in_archive.mangled_name();
+
+    // Unzip the sqb file
+    let cache_dir = cache_path.parent().unwrap();
+    let mut sqlite_path = cache_dir.to_path_buf();
+    sqlite_path.push(sqlite_in_archive.mangled_name());
     let mut sqlite_file = File::create(&sqlite_path).unwrap();
     copy(&mut sqlite_in_archive, &mut sqlite_file).unwrap();
 
