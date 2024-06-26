@@ -6,7 +6,7 @@ use std::{
 };
 
 use futures::stream::StreamExt;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use rs1090::prelude::TimedMessage;
 use serde::{Deserialize, Serialize};
 use serde_tuple::{Deserialize_tuple, Serialize_tuple};
@@ -179,7 +179,7 @@ pub async fn timestamp_task(local_state: Arc<State>, channel_name: &str) {
             Ok(0) => {} // no client
             Ok(_) => debug!("datetime > {}", text),
             Err(e) => {
-                error!("fail to send, err: {}", e)
+                warn!("fail to send, err: {}", e)
             }
         }
 
