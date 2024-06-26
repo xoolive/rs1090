@@ -24,7 +24,7 @@ use rs1090::decode::{TimeSource, TimedMessage};
 #[derive(Clone, Debug, Serialize)]
 pub enum ChannelMessage {
     Reply(ReplyMessage),
-    ReloadFilter(String),
+    ReloadFilter { user_id: String, code: String },
 }
 
 /// user channel, can broadcast to every user in the channel
@@ -428,7 +428,7 @@ async fn user_receiver_to_websocket_sender(
 
     while let Ok(channel_message) = channel_subscription_receiver.recv().await {
         match &channel_message {
-            ChannelMessage::ReloadFilter(code) => {
+            ChannelMessage::ReloadFilter { user_id, code } => {
                 info!("reloading filter ...");
                 match build_operator_tree(code) {
                     Ok(node) => {

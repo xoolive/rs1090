@@ -325,12 +325,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let channels_assets = warp::path("channels")
                 .and(warp::fs::dir("./crates/jet1090/src/assets"));
 
+            #[derive(Debug, Clone, Serialize, Deserialize)]
+            struct Code {
+                user_id: String,
+                channel_name: String,
+                code: String,
+            }
             let channel_control_state = state.clone();
-            let update_filter_route = warp::path!("filter")
+            let update_filter_route = warp::path!("channels" / "filters")
                 .and(warp::post())
                 .and(warp::body::json())
                 .and(warp::any().map(move || channel_control_state.clone()))
-                .and_then(|code: String, state: Arc<State>| async move {
+                .and_then(|code: Code, state: Arc<State>| async move {
                     state
                         .channels
                         .lock()
@@ -338,22 +344,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .channel_map
                         .lock()
                         .await
-                        .get("jet1090")
+                        .get(code.channel_name.as_str())
                         .unwrap()
-                        .send(ChannelMessage::ReloadFilter(code.clone()))
+                        .send(ChannelMessage::ReloadFilter {
+                            user_id: code.user_id,
+                            code: code.code,
+                        })
                         .unwrap();
                     Ok::<_, std::convert::Infallible>(warp::reply::json(&0))
                 });
 
             let routes = warp::get()
-                .and(home.or(all).or(track).or(receivers).or(channels_assets))
+                .and(
+                    home.or(all)
+                        .or(track)
+                        .or(receivers)
+                        .or(channels_assets)
+                        .or(ws_route),
+                )
+                .or(update_filter_route)
                 .recover(web::handle_rejection)
                 .with(cors);
 
-            let updated_routes = ws_route.or(update_filter_route); // .or(routes);
-
-            warp::serve(updated_routes).run(([0, 0, 0, 0], port)).await;
-            // warp::serve(routes).run(([0, 0, 0, 0], port)).await;
+            warp::serve(routes).run(([0, 0, 0, 0], port)).await;
         });
     }
 
