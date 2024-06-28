@@ -14,7 +14,7 @@ clap = { version = "4.5.7", features = ["color", "derive", "wrap_help"] }
 deku = "0.16.0"
 futures-util = "0.3.30"
 hex = "0.4.3"
-rs1090 = { version = "0.2.4", path = "../rs1090" }
+rs1090 = { version = "0.2.5", path = "../rs1090" }
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
 tokio = { version = "1.38.0", features = ["full"] }
