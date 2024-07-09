@@ -443,7 +443,7 @@ version = "4.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bac35c6dafb060fd4d275d9a4ffae97917c13a6327903a8be2153cd964f7085"
 dependencies = [
- "heck 0.5.0",
+ "heck",
  "proc-macro2",
  "quote",
  "syn 2.0.66",
@@ -1092,12 +1092,6 @@ checksum = "e7f66481bfee273957b1f20485a4ff3362987f85b2c236580d81b4eb7a326429"
 dependencies = [
  "http 0.2.12",
 ]
-
-[[package]]
-name = "heck"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "heck"
@@ -1953,15 +1947,15 @@ dependencies = [
 
 [[package]]
 name = "pyo3"
-version = "0.21.2"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5e00b96a521718e08e03b1a622f01c8a8deb50719335de3f60b3b3950f069d8"
+checksum = "4e99090d12f6182924499253aaa1e73bf15c69cea8d2774c3c781e35badc3548"
 dependencies = [
  "cfg-if",
  "indoc",
  "libc",
  "memoffset",
- "parking_lot",
+ "once_cell",
  "portable-atomic",
  "pyo3-build-config",
  "pyo3-ffi",
@@ -1971,9 +1965,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.21.2"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7883df5835fafdad87c0d888b266c8ec0f4c9ca48a5bed6bbb592e8dedee1b50"
+checksum = "7879eb018ac754bba32cb0eec7526391c02c14a093121857ed09fbf1d1057d41"
 dependencies = [
  "once_cell",
  "target-lexicon",
@@ -1981,9 +1975,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-ffi"
-version = "0.21.2"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01be5843dc60b916ab4dad1dca6d20b9b4e6ddc8e15f50c47fe6d85f1fb97403"
+checksum = "ce2baa5559a411fc1cf519295f24c34b53d5d725818bc96b5abf94762da09041"
 dependencies = [
  "libc",
  "pyo3-build-config",
@@ -1991,9 +1985,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros"
-version = "0.21.2"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77b34069fc0682e11b31dbd10321cbf94808394c56fd996796ce45217dfac53c"
+checksum = "049621c20a23f2def20f4fe67978d1da8d8a883d64b9c21362f3b776e254edc7"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -2003,11 +1997,11 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros-backend"
-version = "0.21.2"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08260721f32db5e1a5beae69a55553f56b99bd0e1c3e6e0a5e8851a9d0f5a85c"
+checksum = "0e969ee2e025435f1819d31a275ba4bb9cbbdf3ac535227fdbd85b9322ffe144"
 dependencies = [
- "heck 0.4.1",
+ "heck",
  "proc-macro2",
  "pyo3-build-config",
  "quote",
@@ -2601,7 +2595,7 @@ version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
 dependencies = [
- "heck 0.5.0",
+ "heck",
  "proc-macro2",
  "quote",
  "rustversion",
