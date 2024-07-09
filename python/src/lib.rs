@@ -46,6 +46,7 @@ fn decode_1090_vec(msgs_set: Vec<Vec<String>>) -> PyResult<Vec<u8>> {
 }
 
 #[pyfunction]
+#[pyo3(signature = (msgs_set, ts_set, reference=None))]
 fn decode_1090t_vec(
     msgs_set: Vec<Vec<String>>,
     ts_set: Vec<Vec<f64>>,
@@ -150,6 +151,7 @@ fn decode_flarm_vec(
 }
 
 #[pyfunction]
+#[pyo3(signature = (icao24, registration=None))]
 fn aircraft_information(
     icao24: &str,
     registration: Option<&str>,
