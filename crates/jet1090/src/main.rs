@@ -7,7 +7,8 @@ mod table;
 mod tui;
 mod web;
 
-use clap::Parser;
+use clap::{Command, CommandFactory, Parser, ValueHint};
+use clap_complete::{generate, Generator, Shell};
 use cli::Source;
 use crossterm::event::KeyCode;
 use ratatui::widgets::*;
@@ -15,6 +16,7 @@ use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::prelude::*;
 use serde::Deserialize;
 use std::collections::BTreeMap;
+use std::io;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::fs;
@@ -25,7 +27,7 @@ use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
 
-#[derive(Debug, Default, Deserialize, Parser)]
+#[derive(Default, Deserialize, Parser)]
 #[command(
     name = "jet1090",
     version,
@@ -38,7 +40,7 @@ struct Options {
     verbose: bool,
 
     /// Dump a copy of the received messages as .jsonl
-    #[arg(short, long, default_value=None)]
+    #[arg(short, long, default_value=None, value_hint=ValueHint::FilePath)]
     output: Option<String>,
 
     /// Display a table in interactive mode (not compatible with verbose)
@@ -56,6 +58,11 @@ struct Options {
     /// Should we update the reference positions (if the receiver is moving)
     #[arg(short, long, default_value = "false")]
     update_position: bool,
+
+    /// Shell completion generation
+    #[arg(long = "completion", value_enum)]
+    #[serde(skip)]
+    completion: Option<Shell>,
 
     /// List the sources of data following the format \[host:\]port\[\@reference\]
     //
@@ -87,6 +94,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut cli_options = Options::parse();
+
+    // Generate completion instructions
+    if let Some(generator) = cli_options.completion {
+        let mut cmd = Options::command();
+        print_completions(generator, &mut cmd);
+        return Ok(());
+    }
+
     if cli_options.verbose {
         options.verbose = true;
     }
@@ -444,6 +459,10 @@ impl Jet1090 {
         self.state.select(Some(0));
         self.scroll_state = self.scroll_state.position(0);
     }
+}
+
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
 #[cfg(test)]
