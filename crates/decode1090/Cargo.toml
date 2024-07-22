@@ -17,7 +17,7 @@ hex = "0.4.3"
 rs1090 = { version = "0.2.5", path = "../rs1090" }
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.120"
-tokio = { version = "1.38.0", features = ["full"] }
+tokio = { version = "1.38.1", features = ["full"] }
 
 [[bin]]
 name = "decode1090"
