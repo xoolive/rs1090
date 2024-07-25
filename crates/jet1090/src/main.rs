@@ -269,7 +269,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+    // I am not sure whether this size calibration is relevant, but let's try...
+    let multiplier = options.sources.len();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(100 * multiplier);
 
     for (idx, source) in options.sources.into_iter().enumerate() {
         let tx_copy = tx.clone();
