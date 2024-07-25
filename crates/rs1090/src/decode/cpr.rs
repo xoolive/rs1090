@@ -106,7 +106,10 @@ impl FromStr for Position {
 pub struct AircraftState {
     timestamp: f64,
     pos: Option<Position>,
-    msg: Option<AirbornePosition>,
+    odd_ts: f64,
+    odd_msg: Option<AirbornePosition>,
+    even_ts: f64,
+    even_msg: Option<AirbornePosition>,
 }
 
 /// NZ represents the number of latitude zones between the equator and a pole.
@@ -424,22 +427,40 @@ pub fn decode_position(
     let latest = aircraft.entry(*icao24).or_insert(AircraftState {
         timestamp,
         pos: None,
-        msg: None,
+        odd_ts: timestamp,
+        odd_msg: None,
+        even_ts: timestamp,
+        even_msg: None,
     });
     match message {
         ME::BDS05(airborne) => {
             let mut pos: Option<Position> = None;
 
-            if (timestamp - latest.timestamp) < 10. {
+            let latest_timestamp = match airborne.parity {
+                CPRFormat::Even => latest.odd_ts,
+                CPRFormat::Odd => latest.even_ts,
+            };
+            let latest_msg = match airborne.parity {
+                CPRFormat::Even => latest.odd_msg,
+                CPRFormat::Odd => latest.even_msg,
+            };
+
+            // This may happen with several sources of data coming on one mpsc
+            if (timestamp - latest_timestamp) < 0. {
+                return;
+            }
+
+            if (timestamp - latest_timestamp) < 10. {
                 // First decoding based on odd/even (global)
-                pos = match latest.msg {
+                // This is the most reasonable way to decode
+                pos = match latest_msg {
                     Some(oldest) => airborne_position(&oldest, airborne),
                     None => None,
                 };
-                // TODO if check with static reference, pick 300 nautical miles
             }
 
             // If failed try to use previous reference
+            // This is tricky though, use with extra care
             if pos.is_none() & ((timestamp - latest.timestamp) < 180.) {
                 if let Some(latest_pos) = latest.pos {
                     pos = airborne_position_with_reference(
@@ -457,14 +478,15 @@ pub fn decode_position(
                         pos = None
                     }
                 }
-                // TODO if check with static reference, pick 180 nautical miles
             }
+
             if let Some(pos) = pos {
                 // First update the message
                 airborne.latitude = Some(pos.latitude);
                 airborne.longitude = Some(pos.longitude);
                 // Then update the reference in aircraft
                 latest.pos = Some(pos);
+                latest.timestamp = timestamp;
                 // If necessary update the reference position
                 if let Some(alt) = airborne.alt {
                     if alt < 1000 {
@@ -474,9 +496,20 @@ pub fn decode_position(
                         })
                     }
                 }
+            } else {
+                latest.pos = None;
             }
-            latest.msg = Some(*airborne);
-            latest.timestamp = timestamp;
+
+            match airborne.parity {
+                CPRFormat::Even => {
+                    latest.even_msg = Some(*airborne);
+                    latest.even_ts = timestamp
+                }
+                CPRFormat::Odd => {
+                    latest.odd_msg = Some(*airborne);
+                    latest.odd_ts = timestamp
+                }
+            }
         }
         ME::BDS06(surface) => {
             let mut pos = None;
