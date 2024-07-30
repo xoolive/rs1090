@@ -8,6 +8,7 @@ use rayon::prelude::*;
 use regex::Regex;
 use rs1090::data::patterns::PATTERNS;
 use rs1090::data::tail::tail;
+use rs1090::decode::bds::bds17::CommonUsageGICBCapabilityReport;
 use rs1090::decode::bds::bds21::AircraftAndAirlineRegistrationMarkings;
 use rs1090::decode::bds::bds50::TrackAndTurnReport;
 use rs1090::decode::cpr::{decode_positions, Position};
@@ -30,6 +31,18 @@ fn transform_error(e: DekuError) -> PyResult<Vec<u8>> {
     match e {
         DekuError::Assertion(msg) => Err(PyAssertionError::new_err(msg)),
         _ => Err(PyValueError::new_err(e.to_string())),
+    }
+}
+
+#[pyfunction]
+fn decode_bds17(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match CommonUsageGICBCapabilityReport::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
     }
 }
 
@@ -260,6 +273,7 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_flarm_vec, m)?)?;
 
     // Comm-B BDS inference
+    m.add_function(wrap_pyfunction!(decode_bds17, m)?)?;
     m.add_function(wrap_pyfunction!(decode_bds21, m)?)?;
     m.add_function(wrap_pyfunction!(decode_bds50, m)?)?;
 

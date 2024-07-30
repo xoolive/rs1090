@@ -161,13 +161,15 @@ fn check_zeros(
     rest: &BitSlice<u8, Msb0>,
 ) -> Result<(&BitSlice<u8, Msb0>, bool), DekuError> {
     let mut inside_rest = rest;
-    for _ in 0..=3 {
+    for i in 0..=3 {
+        // there are 3 bits left with reserved fields in the first u8 block
+        let bit_size = if i == 0 { 3 } else { 8 };
         let (for_rest, value) = u8::read(
             inside_rest,
-            (deku::ctx::Endian::Big, deku::ctx::BitSize(8)),
+            (deku::ctx::Endian::Big, deku::ctx::BitSize(bit_size)),
         )?;
         if value != 0 {
-            return Err(DekuError::InvalidParam(
+            return Err(DekuError::Assertion(
                 "BDS 1,7 must have all final bits set to 0".to_string(),
             ));
         }
