@@ -90,7 +90,11 @@ pub fn airline_registration_read(
         .collect::<String>();
 
     if status {
-        Ok((inside_rest, Some(encoded)))
+        // Ok((inside_rest, Some(encoded)))
+        Err(DekuError::Assertion(format!(
+            "Most transponders don't implement this field. (value = {})",
+            encoded
+        )))
     } else if all_zeros {
         Ok((inside_rest, None))
     } else {
