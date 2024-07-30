@@ -17,7 +17,7 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct AirbornePosition {
-    #[deku(bits = "5")]
+    #[deku(bits = "5", map = "check_typecode")]
     #[serde(skip)]
     /// The typecode value (between 9 and 18 or between 20 and 22)
     pub tc: u8,
@@ -124,6 +124,19 @@ fn read_source(
         Source::Gnss
     };
     Ok((rest, source))
+}
+
+/// This check is irrelevant in ADS-B messages but makes sense when decoding
+/// BDS 0,5 as part of DF20 or DF21 messages.
+fn check_typecode(value: u8) -> Result<u8, DekuError> {
+    if (9..22).contains(&value) && value != 19 {
+        Ok(value)
+    } else {
+        Err(DekuError::Assertion(format!(
+            "Typecode inconsistency {} should be in [9, 18] or [20, 22]",
+            value
+        )))
+    }
 }
 
 impl fmt::Display for AirbornePosition {

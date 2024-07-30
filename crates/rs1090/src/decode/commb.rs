@@ -1,11 +1,18 @@
+use super::bds::bds05::AirbornePosition;
 use super::bds::bds10::DataLinkCapability;
-use super::bds::bds17::GICBCapabilityReport;
+use super::bds::bds17::CommonUsageGICBCapabilityReport;
+use super::bds::bds18::GICBCapabilityReportPart1;
+use super::bds::bds19::GICBCapabilityReportPart2;
 use super::bds::bds20::AircraftIdentification;
+use super::bds::bds21::AircraftAndAirlineRegistrationMarkings;
 use super::bds::bds30::ACASResolutionAdvisory;
 use super::bds::bds40::SelectedVerticalIntention;
 use super::bds::bds44::MeteorologicalRoutineAirReport;
+use super::bds::bds45::MeteorologicalHazardReport;
 use super::bds::bds50::TrackAndTurnReport;
 use super::bds::bds60::HeadingAndSpeedReport;
+use super::bds::bds65::AircraftOperationStatus;
+use super::AC13Field;
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
@@ -20,48 +27,162 @@ use std::fmt;
  */
 
 #[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
-pub struct DataSelector {
+#[deku(ctx = "ac: AC13Field")] // altitude helps a lot in the validation
+pub struct DF20DataSelector {
     #[deku(reader = "check_empty_bds(deku::input_bits)")]
     #[serde(skip)]
     /// Set to true if all zeros, then there is no need to parse
     pub is_empty: bool,
 
+    #[deku(reader = "read_bds05(deku::input_bits, *is_empty, ac)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds05: Option<AirbornePosition>,
+
     #[deku(reader = "read_bds10(deku::input_bits, *is_empty)")]
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds10: Option<DataLinkCapability>,
 
     #[deku(reader = "read_bds17(deku::input_bits, *is_empty)")]
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub bds17: Option<GICBCapabilityReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds17: Option<CommonUsageGICBCapabilityReport>,
+
+    #[deku(reader = "read_bds18(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds18: Option<GICBCapabilityReportPart1>,
+
+    #[deku(reader = "read_bds19(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds19: Option<GICBCapabilityReportPart2>,
 
     #[deku(reader = "read_bds20(deku::input_bits, *is_empty)")]
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds20: Option<AircraftIdentification>,
 
+    #[deku(reader = "read_bds21(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds21: Option<AircraftAndAirlineRegistrationMarkings>,
+
     #[deku(reader = "read_bds30(deku::input_bits, *is_empty)")]
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds30: Option<ACASResolutionAdvisory>,
 
     #[deku(reader = "read_bds40(deku::input_bits, *is_empty)")]
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds40: Option<SelectedVerticalIntention>,
 
     #[deku(reader = "read_bds44(deku::input_bits, *is_empty)")]
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds44: Option<MeteorologicalRoutineAirReport>,
 
+    #[deku(reader = "read_bds45(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds45: Option<MeteorologicalHazardReport>,
+
     #[deku(reader = "read_bds50(deku::input_bits, *is_empty)")]
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds50: Option<TrackAndTurnReport>,
 
     #[deku(reader = "read_bds60(deku::input_bits, *is_empty)")]
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds60: Option<HeadingAndSpeedReport>,
+
+    #[deku(reader = "read_bds65(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds65: Option<AircraftOperationStatus>,
 }
 
-impl fmt::Display for DataSelector {
+#[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
+pub struct DF21DataSelector {
+    #[deku(reader = "check_empty_bds(deku::input_bits)")]
+    #[serde(skip)]
+    /// Set to true if all zeros, then there is no need to parse
+    pub is_empty: bool,
+
+    // On purpose: do not try bds05 here.
+    // The reason for that is that there is no way to validate the altitude
+    #[deku(reader = "read_bds10(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds10: Option<DataLinkCapability>,
+
+    #[deku(reader = "read_bds17(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds17: Option<CommonUsageGICBCapabilityReport>,
+
+    #[deku(reader = "read_bds18(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds18: Option<GICBCapabilityReportPart1>,
+
+    #[deku(reader = "read_bds19(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds19: Option<GICBCapabilityReportPart2>,
+
+    #[deku(reader = "read_bds20(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds20: Option<AircraftIdentification>,
+
+    #[deku(reader = "read_bds21(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds21: Option<AircraftAndAirlineRegistrationMarkings>,
+
+    #[deku(reader = "read_bds30(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds30: Option<ACASResolutionAdvisory>,
+
+    #[deku(reader = "read_bds40(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds40: Option<SelectedVerticalIntention>,
+
+    #[deku(reader = "read_bds44(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds44: Option<MeteorologicalRoutineAirReport>,
+
+    #[deku(reader = "read_bds45(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds45: Option<MeteorologicalHazardReport>,
+
+    #[deku(reader = "read_bds50(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds50: Option<TrackAndTurnReport>,
+
+    #[deku(reader = "read_bds60(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds60: Option<HeadingAndSpeedReport>,
+
+    #[deku(reader = "read_bds65(deku::input_bits, *is_empty)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bds65: Option<AircraftOperationStatus>,
+}
+
+impl fmt::Display for DF21DataSelector {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Ok(())
+    }
+}
+
+impl fmt::Display for DF20DataSelector {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+fn read_bds05(
+    input: &BitSlice<u8, Msb0>,
+    empty: bool,
+    ac: AC13Field,
+) -> Result<(&BitSlice<u8, Msb0>, Option<AirbornePosition>), DekuError> {
+    if empty {
+        return Ok((input, None));
+    }
+    let (_, bytes, _) = input.domain().region().unwrap();
+
+    if let Ok((_, bds05)) = AirbornePosition::from_bytes((bytes, 0)) {
+        match bds05.alt {
+            None => Ok((input, None)),
+            Some(alt) if alt == ac.0 => Ok((input, Some(bds05))),
+            Some(_) => Ok((input, None)),
+        }
+    } else {
+        Ok((input, None))
     }
 }
 
@@ -84,14 +205,50 @@ fn read_bds10(
 fn read_bds17(
     input: &BitSlice<u8, Msb0>,
     empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<GICBCapabilityReport>), DekuError> {
+) -> Result<
+    (&BitSlice<u8, Msb0>, Option<CommonUsageGICBCapabilityReport>),
+    DekuError,
+> {
     if empty {
         return Ok((input, None));
     }
     let (_, bytes, _) = input.domain().region().unwrap();
 
-    if let Ok((_, bds17)) = GICBCapabilityReport::from_bytes((bytes, 0)) {
+    if let Ok((_, bds17)) =
+        CommonUsageGICBCapabilityReport::from_bytes((bytes, 0))
+    {
         Ok((input, Some(bds17)))
+    } else {
+        Ok((input, None))
+    }
+}
+fn read_bds18(
+    input: &BitSlice<u8, Msb0>,
+    empty: bool,
+) -> Result<(&BitSlice<u8, Msb0>, Option<GICBCapabilityReportPart1>), DekuError>
+{
+    if empty {
+        return Ok((input, None));
+    }
+    let (_, bytes, _) = input.domain().region().unwrap();
+
+    match GICBCapabilityReportPart1::from_bytes((bytes, 0)) {
+        Ok((_, bds18)) => Ok((input, Some(bds18))),
+        Err(_err) => Ok((input, None)),
+    }
+}
+fn read_bds19(
+    input: &BitSlice<u8, Msb0>,
+    empty: bool,
+) -> Result<(&BitSlice<u8, Msb0>, Option<GICBCapabilityReportPart2>), DekuError>
+{
+    if empty {
+        return Ok((input, None));
+    }
+    let (_, bytes, _) = input.domain().region().unwrap();
+
+    if let Ok((_, bds19)) = GICBCapabilityReportPart2::from_bytes((bytes, 0)) {
+        Ok((input, Some(bds19)))
     } else {
         Ok((input, None))
     }
@@ -108,6 +265,30 @@ fn read_bds20(
 
     if let Ok((_, bds20)) = AircraftIdentification::from_bytes((bytes, 0)) {
         Ok((input, Some(bds20)))
+    } else {
+        Ok((input, None))
+    }
+}
+
+fn read_bds21(
+    input: &BitSlice<u8, Msb0>,
+    empty: bool,
+) -> Result<
+    (
+        &BitSlice<u8, Msb0>,
+        Option<AircraftAndAirlineRegistrationMarkings>,
+    ),
+    DekuError,
+> {
+    if empty {
+        return Ok((input, None));
+    }
+    let (_, bytes, _) = input.domain().region().unwrap();
+
+    if let Ok((_, bds21)) =
+        AircraftAndAirlineRegistrationMarkings::from_bytes((bytes, 0))
+    {
+        Ok((input, Some(bds21)))
     } else {
         Ok((input, None))
     }
@@ -164,6 +345,21 @@ fn read_bds44(
         Ok((input, None))
     }
 }
+fn read_bds45(
+    input: &BitSlice<u8, Msb0>,
+    empty: bool,
+) -> Result<(&BitSlice<u8, Msb0>, Option<MeteorologicalHazardReport>), DekuError>
+{
+    if empty {
+        return Ok((input, None));
+    }
+    let (_, bytes, _) = input.domain().region().unwrap();
+    if let Ok((_, bds45)) = MeteorologicalHazardReport::from_bytes((bytes, 0)) {
+        Ok((input, Some(bds45)))
+    } else {
+        Ok((input, None))
+    }
+}
 
 fn read_bds50(
     input: &BitSlice<u8, Msb0>,
@@ -192,6 +388,35 @@ fn read_bds60(
         Ok((input, Some(bds60)))
     } else {
         Ok((input, None))
+    }
+}
+
+fn read_bds65(
+    input: &BitSlice<u8, Msb0>,
+    empty: bool,
+) -> Result<(&BitSlice<u8, Msb0>, Option<AircraftOperationStatus>), DekuError> {
+    if empty {
+        return Ok((input, None));
+    }
+
+    let (rest, typecode) =
+        u8::read(input, (deku::ctx::Endian::Big, deku::ctx::BitSize(5)))?;
+
+    if typecode != 31 {
+        return Ok((input, None));
+    }
+
+    let (_, bytes, _) = rest.domain().region().unwrap();
+
+    match AircraftOperationStatus::from_bytes((bytes, 0)) {
+        Ok((_, AircraftOperationStatus::Airborne(bds65))) => {
+            Ok((input, Some(AircraftOperationStatus::Airborne(bds65))))
+        }
+        Ok(_) => {
+            // Surface and Reserved are considered impossible in for DF20/DF21
+            Ok((input, None))
+        }
+        Err(_err) => Ok((input, None)),
     }
 }
 
