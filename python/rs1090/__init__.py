@@ -10,6 +10,7 @@ from ._rust import (
     decode_1090,
     decode_1090_vec,
     decode_1090t_vec,
+    decode_bds17,
     decode_bds21,
     decode_bds50,
     decode_flarm,
@@ -69,6 +70,7 @@ def unpickle_fun(fun):
     return wrapped_fun
 
 
+decode_bds17 = unpickle_fun(decode_bds17)
 decode_bds21 = unpickle_fun(decode_bds21)
 decode_bds50 = unpickle_fun(decode_bds50)
 
@@ -78,6 +80,7 @@ __all__ = [
     "Message",
     "batched",
     "decode",
+    "decode_bds17",
     "decode_bds21",
     "decode_bds50",
     "flarm",

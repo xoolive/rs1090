@@ -691,7 +691,7 @@ def is_df21(message: Message) -> TypeGuard[DF21]:
 
 
 def is_bds05(message: DF17) -> TypeGuard[DF17_BDS05]:
-    return message["bds"] == "05"
+    return message.get("bds", None) == "05" or "bds05" in message
 
 
 @overload
@@ -699,7 +699,7 @@ def is_bds06(message: DF17) -> TypeGuard[DF17_BDS06]: ...
 @overload
 def is_bds06(message: DF18) -> TypeGuard[DF18_BDS06]: ...
 def is_bds06(message: DF17 | DF18) -> TypeGuard[DF17_BDS06 | DF18_BDS06]:
-    return message["bds"] == "06"
+    return message.get("bds", None) == "06" or "bds06" in message
 
 
 @overload
@@ -707,11 +707,11 @@ def is_bds08(message: DF17) -> TypeGuard[DF17_BDS08]: ...
 @overload
 def is_bds08(message: DF18) -> TypeGuard[DF18_BDS08]: ...
 def is_bds08(message: DF17 | DF18) -> TypeGuard[DF17_BDS08 | DF18_BDS08]:
-    return message["bds"] == "08"
+    return message.get("bds", None) == "08" or "bds08" in message
 
 
 def is_bds09(message: DF17) -> TypeGuard[DF17_BDS09]:
-    return message["bds"] == "09"
+    return message.get("bds", None) == "09" or "bds09" in message
 
 
 @overload
@@ -719,7 +719,7 @@ def is_bds10(message: DF20) -> TypeGuard[DF20_BDS10]: ...
 @overload
 def is_bds10(message: DF21) -> TypeGuard[DF21_BDS10]: ...
 def is_bds10(message: DF20 | DF21) -> TypeGuard[DF20_BDS10 | DF21_BDS10]:
-    return message["bds"] == "10"
+    return message.get("bds", None) == "10" or "bds10" in message
 
 
 @overload
@@ -727,7 +727,7 @@ def is_bds17(message: DF20) -> TypeGuard[DF20_BDS17]: ...
 @overload
 def is_bds17(message: DF21) -> TypeGuard[DF21_BDS17]: ...
 def is_bds17(message: DF20 | DF21) -> TypeGuard[DF20_BDS17 | DF21_BDS17]:
-    return message["bds"] == "17"
+    return message.get("bds", None) == "17" or "bds17" in message
 
 
 @overload
@@ -735,7 +735,7 @@ def is_bds20(message: DF20) -> TypeGuard[DF20_BDS20]: ...
 @overload
 def is_bds20(message: DF21) -> TypeGuard[DF21_BDS20]: ...
 def is_bds20(message: DF20 | DF21) -> TypeGuard[DF20_BDS20 | DF21_BDS20]:
-    return message["bds"] == "20"
+    return message.get("bds", None) == "20" or "bds20" in message
 
 
 @overload
@@ -743,7 +743,7 @@ def is_bds30(message: DF20) -> TypeGuard[DF20_BDS30]: ...
 @overload
 def is_bds30(message: DF21) -> TypeGuard[DF21_BDS30]: ...
 def is_bds30(message: DF20 | DF21) -> TypeGuard[DF20_BDS30 | DF21_BDS30]:
-    return message["bds"] == "30"
+    return message.get("bds", None) == "30" or "bds30" in message
 
 
 @overload
@@ -751,7 +751,7 @@ def is_bds40(message: DF20) -> TypeGuard[DF20_BDS40]: ...
 @overload
 def is_bds40(message: DF21) -> TypeGuard[DF21_BDS40]: ...
 def is_bds40(message: DF20 | DF21) -> TypeGuard[DF20_BDS40 | DF21_BDS40]:
-    return message["bds"] == "40"
+    return message.get("bds", None) == "40" or "bds40" in message
 
 
 @overload
@@ -759,7 +759,7 @@ def is_bds44(message: DF20) -> TypeGuard[DF20_BDS44]: ...
 @overload
 def is_bds44(message: DF21) -> TypeGuard[DF21_BDS44]: ...
 def is_bds44(message: DF20 | DF21) -> TypeGuard[DF20_BDS44 | DF21_BDS44]:
-    return message["bds"] == "44"
+    return message.get("bds", None) == "44" or "bds44" in message
 
 
 @overload
@@ -767,7 +767,7 @@ def is_bds50(message: DF20) -> TypeGuard[DF20_BDS50]: ...
 @overload
 def is_bds50(message: DF21) -> TypeGuard[DF21_BDS50]: ...
 def is_bds50(message: DF20 | DF21) -> TypeGuard[DF20_BDS50 | DF21_BDS50]:
-    return message["bds"] == "50"
+    return message.get("bds", None) == "50" or "bds50" in message
 
 
 @overload
@@ -775,19 +775,19 @@ def is_bds60(message: DF20) -> TypeGuard[DF20_BDS60]: ...
 @overload
 def is_bds60(message: DF21) -> TypeGuard[DF21_BDS60]: ...
 def is_bds60(message: DF20 | DF21) -> TypeGuard[DF20_BDS60 | DF21_BDS60]:
-    return message["bds"] == "60"
+    return message.get("bds", None) == "60" or "bds60" in message
 
 
 def is_bds61(message: DF17) -> TypeGuard[DF17_BDS61]:
-    return message["bds"] == "61"
+    return message.get("bds", None) == "61" or "bds61" in message
 
 
 def is_bds62(message: DF17) -> TypeGuard[DF17_BDS62]:
-    return message["bds"] == "62"
+    return message.get("bds", None) == "62" or "bds62" in message
 
 
 def is_bds65(message: DF17) -> TypeGuard[DF17_BDS65]:
-    return message["bds"] == "65"
+    return message.get("bds", None) == "65" or "bds65" in message
 
 
 class Flarm(TypedDict):
