@@ -411,6 +411,10 @@ pub enum TimeSource {
     External,
 }
 
+fn is_zero(value: &usize) -> bool {
+    *value == 0
+}
+
 #[derive(Serialize)]
 pub struct TimedMessage {
     pub timestamp: f64,
@@ -422,6 +426,7 @@ pub struct TimedMessage {
     #[serde(flatten)]
     pub message: Option<Message>,
 
+    #[serde(skip_serializing_if = "is_zero")]
     pub idx: usize,
 }
 

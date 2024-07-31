@@ -39,7 +39,7 @@ struct JSONEntry {
     timestamp: f64,
     timesource: rs1090::decode::TimeSource,
     frame: String,
-    idx: usize,
+    idx: Option<usize>,
 }
 
 #[tokio::main]
@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 timesource: json.timesource,
                 frame: json.frame.to_string(),
                 message,
-                idx: json.idx,
+                idx: json.idx.map_or(0, |idx| idx),
             };
             if let Some(message) = &mut msg.message {
                 match &mut message.df {
