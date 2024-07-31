@@ -1,5 +1,4 @@
 #![doc = include_str!("../readme.md")]
-#![allow(unused)]
 
 mod aircraftdb;
 mod cli;
@@ -12,47 +11,39 @@ use clap::{Command, CommandFactory, Parser, ValueHint};
 use clap_complete::{generate, Generator, Shell};
 mod channel;
 mod websocket;
-
 use crate::channel::{ChannelControl, ChannelMessage};
 use crate::websocket::{
     jet1090_data_task, on_connected, system_datetime_task, State,
 };
-
-use clap::Parser;
 use cli::Source;
 use crossterm::event::KeyCode;
 use ratatui::widgets::*;
 use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::prelude::*;
-use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::io;
-use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::net::UdpSocket;
-use tokio::select;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_tungstenite::connect_async;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
 
-#[derive(Default, Deserialize, Parser)]
-use futures::SinkExt;
+// use futures::SinkExt;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Error};
 
-use uuid::Uuid;
-use warp::ws::WebSocket;
+// use uuid::Uuid;
+// use warp::ws::WebSocket;
 
-#[derive(Debug, Parser)]
+#[derive(Default, Deserialize, Parser)]
 #[command(
     name = "jet1090",
     version,
