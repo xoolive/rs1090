@@ -1,5 +1,6 @@
 use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
+use regex::Regex;
 use serde::Serialize;
 
 /**
@@ -17,6 +18,7 @@ pub struct AircraftAndAirlineRegistrationMarkings {
     pub ac_status: bool,
 
     #[deku(reader = "aircraft_registration_read(deku::rest, *ac_status)")]
+    #[serde(rename = "registration")]
     pub aircraft_registration: Option<String>,
 
     #[deku(bits = "1")]
@@ -24,6 +26,7 @@ pub struct AircraftAndAirlineRegistrationMarkings {
     pub al_status: bool,
 
     #[deku(reader = "airline_registration_read(deku::rest, *al_status)")]
+    #[serde(rename = "airline", skip_serializing_if = "Option::is_none")]
     pub airline_registration: Option<String>,
 }
 
@@ -37,7 +40,7 @@ pub fn aircraft_registration_read(
     let mut inside_rest = rest;
 
     let mut chars = vec![];
-    for _ in 0..=7 {
+    for _ in 0..=6 {
         let (for_rest, c) = <u8>::read(inside_rest, deku::ctx::BitSize(6))?;
         if c != 32 {
             chars.push(c);
@@ -52,13 +55,15 @@ pub fn aircraft_registration_read(
         .collect::<String>();
 
     if status {
-        if encoded.starts_with('#') {
-            return Err(DekuError::Assertion(
-                "Valid aircraft registration starting with an invalid character"
-                    .to_string(),
-            ));
+        let re = Regex::new(r"^[A-Z0-9]+[\s#]?[A-Z0-9]+$").unwrap();
+        if re.is_match(&encoded) {
+            Ok((inside_rest, Some(encoded)))
+        } else {
+            Err(DekuError::Assertion(format!(
+                "Invalid aircraft registration {}",
+                encoded
+            )))
         }
-        Ok((inside_rest, Some(encoded)))
     } else if all_zeros {
         Ok((inside_rest, None))
     } else {
@@ -102,5 +107,50 @@ pub fn airline_registration_read(
             "Non-null value after invalid airline registration status: {}",
             encoded
         )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::*;
+    use hexlit::hex;
+
+    #[test]
+    fn test_valid_bds21() {
+        let bytes = hex!("a00002bf940f19680c0000000000");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        if let CommBAltitudeReply { bds, .. } = msg.df {
+            let AircraftAndAirlineRegistrationMarkings {
+                aircraft_registration,
+                ..
+            } = bds.bds21.unwrap();
+            assert_eq!(aircraft_registration, Some("JA824A".to_string()));
+        } else {
+            unreachable!();
+        }
+
+        let bytes = hex!("a00002988230c3b470a000000000");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        if let CommBAltitudeReply { bds, .. } = msg.df {
+            let AircraftAndAirlineRegistrationMarkings {
+                aircraft_registration,
+                ..
+            } = bds.bds21.unwrap();
+            assert_eq!(aircraft_registration, Some("AFFGZNE".to_string()));
+        } else {
+            unreachable!();
+        }
+        let bytes = hex!("a0000793ac45ab164c0000000000");
+        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        if let CommBAltitudeReply { bds, .. } = msg.df {
+            let AircraftAndAirlineRegistrationMarkings {
+                aircraft_registration,
+                ..
+            } = bds.bds21.unwrap();
+            assert_eq!(aircraft_registration, Some("VH#VKI".to_string()));
+        } else {
+            unreachable!();
+        }
     }
 }
