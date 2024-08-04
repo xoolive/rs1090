@@ -188,7 +188,7 @@ async fn agent_rx_to_conn(
         .await
         .unwrap();
     debug!(
-        "forward agent {} to conn {} ...",
+        "forward from agent {} to conn {} ...",
         agent_id.clone(),
         conn_id.clone()
     );
@@ -197,7 +197,7 @@ async fn agent_rx_to_conn(
             reply_message.join_reference = Some(join_ref.clone());
             let result = conn_tx.send(channel_message.clone());
             if result.is_err() {
-                error!("sending failure: {:?}", result.err().unwrap());
+                error!("agent -> conn, sending failure, the task will quit");
                 break; // fails when there's no reciever, stop forwarding
             }
             debug!("F {:?}", channel_message);
@@ -280,7 +280,7 @@ async fn websocket_sender(
             let text = serde_json::to_string(&reply_message).unwrap();
             let result = ws_tx.send(warp::ws::Message::text(text)).await;
             if result.is_err() {
-                error!("sending failure: {:?}", result);
+                error!("ws sender, sending failure: {:?}", result);
                 continue;
             }
         }
