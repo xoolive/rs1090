@@ -31,7 +31,7 @@ serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.121"
 soapysdr = { version = "0.4.0", optional = true }
 tokio = { version = "1.39.2", features = ["full"] }
-toml = "0.8.15"
+toml = "0.8.19"
 warp = "0.3.6"
 zip = "2.1.5"
 
