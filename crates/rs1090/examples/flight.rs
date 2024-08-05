@@ -61,6 +61,9 @@ fn main() -> io::Result<()> {
                     parts.next().unwrap().parse::<f64>().expect("not a float");
                 let msg = parts.next().unwrap();
                 let hex = &mut msg.to_string()[18..].to_string();
+                // Without the &hex, a copy is necessary for the hex.to_string()
+                // in the TimedMessage below.
+                #[allow(clippy::needless_borrows_for_generic_args)]
                 let bytes = hex::decode(&hex).unwrap();
                 let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
                 res.push(TimedMessage {
