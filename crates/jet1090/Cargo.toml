@@ -34,6 +34,8 @@ tokio = { version = "1.39.2", features = ["full"] }
 toml = "0.8.19"
 warp = "0.3.6"
 zip = "2.1.6"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 
 [[bin]]
