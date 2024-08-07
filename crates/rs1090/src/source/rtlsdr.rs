@@ -58,6 +58,7 @@ pub async fn receiver(tx: mpsc::Sender<TimedMessage>, idx: usize) {
                     let msg = TimedMessage {
                         timestamp: timestamp as f64 * 1e-6,
                         timesource: TimeSource::System,
+                        rssi: None,
                         frame: hex::encode(data),
                         message: None,
                         idx,
