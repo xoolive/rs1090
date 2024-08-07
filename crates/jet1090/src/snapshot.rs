@@ -312,6 +312,7 @@ pub async fn store_history(
     if let TimedMessage {
         timestamp,
         timesource,
+        rssi,
         message: Some(message),
         idx,
         ..
@@ -336,6 +337,7 @@ pub async fn store_history(
                     aircraft.hist.push(TimedMessage {
                         timestamp,
                         timesource,
+                        rssi,
                         frame: "".to_string(),
                         message: Some(message),
                         idx,

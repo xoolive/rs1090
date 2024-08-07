@@ -69,6 +69,7 @@ fn main() -> io::Result<()> {
                 res.push(TimedMessage {
                     timestamp,
                     timesource: TimeSource::External,
+                    rssi: None,
                     frame: hex.to_string(),
                     message: Some(msg),
                     idx: 0,

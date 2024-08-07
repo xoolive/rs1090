@@ -70,6 +70,9 @@ fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
     let seconds = ts_u64 >> 30;
     let nanos = ts_u64 & 0x00003FFFFFFF;
     let ts = seconds as f64 + nanos as f64 * 1e-9;
+
+    let rssi = Some(msg[8]);
+
     let frame = msg[9..]
         .iter()
         .map(|&b| format!("{:02x}", b))
@@ -94,6 +97,7 @@ fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
     TimedMessage {
         timestamp,
         timesource,
+        rssi,
         frame,
         message: None,
         idx,

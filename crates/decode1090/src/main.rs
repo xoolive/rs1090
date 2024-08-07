@@ -38,6 +38,7 @@ struct Options {
 struct JSONEntry {
     timestamp: f64,
     timesource: rs1090::decode::TimeSource,
+    rssi: Option<u8>,
     frame: String,
     idx: Option<usize>,
 }
@@ -93,6 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut msg = TimedMessage {
                 timestamp: json.timestamp,
                 timesource: json.timesource,
+                rssi: json.rssi,
                 frame: json.frame.to_string(),
                 message,
                 idx: json.idx.map_or(0, |idx| idx),

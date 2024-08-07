@@ -64,6 +64,7 @@ fn decode_1090t_vec(
                         Some(TimedMessage {
                             timestamp,
                             timesource: TimeSource::External,
+                            rssi: None,
                             frame: msg.to_string(),
                             message: Some(message),
                             idx: 0,

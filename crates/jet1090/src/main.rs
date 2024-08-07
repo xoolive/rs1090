@@ -286,6 +286,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut msg = TimedMessage {
                 timestamp: tmsg.timestamp,
                 timesource: tmsg.timesource,
+                rssi: tmsg.rssi,
                 frame: tmsg.frame.to_string(),
                 message: Some(msg),
                 idx: tmsg.idx,
