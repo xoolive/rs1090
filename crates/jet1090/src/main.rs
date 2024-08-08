@@ -23,6 +23,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
@@ -70,6 +71,9 @@ struct Options {
     // - `port` must be a number
     // - `reference` can be LFPG for major airports, `43.3,1.35` otherwise
     sources: Vec<cli::Source>,
+
+    #[arg(short, long, value_name = "FILE", default_value = "jet1090.log")]
+    log_file: std::path::PathBuf,
 }
 
 #[tokio::main]
@@ -121,6 +125,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         options.update_position = cli_options.update_position;
     }
     options.sources.append(&mut cli_options.sources);
+
+    let log_file = std::fs::File::create(&cli_options.log_file)
+        .expect("fail to create log file");
+    let log_file_layer = fmt::layer().with_writer(log_file).with_ansi(false);
+
+    // example: RUST_LOG=rs1090=DEBUG
+    let env_filter = EnvFilter::from_default_env();
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(log_file_layer)
+        .init();
 
     let mut file = if let Some(output_path) = options.output {
         Some(
