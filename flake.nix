@@ -101,7 +101,7 @@
           checks =
             {
               fmt = craneLib.cargoFmt (commonArgs);
-              # audit = craneLib.cargoAudit (commonArgs // { inherit advisory-db; });
+              audit = craneLib.cargoAudit (commonArgs // { inherit advisory-db; });
               rustdoc = craneLib.cargoDoc (commonArgs // { inherit cargoArtifacts; });
 
               clippy-check = craneLib.cargoClippy (commonArgs // {
