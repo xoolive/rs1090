@@ -10,6 +10,9 @@ from ._rust import (
     decode_1090,
     decode_1090_vec,
     decode_1090t_vec,
+    decode_bds17,
+    decode_bds21,
+    decode_bds50,
     decode_flarm,
     decode_flarm_vec,
 )
@@ -59,11 +62,27 @@ except ImportError:
             yield batch
 
 
+def unpickle_fun(fun):
+    def wrapped_fun(a):
+        int_list = fun(a)
+        return pickle.loads(bytes(int_list))
+
+    return wrapped_fun
+
+
+decode_bds17 = unpickle_fun(decode_bds17)
+decode_bds21 = unpickle_fun(decode_bds21)
+decode_bds50 = unpickle_fun(decode_bds50)
+
+
 __all__ = [
     "Flarm",
     "Message",
     "batched",
     "decode",
+    "decode_bds17",
+    "decode_bds21",
+    "decode_bds50",
     "flarm",
     "is_bds05",
     "is_bds06",

@@ -42,7 +42,9 @@ fn read_roll(
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: roll angle".to_string(),
+            ));
         } else {
             return Ok((rest, None));
         }
@@ -54,7 +56,10 @@ fn read_roll(
         value as f64 * 45. / 256.
     };
     if roll.abs() > 50. {
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        return Err(DekuError::Assertion(format!(
+            "Roll angle: abs({}) > 50",
+            roll
+        )));
     }
     Ok((rest, Some(roll)))
 }
@@ -71,7 +76,9 @@ fn read_track(
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: track angle".to_string(),
+            ));
         } else {
             return Ok((rest, None));
         }
@@ -100,7 +107,9 @@ fn read_groundspeed(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: groundspeed".to_string(),
+            ));
         } else {
             return Ok((rest, None));
         }
@@ -108,7 +117,10 @@ fn read_groundspeed(
 
     let gs = value * 2;
     if gs > 600 {
-        return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+        return Err(DekuError::Assertion(format!(
+            "Groundspeed value: {} > 600",
+            gs
+        )));
     }
     Ok((rest, Some(gs)))
 }
@@ -126,7 +138,9 @@ fn read_rate(
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: track rate".to_string(),
+            ));
         } else {
             return Ok((rest, None));
         }
@@ -146,7 +160,10 @@ fn read_rate(
     if let Some(roll) = roll {
         if roll * rate < 0. {
             // signs must agree: left wing down = turn left
-            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+            return Err(DekuError::Assertion(format!(
+                "Roll angle {} and track rate {} signs do not agree.",
+                roll, rate
+            )));
         }
     }
 
@@ -164,7 +181,10 @@ fn read_tas(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: true air speed"
+                    .to_string(),
+            ));
         } else {
             return Ok((rest, None));
         }
@@ -174,7 +194,10 @@ fn read_tas(
 
     if let Some(gs) = gs {
         if !(80..=500).contains(&tas) | ((gs as i16 - tas as i16).abs() > 200) {
-            return Err(DekuError::Assertion("BDS 5,0 status".to_string()));
+            return Err(DekuError::Assertion(format!(
+                "TAS = {} must be within [80, 500] and abs(GS - TAS) = {} < 200",
+                tas, gs
+            )));
         }
     }
     Ok((rest, Some(tas)))
