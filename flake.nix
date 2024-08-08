@@ -39,10 +39,22 @@
           rustToolchain = fenix.packages.${system}.stable.toolchain;
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
+          # include .md and .json files for the build
+          markdownFilter = path: _type: builtins.match ".*md$" path != null;
+          jsonFilter = path: _type: builtins.match ".*json$" path != null;
+          markdownOrJSONOrCargo = path: type:
+          (markdownFilter path type) ||
+          (jsonFilter path type) ||
+          (craneLib.filterCargoSources path type);
+
           version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
 
           commonArgs = {
-            src = craneLib.cleanCargoSource ./.;
+            src = lib.cleanSourceWith {
+              src = ./.;
+              filter = markdownOrJSONOrCargo;
+              name = "source";
+            };
             pname = "rs1090";
             version = version;
 
