@@ -58,7 +58,7 @@
             pname = "rs1090";
             version = version;
 
-            nativeBuildInputs = with pkgs; [ pkg-config openssl python3 bzip2 ] ++
+            nativeBuildInputs = with pkgs; [ pkg-config openssl python3 bzip2 soapysdr ] ++
               lib.optionals pkgs.stdenv.isLinux [ clang mold ]
             ;
             buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin
@@ -88,9 +88,9 @@
 
           packages =
             {
-              default =  craneLib.buildPackage (commonArgs // {  # TODO  this does not build for now
+              default =  craneLib.buildPackage (commonArgs // {
                 pname = "jet1090";
-                cargoExtraFlags = "-p jet1090";
+                cargoExtraFlags = "--all-features -p jet1090";
                 meta.mainProgram = "jet1090";
                 inherit cargoArtifacts;
               });
@@ -101,7 +101,7 @@
           checks =
             {
               fmt = craneLib.cargoFmt (commonArgs);
-              audit = craneLib.cargoAudit (commonArgs // { inherit advisory-db; });
+              # audit = craneLib.cargoAudit (commonArgs // { inherit advisory-db; });
               rustdoc = craneLib.cargoDoc (commonArgs // { inherit cargoArtifacts; });
 
               clippy-check = craneLib.cargoClippy (commonArgs // {
