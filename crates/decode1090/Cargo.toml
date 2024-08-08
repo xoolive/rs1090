@@ -11,7 +11,7 @@ edition.workspace = true
 
 [dependencies]
 clap = { version = "4.5.13", features = ["color", "derive", "wrap_help"] }
-deku = "0.16.0"
+deku = "0.17.0"
 futures-util = "0.3.30"
 hex = "0.4.3"
 rs1090 = { version = "0.2.5", path = "../rs1090" }
