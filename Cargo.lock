@@ -2276,6 +2276,7 @@ dependencies = [
  "serde_json",
  "soapysdr",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
