@@ -46,14 +46,16 @@
             pname = "rs1090";
             version = version;
 
-            nativeBuildInputs = with pkgs; [ pkg-config openssl python3 bzip2] ++
-              lib.optionals pkgs.stdenv.isLinux [ clang mold ];
-            buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
+            nativeBuildInputs = with pkgs; [ pkg-config openssl python3 bzip2 ] ++
+              lib.optionals pkgs.stdenv.isLinux [ clang mold ]
+            ;
+            buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin
+            [
+              pkgs.libiconv
+              pkgs.darwin.apple_sdk.frameworks.Security
+              pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+            ];
 
-            RUSTFLAGS = if pkgs.stdenv.isLinux then
-              "-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold"
-            else
-              "";
           };
 
           cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -62,6 +64,14 @@
           devShells.default = pkgs.mkShell {
             inputsFrom = builtins.attrValues self.checks;
             buildInputs = [ rustToolchain pkgs.pkg-config pkgs.openssl ];
+            shellHook = if pkgs.stdenv.isDarwin then ''
+              export NIX_LDFLAGS="-L${lib.makeLibraryPath [pkgs.libiconv]} $NIX_LDFLAGS"
+              export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.SystemConfiguration}/Library/Frameworks -framework SystemConfiguration $NIX_LDFLAGS"
+              export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.Security}/Library/Frameworks -framework Security $NIX_LDFLAGS"
+            '' else if pkgs.stdenv.isLinux then ''
+              export RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold"
+            ''
+            else "";
           };
 
           packages =
