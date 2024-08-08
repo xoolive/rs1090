@@ -45,12 +45,15 @@
             src = craneLib.cleanCargoSource ./.;
             pname = "rs1090";
             version = version;
-            nativeBuildInputs = with pkgs; [ pkg-config openssl clang mold python3 bzip2];
-            buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin [
-              pkgs.libiconv
-            ];
 
-            RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold";
+            nativeBuildInputs = with pkgs; [ pkg-config openssl python3 bzip2] ++
+              lib.optionals pkgs.stdenv.isLinux [ clang mold ];
+            buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
+
+            RUSTFLAGS = if pkgs.stdenv.isLinux then
+              "-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold"
+            else
+              "";
           };
 
           cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -97,4 +100,3 @@
         };
     });
 }
-
