@@ -23,7 +23,7 @@ dotenv = "0.15.0"
 futures = "0.3.30"
 futures-util = "0.3.30"
 hex = "0.4.3"
-ratatui = "0.27.0"
+ratatui = "0.28.0"
 reqwest = "0.12.5"
 rs1090 = { version = "0.2.5", path = "../rs1090" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
