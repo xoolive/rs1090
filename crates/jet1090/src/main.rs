@@ -23,6 +23,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
@@ -70,6 +71,10 @@ struct Options {
     // - `port` must be a number
     // - `reference` can be LFPG for major airports, `43.3,1.35` otherwise
     sources: Vec<cli::Source>,
+
+    /// logging file, use "-" for stdout (only in non-interactive mode)
+    #[arg(short, long, value_name = "FILE")]
+    log_file: Option<String>,
 }
 
 #[tokio::main]
@@ -121,6 +126,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         options.update_position = cli_options.update_position;
     }
     options.sources.append(&mut cli_options.sources);
+
+    // example: RUST_LOG=rs1090=DEBUG
+    let env_filter = EnvFilter::from_default_env();
+
+    let subscriber = tracing_subscriber::registry().with(env_filter);
+    match cli_options.log_file.as_deref() {
+        Some("-") if !cli_options.interactive => {
+            // when it's interactive, logs will disrupt the display
+            subscriber.with(fmt::layer().pretty()).init();
+        }
+        Some(log_file) if log_file != "-" => {
+            let file = std::fs::File::create(log_file).unwrap_or_else(|_| {
+                panic!("fail to create log file: {}", log_file)
+            });
+            let file_layer = fmt::layer().with_writer(file).with_ansi(false);
+            subscriber.with(file_layer).init();
+        }
+        _ => {
+            subscriber.init(); // no logging
+        }
+    }
 
     let mut file = if let Some(output_path) = options.output {
         Some(
