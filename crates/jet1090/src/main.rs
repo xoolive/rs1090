@@ -136,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // when it's interactive, logs will disrupt the display
             subscriber.with(fmt::layer().pretty()).init();
         }
-        Some(log_file) if log_file != "_" => {
+        Some(log_file) if log_file != "-" => {
             let file = std::fs::File::create(log_file).unwrap_or_else(|_| {
                 panic!("fail to create log file: {}", log_file)
             });
