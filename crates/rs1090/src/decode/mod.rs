@@ -422,7 +422,7 @@ pub struct TimedMessage {
     pub timesource: TimeSource,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub rssi: Option<u8>,
+    pub rssi: Option<f64>,
 
     pub frame: String,
 

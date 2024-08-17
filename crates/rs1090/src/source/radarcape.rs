@@ -71,7 +71,9 @@ fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
     let nanos = ts_u64 & 0x00003FFFFFFF;
     let ts = seconds as f64 + nanos as f64 * 1e-9;
 
-    let rssi = Some(msg[8]);
+    let rssi = if msg[8] == 0xff { None } else { Some(msg[8]) };
+    let rssi = rssi.map(|v| v as f64 / 255.);
+    let rssi = rssi.map(|v| 10. * (v * v).log10());
 
     let frame = msg[9..]
         .iter()

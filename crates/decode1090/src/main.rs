@@ -38,7 +38,7 @@ struct Options {
 struct JSONEntry {
     timestamp: f64,
     timesource: rs1090::decode::TimeSource,
-    rssi: Option<u8>,
+    rssi: Option<f64>,
     frame: String,
     idx: Option<usize>,
 }
