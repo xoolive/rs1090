@@ -31,7 +31,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     app.scroll_state = app.scroll_state.content_length(app.items.len());
 
     let rects = Layout::vertical([Constraint::Min(5), Constraint::Length(1)])
-        .split(frame.size());
+        .split(frame.area());
     let colors = TableColors::new(&tailwind::CYAN);
 
     use crate::snapshot::StateVectors;
