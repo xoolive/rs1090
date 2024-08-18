@@ -508,7 +508,7 @@ pub fn demodulate2400(
                     let signal_len = msg.len() * 12 / 5;
                     for k in 0..signal_len {
                         let mag = data[j + 19 + k] as u64;
-                        scaled_signal_power = scaled_signal_power + mag * mag;
+                        scaled_signal_power += mag * mag;
                     }
                     let signal_power =
                         scaled_signal_power as f64 / 65535.0 / 65535.0;
