@@ -14,9 +14,9 @@ rtlsdr = ['rs1090/rtlsdr']
 
 [dependencies]
 chrono = "0.4.37"
-clap = { version = "4.5.15", features = ["color", "derive", "wrap_help"] }
+clap = { version = "4.5.16", features = ["color", "derive", "wrap_help"] }
 clap_complete = "4.5.8"
-crossterm = { version = "0.27.0", features = ["event-stream"] }
+crossterm = { version = "0.28.1", features = ["event-stream"] }
 deku = "0.16.0"
 dirs = "5.0.1"
 dotenv = "0.15.0"
@@ -28,9 +28,9 @@ reqwest = "0.12.5"
 rs1090 = { version = "0.2.5", path = "../rs1090" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 serde = { version = "1.0.206", features = ["derive"] }
-serde_json = "1.0.122"
+serde_json = "1.0.125"
 soapysdr = { version = "0.4.0", optional = true }
-tokio = { version = "1.39.2", features = ["full"] }
+tokio = { version = "1.39.3", features = ["full"] }
 toml = "0.8.19"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

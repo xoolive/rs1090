@@ -10,14 +10,14 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-clap = { version = "4.5.15", features = ["color", "derive", "wrap_help"] }
+clap = { version = "4.5.16", features = ["color", "derive", "wrap_help"] }
 deku = "0.16.0"
 futures-util = "0.3.30"
 hex = "0.4.3"
 rs1090 = { version = "0.2.5", path = "../rs1090" }
 serde = { version = "1.0.206", features = ["derive"] }
-serde_json = "1.0.122"
-tokio = { version = "1.39.2", features = ["full"] }
+serde_json = "1.0.125"
+tokio = { version = "1.39.3", features = ["full"] }
 
 [[bin]]
 name = "decode1090"
