@@ -2,52 +2,65 @@ use crate::decode::TimeSource;
 use crate::prelude::*;
 use crate::source::beast::DataSource;
 use futures_util::pin_mut;
+use std::io;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::net::{TcpStream, UdpSocket};
 use tokio::sync::mpsc;
+use tokio_tungstenite::connect_async;
+use tracing::info;
+
+pub enum Address {
+    TCP(String),
+    UDP(String),
+    Websocket(String),
+}
 
 pub async fn receiver(
-    address: String,
+    address: Address,
     tx: mpsc::Sender<TimedMessage>,
     idx: usize,
-) {
-    match TcpStream::connect(&address).await {
-        Ok(stream) => {
-            let msg_stream = beast::next_msg(DataSource::Tcp(stream)).await;
-            pin_mut!(msg_stream); // needed for iteration
-            'receive: loop {
-                while let Some(msg) = msg_stream.next().await {
-                    let msg = process_radarcape(&msg, idx);
-                    if tx.send(msg).await.is_err() {
-                        break 'receive;
-                    }
-                }
+) -> io::Result<()> {
+    let msg_stream = match address {
+        Address::TCP(address) => match TcpStream::connect(&address).await {
+            Ok(stream) => {
+                info!("Connected to TCP stream: {}", address);
+                DataSource::Tcp(stream)
             }
+            Err(error) => {
+                info!(
+                    "Failed to connect to TCP {} ({}), trying in UDP",
+                    address,
+                    error.to_string()
+                );
+                DataSource::Udp(UdpSocket::bind(&address).await?)
+            }
+        },
+        Address::UDP(address) => {
+            DataSource::Udp(UdpSocket::bind(&address).await?)
         }
-        Err(err_tcp) => {
-            match UdpSocket::bind(&address).await {
-                Ok(socket) => {
-                    let msg_stream =
-                        beast::next_msg(DataSource::Udp(socket)).await;
-                    pin_mut!(msg_stream); // needed for iteration
-                    'receive: loop {
-                        while let Some(msg) = msg_stream.next().await {
-                            let msg = process_radarcape(&msg, idx);
-                            if tx.send(msg).await.is_err() {
-                                break 'receive;
-                            }
-                        }
-                    }
-                }
-                Err(err_udp) => {
-                    panic!(
-                        "Failed to connect in TCP ({}) and UDP ({})",
-                        err_tcp, err_udp
-                    );
-                }
+        Address::Websocket(address) => {
+            info!("Connecting to websocket: {}", address);
+            let (stream, _) = connect_async(&address)
+                .await
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            info!("Connected to websocket: {}", address);
+            let (_, rx) = stream.split();
+            DataSource::Ws(rx)
+        }
+    };
+
+    let msg_stream = beast::next_msg(msg_stream).await;
+    pin_mut!(msg_stream); // needed for iteration
+    'receive: loop {
+        while let Some(msg) = msg_stream.next().await {
+            let msg = process_radarcape(&msg, idx);
+            info!("Received {}", msg);
+            if tx.send(msg).await.is_err() {
+                break 'receive;
             }
         }
     }
+    Ok(())
 }
 
 fn now() -> u128 {
