@@ -61,7 +61,7 @@ impl FromStr for Source {
                 "ws://{}:{}/{}",
                 url.host_str().unwrap_or("0.0.0.0"),
                 url.port_or_known_default().unwrap(),
-                url.path().strip_prefix("/").unwrap().to_string()
+                url.path().strip_prefix("/").unwrap()
             )),
             _ => return Err("unsupported scheme".to_string()),
         };
