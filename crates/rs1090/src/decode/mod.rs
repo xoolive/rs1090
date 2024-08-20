@@ -435,7 +435,7 @@ pub struct TimedMessage {
 
 impl fmt::Display for TimedMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
+        writeln!(f, "{:.5},{}", &self.timestamp, &self.frame)?;
         if let Some(msg) = &self.message {
             writeln!(f, "{}", msg)?;
         }
@@ -444,7 +444,7 @@ impl fmt::Display for TimedMessage {
 }
 impl fmt::Debug for TimedMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{:.0} {}", &self.timestamp, &self.frame)?;
+        writeln!(f, "{:.5},{}", &self.timestamp, &self.frame)?;
         if let Some(msg) = &self.message {
             writeln!(f, "{:#}", msg)?;
         }
