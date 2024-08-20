@@ -510,11 +510,11 @@ mod tests {
             update_position = false
 
             [[sources]]
-            path = { Udp = "0.0.0.0:1234" }
+            address = { Udp = "0.0.0.0:1234" }
             airport = 'LFBO'
 
             [[sources]]
-            path = { Udp = "0.0.0.0:3456" }
+            address = { Udp = "0.0.0.0:3456" }
             [reference]
             latitude = 48.723
             longitude = 2.379

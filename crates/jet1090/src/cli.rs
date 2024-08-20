@@ -43,6 +43,7 @@ impl FromStr for Source {
                 match url.host() {
                     Some(_) => url.port_or_known_default().unwrap_or(10003),
                     None => {
+                        // deals with ":4003?LFBO" (parsed as "tcp:///:4003?LFBO")
                         url.path()
                             .strip_prefix("/:")
                             .unwrap()
