@@ -101,7 +101,7 @@ pub enum ME {
     Reserved0(Unused),
 
     #[deku(id_pat = "24")]
-    #[serde(rename = "?")]
+    //#[serde(rename = "?")]
     SurfaceSystemStatus(Unused),
 
     #[deku(id_pat = "25..=27")]

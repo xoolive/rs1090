@@ -9,19 +9,19 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::connect_async;
 use tracing::info;
 
-pub enum Address {
+pub enum BeastSource {
     TCP(String),
     UDP(String),
     Websocket(String),
 }
 
 pub async fn receiver(
-    address: Address,
+    address: BeastSource,
     tx: mpsc::Sender<TimedMessage>,
     idx: usize,
 ) -> io::Result<()> {
     let msg_stream = match address {
-        Address::TCP(address) => match TcpStream::connect(&address).await {
+        BeastSource::TCP(address) => match TcpStream::connect(&address).await {
             Ok(stream) => {
                 info!("Connected to TCP stream: {}", address);
                 DataSource::Tcp(stream)
@@ -35,10 +35,10 @@ pub async fn receiver(
                 DataSource::Udp(UdpSocket::bind(&address).await?)
             }
         },
-        Address::UDP(address) => {
+        BeastSource::UDP(address) => {
             DataSource::Udp(UdpSocket::bind(&address).await?)
         }
-        Address::Websocket(address) => {
+        BeastSource::Websocket(address) => {
             info!("Connecting to websocket: {}", address);
             let (stream, _) = connect_async(&address)
                 .await

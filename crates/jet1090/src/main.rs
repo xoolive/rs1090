@@ -510,15 +510,11 @@ mod tests {
             update_position = false
 
             [[sources]]
-            scheme = "Udp"
-            host = '0.0.0.0'
-            port = 1234
+            path = { Udp = "0.0.0.0:1234" }
             airport = 'LFBO'
 
             [[sources]]
-            scheme = "Udp"
-            host = '0.0.0.0'
-            port = 3456
+            path = { Udp = "0.0.0.0:3456" }
             [reference]
             latitude = 48.723
             longitude = 2.379
