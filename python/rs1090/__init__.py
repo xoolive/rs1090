@@ -3,16 +3,27 @@ from __future__ import annotations
 import pickle
 from typing import Iterable, Sequence, TypeVar, overload
 
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from ._rust import (
     aircraft_information,
     decode_1090,
     decode_1090_vec,
     decode_1090t_vec,
+    decode_bds05,
+    decode_bds10,
     decode_bds17,
+    decode_bds18,
+    decode_bds19,
+    decode_bds20,
     decode_bds21,
+    decode_bds30,
+    decode_bds40,
+    decode_bds44,
+    decode_bds45,
     decode_bds50,
+    decode_bds60,
+    decode_bds65,
     decode_flarm,
     decode_flarm_vec,
 )
@@ -70,9 +81,20 @@ def unpickle_fun(fun):
     return wrapped_fun
 
 
+decode_bds05 = unpickle_fun(decode_bds05)
+decode_bds10 = unpickle_fun(decode_bds10)
 decode_bds17 = unpickle_fun(decode_bds17)
+decode_bds18 = unpickle_fun(decode_bds18)
+decode_bds19 = unpickle_fun(decode_bds19)
+decode_bds20 = unpickle_fun(decode_bds20)
 decode_bds21 = unpickle_fun(decode_bds21)
+decode_bds30 = unpickle_fun(decode_bds30)
+decode_bds40 = unpickle_fun(decode_bds40)
+decode_bds44 = unpickle_fun(decode_bds44)
+decode_bds45 = unpickle_fun(decode_bds45)
 decode_bds50 = unpickle_fun(decode_bds50)
+decode_bds60 = unpickle_fun(decode_bds60)
+decode_bds65 = unpickle_fun(decode_bds65)
 
 
 __all__ = [
@@ -80,9 +102,17 @@ __all__ = [
     "Message",
     "batched",
     "decode",
+    "decode_bds05",
+    "decode_bds10",
     "decode_bds17",
+    "decode_bds20",
     "decode_bds21",
+    "decode_bds30",
+    "decode_bds40",
+    "decode_bds44",
+    "decode_bds45",
     "decode_bds50",
+    "decode_bds60",
     "flarm",
     "is_bds05",
     "is_bds06",

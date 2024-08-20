@@ -368,6 +368,15 @@ class DF20_BDS20(TypedDict):
     icao24: str
 
 
+class DF20_BDS21(TypedDict):
+    timestamp: float
+    df: Literal["20"]
+    altitude: int
+    bds: Literal["21"]
+    registration: None | str
+    airline: None | str
+
+
 class DF20_BDS30(TypedDict):
     timestamp: float
     df: Literal["20"]
@@ -422,6 +431,20 @@ class DF20_BDS44(TypedDict):
     turbulence: Literal[None, "Nil", "Light", "Moderate", "Severe"]
     humidity: None | float
     icao24: str
+
+
+class DF20_BDS45(TypedDict):
+    timestamp: float
+    df: Literal["20"]
+    altitude: int
+    bds: Literal["45"]
+    turbulence: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    wind_shear: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    icing: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    wake_vortex: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    static_temperature: float
+    static_pressure: int
+    radio_hein: None | int
 
 
 class DF20_BDS50(TypedDict):
@@ -519,6 +542,15 @@ class DF21_BDS20(TypedDict):
     icao24: str
 
 
+class DF21_BDS21(TypedDict):
+    timestamp: float
+    df: Literal["21"]
+    squawk: str
+    bds: Literal["21"]
+    registration: None | str
+    airline: None | str
+
+
 class DF21_BDS30(TypedDict):
     timestamp: float
     df: Literal["21"]
@@ -556,6 +588,20 @@ class DF21_BDS40(TypedDict):
         "AircraftAltitude", "FcpMcuSelectedAltitude", "FmsSelectedAltitude"
     ]
     icao24: str
+
+
+class DF21_BDS45(TypedDict):
+    timestamp: float
+    df: Literal["21"]
+    squawk: str
+    bds: Literal["45"]
+    turbulence: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    wind_shear: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    icing: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    wake_vortex: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    static_temperature: float
+    static_pressure: int
+    radio_hein: None | int
 
 
 class DF21_BDS44(TypedDict):
