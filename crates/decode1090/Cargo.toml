@@ -8,6 +8,7 @@ authors.workspace = true
 version.workspace = true
 license.workspace = true
 edition.workspace = true
+homepage.workspace = true
 
 [dependencies]
 clap = { version = "4.5.16", features = ["color", "derive", "wrap_help"] }
