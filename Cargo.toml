@@ -36,6 +36,10 @@ install-path = "CARGO_HOME"
 # Whether to install an updater program
 install-updater = true
 
+[workspace.metadata.release]
+shared-version = true
+tag-name = "v{{version}}"
+
 [workspace.metadata.dist.dependencies.apt]
 libsoapysdr-dev = "*"
 soapysdr-module-rtlsdr = "*"

@@ -43,13 +43,13 @@ on:
   push:
     tags:
       - '**[0-9]+.[0-9]+.[0-9]+*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Release Tag
-        required: true
-        default: dry-run
-        type: string
+  # workflow_dispatch:
+  #   inputs:
+  #     tag:
+  #       description: Release Tag
+  #       required: true
+  #       default: dry-run
+  #       type: string
 
 jobs:
   # Run 'cargo dist plan' (or host) to determine what tasks we need to do
@@ -57,12 +57,12 @@ jobs:
     runs-on: "ubuntu-20.04"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
-      # tag: ${{ !github.event.pull_request && github.ref_name || '' }}
-      # tag-flag: ${{ !github.event.pull_request && format('--tag={0}', github.ref_name) || '' }}
-      # publishing: ${{ !github.event.pull_request }}
-      tag: ${{ (inputs.tag != 'dry-run' && inputs.tag) || '' }}
-      tag-flag: ${{ inputs.tag && inputs.tag != 'dry-run' && format('--tag={0}', inputs.tag) || '' }}
-      publishing: ${{ inputs.tag && inputs.tag != 'dry-run' }}
+      tag: ${{ !github.event.pull_request && github.ref_name || '' }}
+      tag-flag: ${{ !github.event.pull_request && format('--tag={0}', github.ref_name) || '' }}
+      publishing: ${{ !github.event.pull_request }}
+      # tag: ${{ (inputs.tag != 'dry-run' && inputs.tag) || '' }}
+      # tag-flag: ${{ inputs.tag && inputs.tag != 'dry-run' && format('--tag={0}', inputs.tag) || '' }}
+      # publishing: ${{ inputs.tag && inputs.tag != 'dry-run' }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -86,8 +86,8 @@ jobs:
       # but also really annoying to build CI around when it needs secrets to work right.)
       - id: plan
         run: |
-          # cargo dist ${{ (!github.event.pull_request && format('host --steps=create --tag={0}', github.ref_name)) || 'plan' }} --output-format=json > plan-dist-manifest.json
-          cargo dist ${{ (inputs.tag && inputs.tag != 'dry-run' && format('host --steps=create --tag={0}', inputs.tag)) || 'plan' }} --output-format=json > plan-dist-manifest.json
+          cargo dist ${{ (!github.event.pull_request && format('host --steps=create --tag={0}', github.ref_name)) || 'plan' }} --output-format=json > plan-dist-manifest.json
+          # cargo dist ${{ (inputs.tag && inputs.tag != 'dry-run' && format('host --steps=create --tag={0}', inputs.tag)) || 'plan' }} --output-format=json > plan-dist-manifest.json
           echo "cargo dist ran successfully"
           cat plan-dist-manifest.json
           echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
