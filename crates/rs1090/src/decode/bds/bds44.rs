@@ -1,4 +1,3 @@
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -14,26 +13,26 @@ pub struct MeteorologicalRoutineAirReport {
     #[serde(skip)]
     pub figure_of_merit: u8,
 
-    #[deku(reader = "read_wind_speed(deku::rest)")]
+    #[deku(reader = "read_wind_speed(deku::reader)")]
     /// Wind speed in kts
     pub wind_speed: Option<u16>,
-    #[deku(reader = "read_wind_direction(deku::rest, *wind_speed)")]
+    #[deku(reader = "read_wind_direction(deku::reader, *wind_speed)")]
     /// Wind direction in degrees
     pub wind_direction: Option<f64>,
 
-    #[deku(reader = "read_temperature(deku::rest)")]
+    #[deku(reader = "read_temperature(deku::reader)")]
     /// Static air temperature in Celsius (decoded with LSB=0,25)
     pub temperature: f64,
 
-    #[deku(reader = "read_pressure(deku::rest)")]
+    #[deku(reader = "read_pressure(deku::reader)")]
     /// Average static pressure
     pub pressure: Option<u16>,
 
-    #[deku(reader = "read_turbulence(deku::rest)")]
+    #[deku(reader = "read_turbulence(deku::reader)")]
     /// Average static pressure
     pub turbulence: Option<Turbulence>,
 
-    #[deku(reader = "read_humidity(deku::rest)")]
+    #[deku(reader = "read_humidity(deku::reader)")]
     /// Percentage of humidity
     pub humidity: Option<f64>,
 }
@@ -46,53 +45,63 @@ pub enum Turbulence {
     Severe,
 }
 
-fn read_wind_speed(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(9)))?;
+fn read_wind_speed<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<u16>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(9)),
+    )?;
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
+            return Err(DekuError::Assertion("BDS 4,4 status".into()));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
     if value > 250 {
-        return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
+        return Err(DekuError::Assertion("BDS 4,4 status".into()));
     }
 
-    Ok((rest, Some(value)))
+    Ok(Some(value))
 }
 
-fn read_wind_direction(
-    rest: &BitSlice<u8, Msb0>,
+fn read_wind_direction<R: std::io::Read>(
+    reader: &mut Reader<R>,
     speed: Option<u16>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(9)))?;
+) -> Result<Option<f64>, DekuError> {
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(9)),
+    )?;
 
     if speed.is_none() {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
+            return Err(DekuError::Assertion("BDS 4,4 status".into()));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
-    Ok((rest, Some(value as f64 * 180. / 256.)))
+    Ok(Some(value as f64 * 180. / 256.))
 }
 
-fn read_temperature(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, f64), DekuError> {
-    let (rest, sign) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
+fn read_temperature<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<f64, DekuError> {
+    let sign = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
+    )?;
 
     let temp = if sign == 1 {
         (value as f64 - 1024.) * 0.25
@@ -101,46 +110,54 @@ fn read_temperature(
     };
 
     if !(-80. ..=60.).contains(&temp) {
-        return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
+        return Err(DekuError::Assertion("BDS 4,4 status".into()));
     }
-    Ok((rest, temp))
+    Ok(temp)
 }
 
-fn read_pressure(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(11)))?;
+fn read_pressure<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<u16>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(11)),
+    )?;
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
+            return Err(DekuError::Assertion("BDS 4,4 status".into()));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
     // Never seen any anyway
-    Err(DekuError::Assertion("BDS 4,4 status".to_string()))
+    Err(DekuError::Assertion("BDS 4,4 status".into()))
 
     // return Ok((rest, Some(value)));
 }
 
-fn read_turbulence(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<Turbulence>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(2)))?;
+fn read_turbulence<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<Turbulence>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(2)),
+    )?;
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
+            return Err(DekuError::Assertion("BDS 4,4 status".into()));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
@@ -152,26 +169,30 @@ fn read_turbulence(
         _ => None, // never happens anyway
     };
 
-    Ok((rest, value))
+    Ok(value)
 }
 
-fn read_humidity(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(6)))?;
+fn read_humidity<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<f64>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(6)),
+    )?;
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".to_string()));
+            return Err(DekuError::Assertion("BDS 4,4 status".into()));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
-    Ok((rest, Some(value as f64 * 100. / 64.)))
+    Ok(Some(value as f64 * 100. / 64.))
 }
 
 #[cfg(test)]

@@ -65,6 +65,14 @@ impl fmt::Display for ADSB {
 */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+pub struct UnusedU8 {
+    id: u8,
+
+    #[deku(bits = 48)]
+    #[serde(skip)]
+    unused: u64, //[u8; 5],
+}
+#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct Unused {
     #[deku(bits = 48)]
     #[serde(skip)]
@@ -72,41 +80,65 @@ pub struct Unused {
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
-#[deku(type = "u8", bits = "5")]
+#[deku(id_type = "u8", bits = "5")]
 //#[serde(untagged)]
 #[serde(tag = "bds")]
 pub enum ME {
     #[deku(id = "0")]
-    #[serde(rename = "?")]
+    #[serde(rename = "id0")]
     NoPosition(Unused),
 
     #[deku(id_pat = "1..=4")]
     #[serde(rename = "08")]
-    BDS08(bds08::AircraftIdentification),
+    BDS08 {
+        #[serde(skip)]
+        /// The typecode value (between 1 and 4)
+        tc: u8,
+
+        #[serde(flatten)]
+        #[deku(ctx = "*tc")]
+        me: bds08::AircraftIdentification,
+    },
 
     #[deku(id_pat = "5..=8")]
     #[serde(rename = "06")]
-    BDS06(bds06::SurfacePosition),
+    BDS06 {
+        #[serde(skip)]
+        /// The typecode value (between 5 and 8)
+        tc: u8,
+
+        #[serde(flatten)]
+        #[deku(ctx = "*tc")]
+        me: bds06::SurfacePosition,
+    },
 
     #[deku(id_pat = "9..=18 | 20..=22")]
     #[serde(rename = "05")]
-    BDS05(bds05::AirbornePosition),
+    BDS05 {
+        #[serde(skip)]
+        /// The typecode value (between 9 and 18 or between 20 and 22)
+        tc: u8,
+
+        #[serde(flatten)]
+        #[deku(ctx = "*tc")]
+        me: bds05::AirbornePosition,
+    },
 
     #[deku(id = "19")]
     #[serde(rename = "09")]
     BDS09(bds09::AirborneVelocity),
 
     #[deku(id = "23")]
-    #[serde(rename = "?")]
+    #[serde(rename = "id23")]
     Reserved0(Unused),
 
-    #[deku(id_pat = "24")]
-    //#[serde(rename = "?")]
+    #[deku(id = "24")]
+    #[serde(rename = "id24")]
     SurfaceSystemStatus(Unused),
 
     #[deku(id_pat = "25..=27")]
-    #[serde(rename = "?")]
-    Reserved1(Unused),
+    #[serde(rename = "id25_27")]
+    Reserved1 { unused: u8 },
 
     #[deku(id = "28")]
     #[serde(rename = "61")]
@@ -117,7 +149,7 @@ pub enum ME {
     BDS62(bds62::TargetStateAndStatusInformation),
 
     #[deku(id = "30")]
-    #[serde(rename = "?")]
+    #[serde(rename = "id30")]
     AircraftOperationalCoordination(Unused),
 
     #[deku(id = "31")]
@@ -133,13 +165,13 @@ impl fmt::Display for ME {
             | ME::Reserved1 { .. }
             | ME::SurfaceSystemStatus { .. }
             | ME::AircraftOperationalCoordination { .. } => Ok(()),
-            ME::BDS05(me) => {
+            ME::BDS05 { me, .. } => {
                 write!(f, "{}", me)
             }
-            ME::BDS06(me) => {
+            ME::BDS06 { me, .. } => {
                 write!(f, "{}", me)
             }
-            ME::BDS08(me) => {
+            ME::BDS08 { me, .. } => {
                 write!(f, "{}", me)
             }
             ME::BDS09(me) => {

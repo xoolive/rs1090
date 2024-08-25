@@ -17,7 +17,7 @@ pub struct AircraftIdentification {
     /// The first eight bits indicate the BDS code 0010 0000 (2,0 in hexadecimal).
     pub bds: u8,
 
-    #[deku(reader = "bds08::callsign_read(deku::rest)")]
+    #[deku(reader = "bds08::callsign_read(deku::reader)")]
     pub callsign: String,
 }
 
@@ -26,7 +26,7 @@ fn fail_if_not20(value: u8) -> Result<u8, DekuError> {
         Ok(value)
     } else {
         Err(DekuError::Assertion(
-            "First bits must be 0x20 in BDS 2,0".to_string(),
+            "First bits must be 0x20 in BDS 2,0".into(),
         ))
     }
 }

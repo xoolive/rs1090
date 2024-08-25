@@ -6,10 +6,10 @@ use super::bds::bds40::SelectedVerticalIntention;
 use super::bds::bds44::MeteorologicalRoutineAirReport;
 use super::bds::bds50::TrackAndTurnReport;
 use super::bds::bds60::HeadingAndSpeedReport;
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 use std::fmt;
+use tracing::debug;
 
 /**
  * ## Comm-B Data Selector (BDS)
@@ -19,42 +19,33 @@ use std::fmt;
  * and the last two codes (4,4, 4,5) report meteorological information.
  */
 
-#[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Clone, Default)]
 pub struct DataSelector {
-    #[deku(reader = "check_empty_bds(deku::input_bits)")]
     #[serde(skip)]
     /// Set to true if all zeros, then there is no need to parse
     pub is_empty: bool,
 
-    #[deku(reader = "read_bds10(deku::input_bits, *is_empty)")]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds10: Option<DataLinkCapability>,
 
-    #[deku(reader = "read_bds17(deku::input_bits, *is_empty)")]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds17: Option<GICBCapabilityReport>,
 
-    #[deku(reader = "read_bds20(deku::input_bits, *is_empty)")]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds20: Option<AircraftIdentification>,
 
-    #[deku(reader = "read_bds30(deku::input_bits, *is_empty)")]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds30: Option<ACASResolutionAdvisory>,
 
-    #[deku(reader = "read_bds40(deku::input_bits, *is_empty)")]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds40: Option<SelectedVerticalIntention>,
 
-    #[deku(reader = "read_bds44(deku::input_bits, *is_empty)")]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds44: Option<MeteorologicalRoutineAirReport>,
 
-    #[deku(reader = "read_bds50(deku::input_bits, *is_empty)")]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds50: Option<TrackAndTurnReport>,
 
-    #[deku(reader = "read_bds60(deku::input_bits, *is_empty)")]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds60: Option<HeadingAndSpeedReport>,
 }
@@ -65,149 +56,58 @@ impl fmt::Display for DataSelector {
     }
 }
 
-fn read_bds10(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<DataLinkCapability>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds10)) = DataLinkCapability::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds10)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds17(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<GICBCapabilityReport>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds17)) = GICBCapabilityReport::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds17)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds20(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<AircraftIdentification>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds20)) = AircraftIdentification::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds20)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds30(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<ACASResolutionAdvisory>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds30)) = ACASResolutionAdvisory::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds30)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds40(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<SelectedVerticalIntention>), DekuError>
-{
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-    if let Ok((_, bds40)) = SelectedVerticalIntention::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds40)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds44(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<
-    (&BitSlice<u8, Msb0>, Option<MeteorologicalRoutineAirReport>),
-    DekuError,
-> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-    if let Ok((_, bds44)) =
-        MeteorologicalRoutineAirReport::from_bytes((bytes, 0))
+impl DekuReader<'_> for DataSelector {
+    fn from_reader_with_ctx<R: deku::no_std_io::Read>(
+        reader: &mut Reader<R>,
+        _: (),
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
     {
-        Ok((input, Some(bds44)))
-    } else {
-        Ok((input, None))
-    }
-}
+        let mut result = Self::default();
+        let res = reader.read_bits(56)?;
+        let buf = res.unwrap().into_vec();
+        debug!(
+            "Decoding {:?} according to various hypotheses",
+            buf.as_slice()
+        );
 
-fn read_bds50(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<TrackAndTurnReport>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-    if let Ok((_, bds50)) = TrackAndTurnReport::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds50)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds60(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<HeadingAndSpeedReport>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-    if let Ok((_, bds60)) = HeadingAndSpeedReport::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds60)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn check_empty_bds(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, bool), DekuError> {
-    let mut inside_rest = rest;
-    for _ in 0..=5 {
-        let (for_rest, value) = u8::read(
-            inside_rest,
-            (deku::ctx::Endian::Big, deku::ctx::BitSize(8)),
-        )?;
-        if value != 0 {
-            return Ok((rest, false));
+        if buf.iter().all(|&x| x == 0) {
+            result.is_empty = true;
+            return Ok(result);
         }
-        inside_rest = for_rest;
+        match DataLinkCapability::try_from(buf.as_slice()) {
+            Ok(bds10) => result.bds10 = Some(bds10),
+            Err(e) => debug!("Error BDS10: {}", e.to_string()),
+        }
+        match GICBCapabilityReport::try_from(buf.as_slice()) {
+            Ok(bds17) => result.bds17 = Some(bds17),
+            Err(e) => debug!("Error BDS17: {}", e.to_string()),
+        }
+        match AircraftIdentification::try_from(buf.as_slice()) {
+            Ok(bds20) => result.bds20 = Some(bds20),
+            Err(e) => debug!("Error BDS20: {}", e.to_string()),
+        }
+        match ACASResolutionAdvisory::try_from(buf.as_slice()) {
+            Ok(bds30) => result.bds30 = Some(bds30),
+            Err(e) => debug!("Error BDS30: {}", e.to_string()),
+        }
+        match SelectedVerticalIntention::try_from(buf.as_slice()) {
+            Ok(bds40) => result.bds40 = Some(bds40),
+            Err(e) => debug!("Error BDS40: {}", e.to_string()),
+        }
+        match MeteorologicalRoutineAirReport::try_from(buf.as_slice()) {
+            Ok(bds44) => result.bds44 = Some(bds44),
+            Err(e) => debug!("Error BDS44: {}", e.to_string()),
+        }
+        match TrackAndTurnReport::try_from(buf.as_slice()) {
+            Ok(bds50) => result.bds50 = Some(bds50),
+            Err(e) => debug!("Error BDS50: {}", e.to_string()),
+        }
+        match HeadingAndSpeedReport::try_from(buf.as_slice()) {
+            Ok(bds60) => result.bds60 = Some(bds60),
+            Err(e) => debug!("Error BDS60: {}", e.to_string()),
+        }
+        Ok(result)
     }
-    Ok((rest, true))
 }

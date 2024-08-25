@@ -207,7 +207,7 @@ impl fmt::Display for TargetStateAndStatusInformation {
 }
 
 #[derive(Copy, Clone, Debug, Serialize, PartialEq, DekuRead)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 /// Encode the source of information for selected altitude
 pub enum AltSource {
     #[deku(id = "0")]

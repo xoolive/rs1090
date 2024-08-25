@@ -107,7 +107,7 @@ fn fail_if_not0(value: u8) -> Result<u8, DekuError> {
         Ok(value)
     } else {
         Err(DekuError::Assertion(
-            "Reserved bits must be 0 in BDS 1,0".to_string(),
+            "Reserved bits must be 0 in BDS 1,0".into(),
         ))
     }
 }
@@ -116,7 +116,7 @@ fn fail_if_not10(value: u8) -> Result<u8, DekuError> {
         Ok(value)
     } else {
         Err(DekuError::Assertion(
-            "First bits must be 0x10 in BDS 1,0".to_string(),
+            "First bits must be 0x10 in BDS 1,0".into(),
         ))
     }
 }

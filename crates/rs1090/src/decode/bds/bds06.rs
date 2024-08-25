@@ -1,10 +1,10 @@
 #![allow(clippy::suspicious_else_formatting)]
 
 use super::super::cpr::CPRFormat;
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 use std::fmt;
+use tracing::debug;
 
 /**
  * ## Surface Position (BDS 0,6)
@@ -23,21 +23,14 @@ use std::fmt;
  */
 
 #[derive(Debug, PartialEq, DekuRead, Serialize, Copy, Clone)]
+#[deku(ctx = "tc: u8")]
 pub struct SurfacePosition {
-    #[deku(bits = "5")]
-    #[serde(skip)]
-    /// The typecode value (between 5 and 8)
-    pub tc: u8,
-
-    #[deku(
-        bits = "0",
-        map = "|_val: u8| -> Result<_, DekuError> {Ok(14 - *tc)}"
-    )]
+    #[deku(skip, default = "14 - tc")]
     #[serde(rename = "NUCp")]
     /// Navigation Uncertainty Category (position), based on the typecode
     pub nuc_p: u8,
 
-    #[deku(reader = "read_groundspeed(deku::rest)")]
+    #[deku(reader = "read_groundspeed(deku::reader)")]
     /// The groundspeed in kts, None if not available
     pub groundspeed: Option<f64>,
 
@@ -51,7 +44,9 @@ pub struct SurfacePosition {
         map = "|value: u8| -> Result<_, DekuError> {
             if *track_status {
                 Ok(Some(value as f64 * 360. / 128.))
-            } else { Ok(None) }
+            } else {
+                Ok(None)
+            }
         }"
     )]
     /// The track angle in degrees, relative to the true North, None if not available
@@ -70,11 +65,11 @@ pub struct SurfacePosition {
     #[deku(bits = "17", endian = "big")]
     pub lon_cpr: u32,
 
-    #[deku(bits = "0", map = "|_v: u8| -> Result<_, DekuError> { Ok(None) }")]
+    #[deku(skip, default = "None")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latitude: Option<f64>,
 
-    #[deku(bits = "0", map = "|_v: u8| -> Result<_, DekuError> { Ok(None) }")]
+    #[deku(skip, default = "None")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub longitude: Option<f64>,
 }
@@ -85,11 +80,13 @@ pub struct SurfacePosition {
  * ensure that a lower speed can be encoded with a improved precision than a
  * higher speed.
  */
-fn read_groundspeed(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
-    let (rest, mov) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(7)))?;
+fn read_groundspeed<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<f64>, DekuError> {
+    let mov = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(7)),
+    )?;
     let value = match mov {
         0 => None,
         1 => Some(0.),
@@ -102,11 +99,12 @@ fn read_groundspeed(
         124 => Some(175.),
         125..=u8::MAX => None, // Reserved
     };
-    Ok((rest, value))
+    debug!("Groundspeed value: {:?}", value);
+    Ok(value)
 }
 
 #[derive(Debug, PartialEq, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 pub enum StatusForGroundTrack {
     Invalid = 0,
     Valid = 1,
@@ -137,12 +135,17 @@ mod tests {
 
     #[test]
     fn test_surface_position() {
+        tracing_subscriber::fmt::init();
         let bytes = hex!("8c4841753a9a153237aef0f275be");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
-            if let ME::BDS06(SurfacePosition {
-                track, groundspeed, ..
-            }) = adsb_msg.message
+            if let ME::BDS06 {
+                me:
+                    SurfacePosition {
+                        track, groundspeed, ..
+                    },
+                ..
+            } = adsb_msg.message
             {
                 assert_eq!(track, Some(92.8125));
                 assert_eq!(groundspeed, Some(17.));

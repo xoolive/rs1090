@@ -1,4 +1,3 @@
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -18,22 +17,22 @@ use serde::Serialize;
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[serde(tag = "bds", rename = "60")]
 pub struct HeadingAndSpeedReport {
-    #[deku(reader = "read_heading(deku::rest)")] // 12 bits
+    #[deku(reader = "read_heading(deku::reader)")] // 12 bits
     /// The magnetic heading is the aircraft's heading with respect to the magnetic North
     #[serde(rename = "heading", skip_serializing_if = "Option::is_none")]
     pub magnetic_heading: Option<f64>,
 
-    #[deku(reader = "read_ias(deku::rest)")] // 11 bits
+    #[deku(reader = "read_ias(deku::reader)")] // 11 bits
     #[serde(rename = "IAS", skip_serializing_if = "Option::is_none")]
     /// Indicated Airspeed (IAS) in kts, TAS is in BDS 0,5
     pub indicated_airspeed: Option<u16>,
 
-    #[deku(reader = "read_mach(deku::rest, *indicated_airspeed)")] // 11 bits
+    #[deku(reader = "read_mach(deku::reader, *indicated_airspeed)")] // 11 bits
     #[serde(rename = "Mach", skip_serializing_if = "Option::is_none")]
     /// Mach number
     pub mach_number: Option<f64>,
 
-    #[deku(reader = "read_vertical(deku::rest)")] // 11 bits
+    #[deku(reader = "read_vertical(deku::reader)")] // 11 bits
     /// Barometric altitude rates (in ft/mn) are only derived from
     /// barometer measurements (noisy).
     #[serde(
@@ -42,7 +41,7 @@ pub struct HeadingAndSpeedReport {
     )]
     pub barometric_altitude_rate: Option<i16>,
 
-    #[deku(reader = "read_vertical(deku::rest)")] // 11 bits
+    #[deku(reader = "read_vertical(deku::reader)")] // 11 bits
     /// Inertial vertical velocities (in ft/mn) are values provided by
     /// navigational equipment from different sources including the FMS
     #[serde(
@@ -52,21 +51,27 @@ pub struct HeadingAndSpeedReport {
     pub inertial_vertical_velocity: Option<i16>,
 }
 
-fn read_heading(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, sign) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
+fn read_heading<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<f64>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let sign = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
+    )?;
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 6,0 status".to_string()));
+            return Err(DekuError::Assertion("BDS 6,0 status".into()));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
@@ -80,52 +85,60 @@ fn read_heading(
         heading += 360.
     }
 
-    Ok((rest, Some(heading)))
+    Ok(Some(heading))
 }
 
-fn read_ias(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
+fn read_ias<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<u16>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
+    )?;
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 6,0 status".to_string()));
+            return Err(DekuError::Assertion("BDS 6,0 status".into()));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
     if (value == 0) | (value > 500) {
-        return Err(DekuError::Assertion("BDS 6,0 status".to_string()));
+        return Err(DekuError::Assertion("BDS 6,0 status".into()));
     }
-    Ok((rest, Some(value)))
+    Ok(Some(value))
 }
 
-fn read_mach(
-    rest: &BitSlice<u8, Msb0>,
+fn read_mach<R: std::io::Read>(
+    reader: &mut Reader<R>,
     ias: Option<u16>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
+) -> Result<Option<f64>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
+    )?;
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 6,0 status".to_string()));
+            return Err(DekuError::Assertion("BDS 6,0 status".into()));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
     let mach = value as f64 * 2.048 / 512.;
 
     if (mach == 0.) | (mach > 1.) {
-        return Err(DekuError::Assertion("BDS 6,0 status".to_string()));
+        return Err(DekuError::Assertion("BDS 6,0 status".into()));
     }
     if let Some(ias) = ias {
         /*
@@ -137,37 +150,43 @@ fn read_mach(
          * forbid IAS > 250 and Mach < .5
          */
         if (ias > 250) & (mach < 0.4) {
-            return Err(DekuError::Assertion("BDS 6,0 status".to_string()));
+            return Err(DekuError::Assertion("BDS 6,0 status".into()));
         }
         // this one is easy IAS = 150 (close to take-off) at FL 400 is Mach 0.5
         if (ias < 150) & (mach > 0.5) {
-            return Err(DekuError::Assertion("BDS 6,0 status".to_string()));
+            return Err(DekuError::Assertion("BDS 6,0 status".into()));
         }
     }
-    Ok((rest, Some(mach)))
+    Ok(Some(mach))
 }
 
-fn read_vertical(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<i16>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, sign) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(9)))?;
+fn read_vertical<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<i16>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let sign = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(9)),
+    )?;
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 6,0 status".to_string()));
+            return Err(DekuError::Assertion("BDS 6,0 status".into()));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
     if (value == 0) | (value == 511) {
         // all zeros or all ones
-        return Ok((rest, Some(0)));
+        return Ok(Some(0));
     }
     let value = if sign == 1 {
         (value as i16 - 512) * 32
@@ -176,9 +195,9 @@ fn read_vertical(
     };
 
     if value.abs() > 6000 {
-        Err(DekuError::Assertion("BDS 6,0 status".to_string()))
+        Err(DekuError::Assertion("BDS 6,0 status".into()))
     } else {
-        Ok((rest, Some(value)))
+        Ok(Some(value))
     }
 }
 
