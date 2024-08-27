@@ -38,7 +38,7 @@ install-updater = true
 
 [workspace.metadata.release]
 shared-version = true
-tag-name = "v{{version}}"
+tag-name = "rs1090-v{{version}}"
 
 [workspace.metadata.dist.dependencies.apt]
 libsoapysdr-dev = "*"
