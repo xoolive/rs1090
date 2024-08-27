@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn test_valid_bds20() {
         let bytes = hex!("a0001838201584f23468207cdfa5");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             assert_eq!(
                 bds.bds20,
@@ -56,7 +56,7 @@ mod tests {
     #[test]
     fn test_invalid_bds20() {
         let bytes = hex!("a800178d10010080f50000d5893c");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBIdentityReply { bds, .. } = msg.df {
             assert_eq!(bds.bds20, None);
         } else {

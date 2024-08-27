@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn test_valid_bds50() {
         let bytes = hex!("a000139381951536e024d4ccf6b5");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             let TrackAndTurnReport {
                 roll_angle,
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn test_invalid_bds50() {
         let bytes = hex!("a0000638fa81c10000000081a92f");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             assert_eq!(bds.bds50, None);
         } else {

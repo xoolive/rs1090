@@ -591,8 +591,8 @@ mod tests {
     fn decode_airporne_position() {
         let b1 = hex!("8D40058B58C901375147EFD09357");
         let b2 = hex!("8D40058B58C904A87F402D3B8C59");
-        let msg1 = Message::from_bytes((&b1, 0)).unwrap().1;
-        let msg2 = Message::from_bytes((&b2, 0)).unwrap().1;
+        let (_, msg1) = Message::from_bytes((&b1, 0)).unwrap();
+        let (_, msg2) = Message::from_bytes((&b2, 0)).unwrap();
 
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
@@ -617,8 +617,8 @@ mod tests {
         let b3 = hex!("8d4d224f58bf07c2d41a9a353d70");
         let b4 = hex!("8d4d224f58bf003b221b34aa5b8d");
 
-        let msg1 = Message::from_bytes((&b3, 0)).unwrap().1;
-        let msg2 = Message::from_bytes((&b4, 0)).unwrap().1;
+        let (_, msg1) = Message::from_bytes((&b3, 0)).unwrap();
+        let (_, msg2) = Message::from_bytes((&b4, 0)).unwrap();
 
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
@@ -644,7 +644,7 @@ mod tests {
     #[test]
     fn decode_airporne_position_with_reference() {
         let bytes = hex!("8D40058B58C901375147EFD09357");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
@@ -663,7 +663,7 @@ mod tests {
         assert_relative_eq!(longitude, 6.06785, max_relative = 1e-3);
 
         let bytes = hex!("8D40058B58C904A87F402D3B8C59");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
@@ -685,7 +685,7 @@ mod tests {
     #[test]
     fn decode_surface_position_with_reference() {
         let bytes = hex!("8c4841753aab238733c8cd4020b1");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {

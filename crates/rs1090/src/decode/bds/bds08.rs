@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn test_callsign() {
         let bytes = hex!("8d406b902015a678d4d220aa4bda");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let ME::BDS08 {
                 me:
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn test_format() {
         let bytes = hex!("8d406b902015a678d4d220aa4bda");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         assert_eq!(
             format!("{msg}"),
             r#" DF17. Extended Squitter

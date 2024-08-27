@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn test_valid_bds44() {
         let bytes = hex!("a0001692185bd5cf400000dfc696");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             let MeteorologicalRoutineAirReport {
                 wind_speed,

@@ -416,7 +416,7 @@ mod tests {
     #[test]
     fn test_groundspeed_velocity() {
         let bytes = hex!("8D485020994409940838175B284F");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let ME::BDS09(velocity) = adsb_msg.message {
                 if let AirborneVelocitySubType::GroundSpeedDecoding(_gsd) =
@@ -446,7 +446,7 @@ mod tests {
     #[test]
     fn test_format_groundspeed() {
         let bytes = hex!("8D485020994409940838175B284F");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         assert_eq!(
             format!("{msg}"),
             r#" DF17. Extended Squitter
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn test_airspeed_velocity() {
         let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let ME::BDS09(velocity) = adsb_msg.message {
                 if let AirborneVelocitySubType::AirspeedSubsonic(asd) =
@@ -488,7 +488,7 @@ mod tests {
     #[test]
     fn test_format_airspeed() {
         let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         assert_eq!(
             format!("{msg}"),
             r#" DF17. Extended Squitter

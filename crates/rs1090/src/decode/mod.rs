@@ -945,7 +945,7 @@ mod tests {
     #[test]
     fn test_ac13field() {
         let bytes = hex!("a0001910cc300030aa0000eae004");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         match msg.df {
             DF::CommBAltitudeReply { ac, .. } => {
                 assert_eq!(ac.0, 39000);
@@ -957,8 +957,8 @@ mod tests {
     #[test]
     fn test_invalid_crc() {
         let bytes = hex!("8d4ca251204994b1c36e60a5343d");
-        let msg = Message::from_bytes((&bytes, 0));
-        if let Err(e) = msg {
+        let res = Message::from_bytes((&bytes, 0));
+        if let Err(e) = res {
             match e {
                 DekuError::Assertion(_msg) => (),
                 _ => unreachable!(),

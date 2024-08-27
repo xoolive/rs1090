@@ -198,7 +198,7 @@ mod tests {
     #[test]
     fn test_icao24() {
         let bytes = hex!("8D406B902015A678D4D220AA4BDA");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(msg) = msg.df {
             assert_eq!(format!("{}", msg.icao24), "406b90");
             return;
