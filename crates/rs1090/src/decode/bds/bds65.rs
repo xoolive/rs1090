@@ -14,7 +14,7 @@ use std::fmt;
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "3")]
+#[deku(id_type = "u8", bits = "3")]
 #[serde(untagged)]
 pub enum AircraftOperationStatus {
     #[deku(id = "0")]
@@ -255,7 +255,7 @@ impl fmt::Display for OperationalMode {
 /// around 2008 (DO-260A), and version 2 around 2012 (DO-260B). Version 3 is
 /// currently being developed.
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "3")]
+#[deku(id_type = "u8", bits = "3")]
 #[serde(tag = "version")]
 pub enum ADSBVersionAirborne {
     #[deku(id = "0")]
@@ -272,7 +272,7 @@ pub enum ADSBVersionAirborne {
     DOC9871AppendixC(AirborneV2),
     #[deku(id_pat = "3..=7")]
     #[serde(rename = "3to7")]
-    Reserved(Empty),
+    Reserved { id: u8 },
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
@@ -358,7 +358,7 @@ pub struct AirborneV2 {
 /// around 2008 (DO-260A), and version 2 around 2012 (DO-260B). Version 3 is
 /// currently being developed.
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "3")]
+#[deku(id_type = "u8", bits = "3")]
 #[serde(tag = "version")]
 pub enum ADSBVersionSurface {
     #[deku(id = "0")]
@@ -375,7 +375,7 @@ pub enum ADSBVersionSurface {
     DOC9871AppendixC(SurfaceV2),
     #[deku(id_pat = "3..=7")]
     #[serde(skip)]
-    Reserved(Empty),
+    Reserved { id: u8 },
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
@@ -445,3 +445,9 @@ pub struct SurfaceV2 {
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct Empty {}
+
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+pub struct EmptyU8 {
+    pub id: u8,
+    pub unused: u8,
+}

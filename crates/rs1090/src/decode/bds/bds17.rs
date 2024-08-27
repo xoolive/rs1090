@@ -1,4 +1,3 @@
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -134,7 +133,7 @@ pub struct GICBCapabilityReport {
     /// Heading and speed report
     pub bds60: bool,
 
-    #[deku(reader = "check_zeros(deku::rest)")]
+    #[deku(reader = "check_zeros(deku::reader)")]
     #[serde(skip)]
     pub check_flag: bool,
 }
@@ -148,28 +147,26 @@ fn fail_if_false(value: bool) -> Result<bool, DekuError> {
         Ok(value)
     } else {
         Err(DekuError::Assertion(
-            "BDS 2,0 is always valid in BDS 1,7".to_string(),
+            "BDS 2,0 is always valid in BDS 1,7".into(),
         ))
     }
 }
 
-fn check_zeros(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, bool), DekuError> {
-    let mut inside_rest = rest;
+fn check_zeros<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<bool, DekuError> {
     for _ in 0..=3 {
-        let (for_rest, value) = u8::read(
-            inside_rest,
+        let value = u8::from_reader_with_ctx(
+            reader,
             (deku::ctx::Endian::Big, deku::ctx::BitSize(8)),
         )?;
         if value != 0 {
             return Err(DekuError::InvalidParam(
-                "BDS 1,7 must have all final bits set to 0".to_string(),
+                "BDS 1,7 must have all final bits set to 0".into(),
             ));
         }
-        inside_rest = for_rest;
     }
-    Ok((rest, true))
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -181,7 +178,7 @@ mod tests {
     #[test]
     fn test_valid_bds17() {
         let bytes = hex!("a0000638fa81c10000000081a92f");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             assert_eq!(
                 bds.bds17,
@@ -220,7 +217,7 @@ mod tests {
     #[test]
     fn test_invalid_bds17() {
         let bytes = hex!("a0001838201584f23468207cdfa5");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             assert_eq!(bds.bds17, None);
         } else {

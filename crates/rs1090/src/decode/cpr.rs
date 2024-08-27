@@ -45,7 +45,7 @@ fn dist_haversine(pos1: &Position, pos2: &Position) -> f64 {
 
 /// A flag to qualify a CPR position as odd or even
 #[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 #[serde(rename_all = "snake_case")]
 pub enum CPRFormat {
     Even = 0,
@@ -433,7 +433,7 @@ pub fn decode_position(
         even_msg: None,
     });
     match message {
-        ME::BDS05(airborne) => {
+        ME::BDS05 { me: airborne, .. } => {
             let mut pos: Option<Position> = None;
 
             let latest_timestamp = match airborne.parity {
@@ -511,7 +511,7 @@ pub fn decode_position(
                 }
             }
         }
-        ME::BDS06(surface) => {
+        ME::BDS06 { me: surface, .. } => {
             let mut pos = None;
             if let Some(latest_pos) = latest.pos {
                 let surface_pos = surface_position_with_reference(
@@ -591,13 +591,15 @@ mod tests {
     fn decode_airporne_position() {
         let b1 = hex!("8D40058B58C901375147EFD09357");
         let b2 = hex!("8D40058B58C904A87F402D3B8C59");
-        let msg1 = Message::from_bytes((&b1, 0)).unwrap().1;
-        let msg2 = Message::from_bytes((&b2, 0)).unwrap().1;
+        let (_, msg1) = Message::from_bytes((&b1, 0)).unwrap();
+        let (_, msg2) = Message::from_bytes((&b2, 0)).unwrap();
 
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
                 match (msg1.message, msg2.message) {
-                    (ME::BDS05(m1), ME::BDS05(m2)) => (m1, m2),
+                    (ME::BDS05 { me: m1, .. }, ME::BDS05 { me: m2, .. }) => {
+                        (m1, m2)
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -615,13 +617,15 @@ mod tests {
         let b3 = hex!("8d4d224f58bf07c2d41a9a353d70");
         let b4 = hex!("8d4d224f58bf003b221b34aa5b8d");
 
-        let msg1 = Message::from_bytes((&b3, 0)).unwrap().1;
-        let msg2 = Message::from_bytes((&b4, 0)).unwrap().1;
+        let (_, msg1) = Message::from_bytes((&b3, 0)).unwrap();
+        let (_, msg2) = Message::from_bytes((&b4, 0)).unwrap();
 
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
                 match (msg1.message, msg2.message) {
-                    (ME::BDS05(m1), ME::BDS05(m2)) => (m1, m2),
+                    (ME::BDS05 { me: m1, .. }, ME::BDS05 { me: m2, .. }) => {
+                        (m1, m2)
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -640,11 +644,11 @@ mod tests {
     #[test]
     fn decode_airporne_position_with_reference() {
         let bytes = hex!("8D40058B58C901375147EFD09357");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS05(msg) => msg,
+                ME::BDS05 { me, .. } => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -659,11 +663,11 @@ mod tests {
         assert_relative_eq!(longitude, 6.06785, max_relative = 1e-3);
 
         let bytes = hex!("8D40058B58C904A87F402D3B8C59");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS05(msg) => msg,
+                ME::BDS05 { me, .. } => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -681,11 +685,11 @@ mod tests {
     #[test]
     fn decode_surface_position_with_reference() {
         let bytes = hex!("8c4841753aab238733c8cd4020b1");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS06(msg) => msg,
+                ME::BDS06 { me, .. } => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),

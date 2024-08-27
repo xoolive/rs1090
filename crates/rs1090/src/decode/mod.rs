@@ -8,10 +8,10 @@ pub mod flarm;
 use adsb::{ADSB, ME};
 use commb::DataSelector;
 use crc::modes_checksum;
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use tracing::debug;
 
 /**
  * DF stands for Downlink Format.
@@ -35,7 +35,7 @@ use std::fmt;
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
-#[deku(type = "u8", bits = "5", ctx = "crc: u32")]
+#[deku(id_type = "u8", bits = "5", ctx = "crc: u32")]
 #[serde(tag = "df")]
 pub enum DF {
     /// DF=0: Short Air-Air Surveillance (3.1.2.8.2)
@@ -277,30 +277,75 @@ pub enum DF {
 
 /// The entry point to Mode S and ADS-B decoding
 ///
-/// Use as `Message::from_bytes()` in mostly all applications
-#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+/// Use as `Message::try_from()` in mostly all applications
+#[derive(Debug, PartialEq, Serialize, Clone)]
 pub struct Message {
     /// Calculated from all bits, should be 0 for ADS-B (raises a DekuError),
     /// icao24 otherwise
-    #[deku(reader = "Self::read_crc(deku::input_bits)")]
     #[serde(skip)]
     pub crc: u32,
 
     /// The Downlink Format encoded in 5 bits
     #[serde(flatten)]
-    #[deku(ctx = "*crc")]
     pub df: DF,
 }
 
-impl Message {
-    /// Read rest as CRC bits
-    fn read_crc(
-        rest: &BitSlice<u8, Msb0>,
-    ) -> Result<(&BitSlice<u8, Msb0>, u32), DekuError> {
+impl DekuContainerRead<'_> for Message {
+    fn from_reader<R: deku::no_std_io::Read>(
+        input: (&mut R, usize),
+    ) -> Result<(usize, Self), DekuError>
+    where
+        Self: Sized,
+    {
+        let reader = &mut deku::reader::Reader::new(input.0);
+        if input.1 != 0 {
+            reader.skip_bits(input.1)?;
+        }
+
+        let value = Self::from_reader_with_ctx(reader, ()).unwrap();
+
+        Ok((reader.bits_read, value))
+    }
+
+    fn from_bytes(
+        input: (&[u8], usize),
+    ) -> Result<((&[u8], usize), Self), DekuError>
+    where
+        Self: Sized,
+    {
+        let mut cursor = deku::no_std_io::Cursor::new(input.0);
+        let reader = &mut Reader::new(&mut cursor);
+        if input.1 != 0 {
+            reader.skip_bits(input.1)?;
+        }
+
+        let value = Self::from_reader_with_ctx(reader, ())?;
+        let read_whole_byte = (reader.bits_read % 8) == 0;
+        let idx = if read_whole_byte {
+            reader.bits_read / 8
+        } else {
+            (reader.bits_read - (reader.bits_read % 8)) / 8
+        };
+        Ok(((&input.0[idx..], reader.bits_read % 8), value))
+    }
+}
+
+impl DekuReader<'_> for Message {
+    fn from_reader_with_ctx<R: deku::no_std_io::Read>(
+        reader: &mut Reader<R>,
+        _: (),
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
+    {
         const MODES_LONG_MSG_BYTES: usize = 14;
         const MODES_SHORT_MSG_BYTES: usize = 7;
 
-        let (_, remaining_bytes, _) = rest.domain().region().unwrap();
+        let mut remaining_bytes = vec![];
+
+        let value = reader.read_bits(8)?;
+        let res = value.unwrap().into_vec();
+        remaining_bytes.extend_from_slice(&res);
 
         // Decode the DF quickly to determine the length of the message
         let df = remaining_bytes[0] >> 3;
@@ -310,15 +355,44 @@ impl Message {
         } else {
             MODES_SHORT_MSG_BYTES * 8
         };
+        debug!("Reading {} bits based on DF={}", bit_len, df);
 
-        let crc = modes_checksum(remaining_bytes, bit_len)?;
+        let value = reader.read_bits(bit_len - 8)?;
+        let res = value.unwrap().into_vec();
+        remaining_bytes.extend_from_slice(&res);
+
+        let crc = modes_checksum(&remaining_bytes, bit_len)?;
         // Also the CRC must be 0 for ADS-B (DF=17) messages
         match (df, crc) {
-            (17, c) if c > 0 => Err(DekuError::Assertion(format!(
-                "Invalid CRC in ADS-B message: {c}"
-            ))),
-            _ => Ok((rest, crc)),
+            (17, c) if c > 0 => Err(DekuError::Assertion(
+                format!("Invalid CRC in ADS-B message: {c}").into(),
+            )),
+            _ => {
+                // Restart reading by creating a new cursor/reader (with context)
+                let mut input = deku::no_std_io::Cursor::new(&remaining_bytes);
+                let mut reader = Reader::new(&mut input);
+                debug!("reach here?");
+                let df = DF::from_reader_with_ctx(&mut reader, crc).unwrap();
+                debug!("reach here?");
+                Ok(Self { crc, df })
+            }
         }
+    }
+}
+
+impl core::convert::TryFrom<&[u8]> for Message {
+    type Error = DekuError;
+
+    #[inline]
+    fn try_from(input: &[u8]) -> core::result::Result<Self, Self::Error> {
+        let total_len = input.len();
+        let mut cursor = deku::no_std_io::Cursor::new(input);
+        let (amt_read, res) =
+            <Self as DekuContainerRead>::from_reader((&mut cursor, 0))?;
+        if (amt_read / 8) != total_len {
+            return Err(DekuError::Parse(("Too much data").into()));
+        }
+        Ok(res)
     }
 }
 
@@ -535,15 +609,17 @@ impl core::str::FromStr for ICAO {
 }
 /// 13 bit identity code (squawk code), a 4-octal digit identifier
 #[derive(PartialEq, DekuRead, Copy, Clone)]
-pub struct IdentityCode(#[deku(reader = "Self::read(deku::rest)")] pub u16);
+pub struct IdentityCode(#[deku(reader = "Self::read(deku::reader)")] pub u16);
 
 impl IdentityCode {
-    fn read(
-        rest: &BitSlice<u8, Msb0>,
-    ) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
-        let (rest, num) =
-            u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
-        Ok((rest, decode_id13(num)))
+    fn read<R: std::io::Read>(
+        reader: &mut Reader<R>,
+    ) -> Result<u16, DekuError> {
+        let num = u16::from_reader_with_ctx(
+            reader,
+            (deku::ctx::Endian::Big, deku::ctx::BitSize(13)),
+        )?;
+        Ok(decode_id13(num))
     }
 }
 
@@ -573,14 +649,16 @@ impl Serialize for IdentityCode {
 
 /// 13 bit encoded altitude
 #[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
-pub struct AC13Field(#[deku(reader = "Self::read(deku::rest)")] pub u16);
+pub struct AC13Field(#[deku(reader = "Self::read(deku::reader)")] pub u16);
 
 impl AC13Field {
-    fn read(
-        rest: &BitSlice<u8, Msb0>,
-    ) -> Result<(&BitSlice<u8, Msb0>, u16), DekuError> {
-        let (rest, ac13field) =
-            u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(13)))?;
+    fn read<R: std::io::Read>(
+        reader: &mut Reader<R>,
+    ) -> Result<u16, DekuError> {
+        let ac13field = u16::from_reader_with_ctx(
+            reader,
+            (deku::ctx::Endian::Big, deku::ctx::BitSize(13)),
+        )?;
 
         let m_bit = ac13field & 0x0040;
         let q_bit = ac13field & 0x0010;
@@ -588,24 +666,24 @@ impl AC13Field {
         if m_bit != 0 {
             let meters = ((ac13field & 0x1f80) >> 2) | (ac13field & 0x3f);
             // convert to ft
-            Ok((rest, (meters as f32 * 3.28084) as u16))
+            Ok((meters as f32 * 3.28084) as u16)
         } else if q_bit != 0 {
             // 11 bit integer resulting from the removal of bit Q and M
             let n = ((ac13field & 0x1f80) >> 2)
                 | ((ac13field & 0x0020) >> 1)
                 | (ac13field & 0x000f);
             if n > 40 {
-                Ok((rest, n * 25 - 1000)) // 25 ft interval
+                Ok(n * 25 - 1000) // 25 ft interval
             } else {
                 // TODO error?
-                Ok((rest, 0))
+                Ok(0)
             }
         } else {
             // 11 bit Gillham coded altitude
             if let Ok(n) = gray2alt(decode_id13(ac13field)) {
-                Ok((rest, (100 * n) as u16))
+                Ok((100 * n) as u16)
             } else {
-                Ok((rest, 0))
+                Ok(0)
             }
         }
     }
@@ -613,7 +691,7 @@ impl AC13Field {
 
 /// Transponder level and additional information (3.1.2.5.2.2.1)
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "3")]
+#[deku(id_type = "u8", bits = "3")]
 #[allow(non_camel_case_types)]
 pub enum Capability {
     /// Level 1 transponder (surveillance only), and either airborne or on the ground
@@ -655,7 +733,7 @@ impl fmt::Display for Capability {
 
 /// Airborne or Ground and SPI (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "3")]
+#[deku(id_type = "u8", bits = "3")]
 #[serde(rename_all = "snake_case")]
 pub enum FlightStatus {
     NoAlertNoSpiAirborne = 0b000,
@@ -688,7 +766,7 @@ impl fmt::Display for FlightStatus {
 
 /// The downlink request (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "5")]
+#[deku(id_type = "u8", bits = "5")]
 pub enum DownlinkRequest {
     None = 0b00000,
     RequestSendCommB = 0b00001,
@@ -708,7 +786,7 @@ pub struct UtilityMessage {
 
 /// The utility message type (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "2")]
+#[deku(id_type = "u8", bits = "2")]
 pub enum UtilityMessageType {
     NoInformation = 0b00,
     CommB = 0b01,
@@ -737,7 +815,7 @@ impl fmt::Display for ControlField {
 
 /// The control field type in TIS-B messages (DF=18)
 #[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
-#[deku(type = "u8", bits = "3")]
+#[deku(id_type = "u8", bits = "3")]
 #[allow(non_camel_case_types)]
 pub enum ControlFieldType {
     /// ADS-B Message from a non-transponder device
@@ -791,7 +869,7 @@ impl fmt::Display for ControlFieldType {
 
 /// Uplink / Downlink (DF=24)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 pub enum KE {
     DownlinkELMTx = 0,
     UplinkELMAck = 1,
@@ -885,7 +963,7 @@ mod tests {
     #[test]
     fn test_ac13field() {
         let bytes = hex!("a0001910cc300030aa0000eae004");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         match msg.df {
             DF::CommBAltitudeReply { ac, .. } => {
                 assert_eq!(ac.0, 39000);
@@ -897,8 +975,8 @@ mod tests {
     #[test]
     fn test_invalid_crc() {
         let bytes = hex!("8d4ca251204994b1c36e60a5343d");
-        let msg = Message::from_bytes((&bytes, 0));
-        if let Err(e) = msg {
+        let res = Message::from_bytes((&bytes, 0));
+        if let Err(e) = res {
             match e {
                 DekuError::Assertion(_msg) => (),
                 _ => unreachable!(),

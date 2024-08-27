@@ -66,47 +66,70 @@ impl fmt::Display for ADSB {
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct Unused {
-    #[deku(bits = 48)]
+    #[deku(skip, pad_bits_after = "48", default = "true")]
     #[serde(skip)]
-    unused: u64, //[u8; 6],
+    unused: bool,
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
-#[deku(type = "u8", bits = "5")]
+#[deku(id_type = "u8", bits = "5")]
 //#[serde(untagged)]
 #[serde(tag = "bds")]
 pub enum ME {
     #[deku(id = "0")]
-    #[serde(rename = "?")]
     NoPosition(Unused),
 
     #[deku(id_pat = "1..=4")]
     #[serde(rename = "08")]
-    BDS08(bds08::AircraftIdentification),
+    BDS08 {
+        #[serde(skip)]
+        /// The typecode value (between 1 and 4)
+        tc: u8,
+
+        #[serde(flatten)]
+        #[deku(ctx = "*tc")]
+        me: bds08::AircraftIdentification,
+    },
 
     #[deku(id_pat = "5..=8")]
     #[serde(rename = "06")]
-    BDS06(bds06::SurfacePosition),
+    BDS06 {
+        #[serde(skip)]
+        /// The typecode value (between 5 and 8)
+        tc: u8,
+
+        #[serde(flatten)]
+        #[deku(ctx = "*tc")]
+        me: bds06::SurfacePosition,
+    },
 
     #[deku(id_pat = "9..=18 | 20..=22")]
     #[serde(rename = "05")]
-    BDS05(bds05::AirbornePosition),
+    BDS05 {
+        #[serde(skip)]
+        /// The typecode value (between 9 and 18 or between 20 and 22)
+        tc: u8,
+
+        #[serde(flatten)]
+        #[deku(ctx = "*tc")]
+        me: bds05::AirbornePosition,
+    },
 
     #[deku(id = "19")]
     #[serde(rename = "09")]
     BDS09(bds09::AirborneVelocity),
 
     #[deku(id = "23")]
-    #[serde(rename = "?")]
+    #[serde(rename = "id23")]
     Reserved0(Unused),
 
-    #[deku(id_pat = "24")]
-    //#[serde(rename = "?")]
+    #[deku(id = "24")]
+    #[serde(rename = "id24")]
     SurfaceSystemStatus(Unused),
 
     #[deku(id_pat = "25..=27")]
-    #[serde(rename = "?")]
-    Reserved1(Unused),
+    #[serde(rename = "id25_27")]
+    Reserved1 { unused: u8 },
 
     #[deku(id = "28")]
     #[serde(rename = "61")]
@@ -117,7 +140,7 @@ pub enum ME {
     BDS62(bds62::TargetStateAndStatusInformation),
 
     #[deku(id = "30")]
-    #[serde(rename = "?")]
+    #[serde(rename = "id30")]
     AircraftOperationalCoordination(Unused),
 
     #[deku(id = "31")]
@@ -133,13 +156,13 @@ impl fmt::Display for ME {
             | ME::Reserved1 { .. }
             | ME::SurfaceSystemStatus { .. }
             | ME::AircraftOperationalCoordination { .. } => Ok(()),
-            ME::BDS05(me) => {
+            ME::BDS05 { me, .. } => {
                 write!(f, "{}", me)
             }
-            ME::BDS06(me) => {
+            ME::BDS06 { me, .. } => {
                 write!(f, "{}", me)
             }
-            ME::BDS08(me) => {
+            ME::BDS08 { me, .. } => {
                 write!(f, "{}", me)
             }
             ME::BDS09(me) => {
@@ -166,7 +189,7 @@ mod tests {
     #[test]
     fn test_icao24() {
         let bytes = hex!("8D406B902015A678D4D220AA4BDA");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(msg) = msg.df {
             assert_eq!(format!("{}", msg.icao24), "406b90");
             return;

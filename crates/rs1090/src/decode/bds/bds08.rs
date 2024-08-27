@@ -1,7 +1,7 @@
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 use std::fmt;
+use tracing::debug;
 
 /**
  * ## Aircraft Identification and Category (BDS 0,8)
@@ -17,9 +17,11 @@ use std::fmt;
  */
 
 #[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
+#[deku(ctx = "id: u8")]
 pub struct AircraftIdentification {
     /// The typecode of the aircraft (one of A, B, C, D)
     #[serde(skip)]
+    #[deku(skip, default = "Typecode::try_from(id)?")]
     pub tc: Typecode,
 
     /// The category of the aircraft
@@ -28,16 +30,15 @@ pub struct AircraftIdentification {
     pub ca: u8,
 
     /// Both typecode and category define a wake wortex category.
-    #[deku(reader = "wake_vortex(deku::rest, *tc, *ca)")]
+    #[deku(reader = "wake_vortex(*tc, *ca)")]
     pub wake_vortex: WakeVortex,
 
     /// Callsign
-    #[deku(reader = "callsign_read(deku::rest)")]
+    #[deku(reader = "callsign_read(deku::reader)")]
     pub callsign: String,
 }
 
-#[derive(Debug, PartialEq, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "5")]
+#[derive(Debug, PartialEq, Copy, Clone, Default)]
 pub enum Typecode {
     /// Reserved
     D = 1,
@@ -46,6 +47,7 @@ pub enum Typecode {
     /// Without an engine (glider, hangglider, etc.)
     B = 3,
     /// Aircraft
+    #[default]
     A = 4,
 }
 
@@ -61,6 +63,24 @@ impl fmt::Display for Typecode {
                 Self::A => "A",
             }
         )
+    }
+}
+
+use std::convert::TryFrom;
+
+impl TryFrom<u8> for Typecode {
+    type Error = DekuError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::D),
+            2 => Ok(Self::C),
+            3 => Ok(Self::B),
+            4 => Ok(Self::A),
+            _ => Err(DekuError::InvalidParam(
+                "Invalid value for Typecode".into(),
+            )),
+        }
     }
 }
 
@@ -144,11 +164,7 @@ impl fmt::Display for WakeVortex {
     }
 }
 
-pub fn wake_vortex(
-    rest: &BitSlice<u8, Msb0>,
-    tc: Typecode,
-    ca: u8,
-) -> Result<(&BitSlice<u8, Msb0>, WakeVortex), DekuError> {
+pub fn wake_vortex(tc: Typecode, ca: u8) -> Result<WakeVortex, DekuError> {
     let wake_vortex = match (tc, ca) {
         (Typecode::D, _) => WakeVortex::Reserved,
         (_, 0) => WakeVortex::NoInformation,
@@ -171,31 +187,30 @@ pub fn wake_vortex(
         (Typecode::A, 7) => WakeVortex::Rotorcraft,
         _ => WakeVortex::Reserved, // only 3 bits anyway
     };
-    Ok((rest, wake_vortex))
+    Ok(wake_vortex)
 }
 
 const CHAR_LOOKUP: &[u8; 64] =
     b"#ABCDEFGHIJKLMNOPQRSTUVWXYZ##### ###############0123456789######";
 
-pub fn callsign_read(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, String), DekuError> {
-    let mut inside_rest = rest;
-
+pub fn callsign_read<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<String, DekuError> {
     let mut chars = vec![];
-    for _ in 0..=6 {
-        let (for_rest, c) = <u8>::read(inside_rest, deku::ctx::BitSize(6))?;
+    for _ in 1..=8 {
+        let c = u8::from_reader_with_ctx(reader, deku::ctx::BitSize(6))?;
+        debug!("Reading letter {}", CHAR_LOOKUP[c as usize] as char);
         if c != 32 {
             chars.push(c);
         }
-        inside_rest = for_rest;
     }
     let encoded = chars
         .into_iter()
         .map(|b| CHAR_LOOKUP[b as usize] as char)
         .collect::<String>();
 
-    Ok((inside_rest, encoded))
+    debug!("Reading callsign {}", encoded);
+    Ok(encoded)
 }
 
 impl fmt::Display for AircraftIdentification {
@@ -215,14 +230,18 @@ mod tests {
     #[test]
     fn test_callsign() {
         let bytes = hex!("8d406b902015a678d4d220aa4bda");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
-            if let ME::BDS08(AircraftIdentification {
-                tc,
-                ca,
-                callsign,
-                wake_vortex,
-            }) = adsb_msg.message
+            if let ME::BDS08 {
+                me:
+                    AircraftIdentification {
+                        tc,
+                        ca,
+                        callsign,
+                        wake_vortex,
+                    },
+                ..
+            } = adsb_msg.message
             {
                 assert_eq!(format!("{tc}{ca}"), "A0");
                 assert_eq!(format!("{wake_vortex}"), "No category information");
@@ -236,7 +255,7 @@ mod tests {
     #[test]
     fn test_format() {
         let bytes = hex!("8d406b902015a678d4d220aa4bda");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         assert_eq!(
             format!("{msg}"),
             r#" DF17. Extended Squitter
