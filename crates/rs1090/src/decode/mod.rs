@@ -277,7 +277,7 @@ pub enum DF {
 
 /// The entry point to Mode S and ADS-B decoding
 ///
-/// Use as `Message::from_bytes()` in mostly all applications
+/// Use as `Message::try_from()` in mostly all applications
 #[derive(Debug, PartialEq, Serialize, Clone)]
 pub struct Message {
     /// Calculated from all bits, should be 0 for ADS-B (raises a DekuError),
@@ -302,7 +302,7 @@ impl DekuContainerRead<'_> for Message {
             reader.skip_bits(input.1)?;
         }
 
-        let value = Self::from_reader_with_ctx(reader, ())?;
+        let value = Self::from_reader_with_ctx(reader, ()).unwrap();
 
         Ok((reader.bits_read, value))
     }
@@ -371,10 +371,28 @@ impl DekuReader<'_> for Message {
                 // Restart reading by creating a new cursor/reader (with context)
                 let mut input = deku::no_std_io::Cursor::new(&remaining_bytes);
                 let mut reader = Reader::new(&mut input);
-                let df = DF::from_reader_with_ctx(&mut reader, crc)?;
+                debug!("reach here?");
+                let df = DF::from_reader_with_ctx(&mut reader, crc).unwrap();
+                debug!("reach here?");
                 Ok(Self { crc, df })
             }
         }
+    }
+}
+
+impl core::convert::TryFrom<&[u8]> for Message {
+    type Error = DekuError;
+
+    #[inline]
+    fn try_from(input: &[u8]) -> core::result::Result<Self, Self::Error> {
+        let total_len = input.len();
+        let mut cursor = deku::no_std_io::Cursor::new(input);
+        let (amt_read, res) =
+            <Self as DekuContainerRead>::from_reader((&mut cursor, 0))?;
+        if (amt_read / 8) != total_len {
+            return Err(DekuError::Parse(("Too much data").into()));
+        }
+        Ok(res)
     }
 }
 

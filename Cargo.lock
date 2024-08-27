@@ -711,6 +711,7 @@ checksum = "709ade444d53896e60f6265660eb50480dd08b77bfc822e5dcc233b88b0b2fba"
 dependencies = [
  "bitvec",
  "deku_derive",
+ "log",
  "no_std_io",
  "rustversion",
 ]
@@ -2288,6 +2289,7 @@ dependencies = [
  "hex",
  "hexlit",
  "libm",
+ "log",
  "num-complex",
  "once_cell",
  "rayon",

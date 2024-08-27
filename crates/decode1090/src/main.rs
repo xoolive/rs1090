@@ -139,59 +139,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    // if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
-    //     let mut msg = TimedMessage {
-    //         timestamp: tmsg.timestamp,
-    //         timesource: tmsg.timesource,
-    //         frame: tmsg.frame.to_string(),
-    //         message: Some(msg),
-    //         idx: tmsg.idx,
-    //     };
-
-    //     if let Some(message) = &mut msg.message {
-    //         match &mut message.df {
-    //             ExtendedSquitterADSB(adsb) => decode_position(
-    //                 &mut adsb.message,
-    //                 msg.timestamp,
-    //                 &adsb.icao24,
-    //                 &mut aircraft,
-    //                 &mut reference,
-    //             ),
-    //             ExtendedSquitterTisB { cf, .. } => decode_position(
-    //                 &mut cf.me,
-    //                 msg.timestamp,
-    //                 &cf.aa,
-    //                 &mut aircraft,
-    //                 &mut reference,
-    //             ),
-    //             CommBAltitudeReply { bds, .. } => {
-    //                 if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-    //                     bds.bds50 = None;
-    //                     bds.bds60 = None
-    //                 }
-    //             }
-    //             CommBIdentityReply { bds, .. } => {
-    //                 if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-    //                     bds.bds50 = None;
-    //                     bds.bds60 = None
-    //                 }
-    //             }
-    //             _ => {}
-    //         }
-    //         let json = serde_json::to_string(&msg).unwrap();
-    //         if let Some(file) = &mut output_file {
-    //             file.write_all(json.as_bytes()).await?;
-    //             file.write_all("\n".as_bytes()).await?;
-    //         } else {
-    //             println!("{}", json);
-    //         }
-    //     }
-    // }
 
     if !options.msgs.is_empty() {
         for msg in options.msgs {
             let bytes = hex::decode(&msg).unwrap();
-            let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+            let msg = Message::try_from(bytes.as_slice()).unwrap();
             let json = serde_json::to_string(&msg).unwrap();
             if let Some(file) = &mut output_file {
                 file.write_all(json.as_bytes()).await?;

@@ -65,18 +65,10 @@ impl fmt::Display for ADSB {
 */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
-pub struct UnusedU8 {
-    id: u8,
-
-    #[deku(bits = 48)]
-    #[serde(skip)]
-    unused: u64, //[u8; 5],
-}
-#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct Unused {
-    #[deku(bits = 48)]
+    #[deku(skip, pad_bits_after = "48", default = "true")]
     #[serde(skip)]
-    unused: u64, //[u8; 6],
+    unused: bool,
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
@@ -85,7 +77,6 @@ pub struct Unused {
 #[serde(tag = "bds")]
 pub enum ME {
     #[deku(id = "0")]
-    #[serde(rename = "id0")]
     NoPosition(Unused),
 
     #[deku(id_pat = "1..=4")]
