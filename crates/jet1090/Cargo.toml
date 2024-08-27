@@ -16,7 +16,7 @@ rtlsdr = ['rs1090/rtlsdr']
 [dependencies]
 chrono = "0.4.37"
 clap = { version = "4.5.16", features = ["color", "derive", "wrap_help"] }
-clap_complete = "4.5.8"
+clap_complete = "4.5.23"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 deku = "0.17.0"
 dirs = "5.0.1"
