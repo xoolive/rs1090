@@ -1,6 +1,6 @@
 # ruff: noqa: E402
 # %%
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from rs1090 import flarm
 
@@ -27,7 +27,7 @@ df
 # More advanced/expressive preprocessing available in the traffic library
 # https://github.com/xoolive/traffic
 
-from pitot.geodesy import distance
+from pitot.geodesy import distance  # type: ignore
 
 flight = df.query(
     'icao24 == "38f27b" and '
@@ -68,7 +68,7 @@ flight = flight.assign(
 # %%
 import matplotlib.pyplot as plt
 from cartes.crs import Lambert93, PlateCarree  # type: ignore
-from cartes.osm import Overpass
+from cartes.osm import Overpass  # type: ignore
 
 # Get the airport layout
 airport = Overpass.request(area=dict(icao="LFMY"), aeroway=True)

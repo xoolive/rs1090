@@ -1,8 +1,8 @@
 # ruff: noqa: E402
 # %%
-import bench_pms
-import pandas as pd
-from pyModeS import c_common, py_common
+import bench_pms  # type: ignore
+import pandas as pd  # type: ignore
+from pyModeS import c_common, py_common  # type: ignore
 
 from rs1090 import decode
 
@@ -60,7 +60,7 @@ result = pd.DataFrame.from_records(
 
 # %%
 
-import altair as alt
+import altair as alt  # type: ignore
 
 chart = (
     alt.Chart(result)

@@ -59,7 +59,7 @@ use rs1090::prelude::*;
 fn main() {
     let bytes: [u8; 14] = hex!("8c4841753a9a153237aef0f275be");
     // ADS-B decoding
-    if let Ok((_, msg)) = Message::from_bytes((&bytes, 0)) {
+    if let Ok(msg) = Message::try_from(bytes.as_slice()) {
         // JSON output
         let json = serde_json::to_string(&msg).expect("JSON error");
         println!("{}", json);
@@ -153,4 +153,3 @@ nix build  # build the jet1090 executable
 nix run  # run the jet1090 executable
 nix profile install  # install jet1090 and decode1090 in your PATH
 ```
-

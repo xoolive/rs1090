@@ -3,7 +3,7 @@ from __future__ import annotations
 import pickle
 from typing import Iterable, Sequence, TypeVar, overload
 
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from ._rust import (
     aircraft_information,
