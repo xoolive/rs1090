@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.1
+## 0.3.4
 
 - Major code adjustments following upgrade to deku 0.17.0
 - Upgrade cargo-dist, maturin, change version semantics (shared version)

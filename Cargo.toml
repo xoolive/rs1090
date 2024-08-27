@@ -6,7 +6,7 @@ resolver = "2"
 license = "MIT"
 edition = "2021"
 readme = "readme.md"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Xavier Olive <git@xoolive.org>"]
 homepage = "https://github.com/xoolive/rs1090"
 documentation = "https://crates.io/crates/rs1090"
@@ -38,7 +38,7 @@ install-updater = true
 
 [workspace.metadata.release]
 shared-version = true
-tag-name = "rs1090-v{{version}}"
+tag-name = "v{{version}}"
 
 [workspace.metadata.dist.dependencies.apt]
 libsoapysdr-dev = "*"
