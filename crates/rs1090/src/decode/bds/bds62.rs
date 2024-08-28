@@ -207,7 +207,7 @@ impl fmt::Display for TargetStateAndStatusInformation {
 }
 
 #[derive(Copy, Clone, Debug, Serialize, PartialEq, DekuRead)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 /// Encode the source of information for selected altitude
 pub enum AltSource {
     #[deku(id = "0")]
@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn test_surface_position() {
         let bytes = hex!("8DA05629EA21485CBF3F8CADAEEB");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let ME::BDS62(TargetStateAndStatusInformation {
                 selected_altitude,
@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn test_format_groundspeed() {
         let bytes = hex!("8DA05629EA21485CBF3F8CADAEEB");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         assert_eq!(
             format!("{msg}"),
             r#" DF17. Extended Squitter

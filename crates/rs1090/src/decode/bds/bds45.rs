@@ -1,4 +1,3 @@
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -9,31 +8,31 @@ use serde::Serialize;
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[serde(tag = "bds", rename = "45")]
 pub struct MeteorologicalHazardReport {
-    #[deku(reader = "read_level(deku::rest)")]
+    #[deku(reader = "read_level(deku::reader)")]
     /// Turbulence level
     pub turbulence: Option<Level>,
 
-    #[deku(reader = "read_level(deku::rest)")]
+    #[deku(reader = "read_level(deku::reader)")]
     /// Wind shear
     pub wind_shear: Option<Level>,
 
-    #[deku(reader = "read_level(deku::rest)")]
+    #[deku(reader = "read_level(deku::reader)")]
     /// Icing
     pub icing: Option<Level>,
 
-    #[deku(reader = "read_level(deku::rest)")]
+    #[deku(reader = "read_level(deku::reader)")]
     /// Wake vortex
     pub wake_vortex: Option<Level>,
 
-    #[deku(reader = "read_temperature(deku::rest)")]
+    #[deku(reader = "read_temperature(deku::reader)")]
     /// Static air temperature (in °C)
     pub static_temperature: f64,
 
-    #[deku(reader = "read_pressure(deku::rest)")]
+    #[deku(reader = "read_pressure(deku::reader)")]
     /// Average static pressure (in hPa)
     pub static_pressure: Option<u32>,
 
-    #[deku(reader = "read_height(deku::rest)")]
+    #[deku(reader = "read_height(deku::reader)")]
     /// Radio height (in ft)
     pub radio_height: Option<u32>,
 
@@ -50,32 +49,40 @@ pub enum Level {
     Severe,
 }
 
-fn read_level(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<Level>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(2)))?;
+fn read_level<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<Level>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(2)),
+    )?;
 
     match (status, value) {
-        (true, 0) => Ok((rest, Some(Level::Nil))),
-        (true, 1) => Ok((rest, Some(Level::Light))),
-        (true, 2) => Ok((rest, Some(Level::Moderate))),
-        (true, 3) => Ok((rest, Some(Level::Severe))),
+        (true, 0) => Ok(Some(Level::Nil)),
+        (true, 1) => Ok(Some(Level::Light)),
+        (true, 2) => Ok(Some(Level::Moderate)),
+        (true, 3) => Ok(Some(Level::Severe)),
         (true, _) => unreachable!(),
-        (false, 0) => Ok((rest, None)),
-        (false, _) => Err(DekuError::Assertion("invalid data".to_string())),
+        (false, 0) => Ok(None),
+        (false, _) => Err(DekuError::Assertion("invalid data".into())),
     }
 }
 
-fn read_temperature(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, f64), DekuError> {
-    let (rest, sign) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(9)))?;
+fn read_temperature<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<f64, DekuError> {
+    let sign = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(9)),
+    )?;
 
     let temperature = match sign {
         true => (value as f64 - 512.) * 0.25,
@@ -84,41 +91,49 @@ fn read_temperature(
 
     if !(-80. ..=60.).contains(&temperature) {
         return Err(DekuError::Assertion(
-            "Static temperature between -80 and +60".to_string(),
+            "Static temperature between -80 and +60".into(),
         ));
     }
-    Ok((rest, temperature))
+    Ok(temperature)
 }
 
-fn read_pressure(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<u32>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u32::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(11)))?;
+fn read_pressure<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<u32>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u32::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(11)),
+    )?;
 
     match (status, value) {
-        (true, value) => Ok((rest, Some(value))),
-        (false, _) => Ok((rest, None)),
+        (true, value) => Ok(Some(value)),
+        (false, _) => Ok(None),
         // In practice, I see quite some pressure fields with invalid status but non zero values
-        // (false, 0) => Ok((rest, None)),
-        // (false, _) => Err(DekuError::Assertion("invalid data".to_string())),
+        // (false, 0) => Ok((None)),
+        // (false, _) => Err(DekuError::Assertion("invalid data".into())),
     }
 }
 
-fn read_height(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<u32>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u32::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(12)))?;
+fn read_height<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<u32>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u32::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(12)),
+    )?;
 
     match (status, value) {
-        (true, value) => Ok((rest, Some(value * 16))),
-        (false, 0) => Ok((rest, None)),
-        (false, _) => Err(DekuError::Assertion("invalid data".to_string())),
+        (true, value) => Ok(Some(value * 16)),
+        (false, 0) => Ok(None),
+        (false, _) => Err(DekuError::Assertion("invalid data".into())),
     }
 }
 
@@ -126,9 +141,7 @@ fn fail_if_not_zero(value: u8) -> Result<u8, DekuError> {
     if value == 0 {
         Ok(value)
     } else {
-        Err(DekuError::Assertion(
-            "Reserved bits must be zero".to_string(),
-        ))
+        Err(DekuError::Assertion("Reserved bits must be zero".into()))
     }
 }
 

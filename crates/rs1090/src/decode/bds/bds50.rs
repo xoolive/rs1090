@@ -1,4 +1,3 @@
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -8,45 +7,51 @@ use serde::Serialize;
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[serde(tag = "bds", rename = "50")]
 pub struct TrackAndTurnReport {
-    #[deku(reader = "read_roll(deku::rest)")] // 11 bits
+    #[deku(reader = "read_roll(deku::reader)")] // 11 bits
     #[serde(rename = "roll")]
     // Roll angle (negative sign means left wing down)
     pub roll_angle: Option<f64>,
 
-    #[deku(reader = "read_track(deku::rest)")] // 12 bits
+    #[deku(reader = "read_track(deku::reader)")] // 12 bits
     #[serde(rename = "track")]
     pub track_angle: Option<f64>,
 
-    #[deku(reader = "read_groundspeed(deku::rest)")] // 11 bits
+    #[deku(reader = "read_groundspeed(deku::reader)")] // 11 bits
     /// Groundspeed in kts
     pub groundspeed: Option<u16>,
 
-    #[deku(reader = "read_rate(deku::rest, *roll_angle)")] // 11 bits
+    #[deku(reader = "read_rate(deku::reader, *roll_angle)")] // 11 bits
     pub track_rate: Option<f64>,
 
-    #[deku(reader = "read_tas(deku::rest, *groundspeed)")] // 11 bits
+    #[deku(reader = "read_tas(deku::reader, *groundspeed)")] // 11 bits
     #[serde(rename = "TAS")]
     /// True Airspeed (TAS) in kts, IAS is in BDS 0,6
     pub true_airspeed: Option<u16>,
 }
 
-fn read_roll(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, sign) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(9)))?;
+fn read_roll<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<f64>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let sign = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(9)),
+    )?;
 
     if !status {
         if (sign != 0) | (value != 0) {
             return Err(DekuError::Assertion(
-                "Non-null value with invalid status: roll angle".to_string(),
+                "Non-null value with invalid status: roll angle".into(),
             ));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
@@ -56,31 +61,36 @@ fn read_roll(
         value as f64 * 45. / 256.
     };
     if roll.abs() > 50. {
-        return Err(DekuError::Assertion(format!(
-            "Roll angle: abs({}) > 50",
-            roll
-        )));
+        return Err(DekuError::Assertion(
+            format!("Roll angle: abs({}) > 50", roll).into(),
+        ));
     }
-    Ok((rest, Some(roll)))
+    Ok(Some(roll))
 }
 
-fn read_track(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, sign) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
+fn read_track<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<f64>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let sign = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
+    )?;
 
     if !status {
         if (sign != 0) | (value != 0) {
             return Err(DekuError::Assertion(
-                "Non-null value with invalid status: track angle".to_string(),
+                "Non-null value with invalid status: track angle".into(),
             ));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
@@ -94,60 +104,69 @@ fn read_track(
         track += 360.
     }
 
-    Ok((rest, Some(track)))
+    Ok(Some(track))
 }
 
-fn read_groundspeed(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
+fn read_groundspeed<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<u16>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
+    )?;
 
     if !status {
         if value != 0 {
             return Err(DekuError::Assertion(
-                "Non-null value with invalid status: groundspeed".to_string(),
+                "Non-null value with invalid status: groundspeed".into(),
             ));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
     let gs = value * 2;
     if gs > 600 {
-        return Err(DekuError::Assertion(format!(
-            "Groundspeed value: {} > 600",
-            gs
-        )));
+        return Err(DekuError::Assertion(
+            format!("Groundspeed value: {} > 600", gs).into(),
+        ));
     }
-    Ok((rest, Some(gs)))
+    Ok(Some(gs))
 }
 
-fn read_rate(
-    rest: &BitSlice<u8, Msb0>,
+fn read_rate<R: std::io::Read>(
+    reader: &mut Reader<R>,
     roll: Option<f64>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<f64>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, sign) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(9)))?;
+) -> Result<Option<f64>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let sign = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(9)),
+    )?;
 
     if !status {
         if (sign != 0) | (value != 0) {
             return Err(DekuError::Assertion(
-                "Non-null value with invalid status: track rate".to_string(),
+                "Non-null value with invalid status: track rate".into(),
             ));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
     if value == 0b111111111 {
-        return Ok((rest, None));
+        return Ok(None);
     }
 
     let value = if sign == 1 {
@@ -160,33 +179,39 @@ fn read_rate(
     if let Some(roll) = roll {
         if roll * rate < 0. {
             // signs must agree: left wing down = turn left
-            return Err(DekuError::Assertion(format!(
-                "Roll angle {} and track rate {} signs do not agree.",
-                roll, rate
-            )));
+            return Err(DekuError::Assertion(
+                format!(
+                    "Roll angle {} and track rate {} signs do not agree.",
+                    roll, rate
+                )
+                .into(),
+            ));
         }
     }
 
-    Ok((rest, Some(rate)))
+    Ok(Some(rate))
 }
 
-fn read_tas(
-    rest: &BitSlice<u8, Msb0>,
+fn read_tas<R: std::io::Read>(
+    reader: &mut Reader<R>,
     gs: Option<u16>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
-    let (rest, status) =
-        bool::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(1)))?;
-    let (rest, value) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(10)))?;
+) -> Result<Option<u16>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
+    let value = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(10)),
+    )?;
 
     if !status {
         if value != 0 {
             return Err(DekuError::Assertion(
-                "Non-null value with invalid status: true air speed"
-                    .to_string(),
+                "Non-null value with invalid status: true air speed".into(),
             ));
         } else {
-            return Ok((rest, None));
+            return Ok(None);
         }
     }
 
@@ -197,10 +222,10 @@ fn read_tas(
             return Err(DekuError::Assertion(format!(
                 "TAS = {} must be within [80, 500] and abs(GS - TAS) = {} < 200",
                 tas, gs
-            )));
+            ).into()));
         }
     }
-    Ok((rest, Some(tas)))
+    Ok(Some(tas))
 }
 
 #[cfg(test)]
@@ -213,7 +238,7 @@ mod tests {
     #[test]
     fn test_valid_bds50() {
         let bytes = hex!("a000139381951536e024d4ccf6b5");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             let TrackAndTurnReport {
                 roll_angle,
@@ -242,7 +267,7 @@ mod tests {
     #[test]
     fn test_invalid_bds50() {
         let bytes = hex!("a0000638fa81c10000000081a92f");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             assert_eq!(bds.bds50, None);
         } else {

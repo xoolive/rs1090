@@ -1,6 +1,5 @@
 use crate::decode::cpr::CPRFormat;
 use crate::decode::{decode_id13, gray2alt};
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 use std::fmt;
@@ -16,22 +15,17 @@ use std::fmt;
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[deku(ctx = "tc: u8")]
 pub struct AirbornePosition {
-    #[deku(bits = "5", map = "check_typecode")]
-    #[serde(skip)]
-    /// The typecode value (between 9 and 18 or between 20 and 22)
-    pub tc: u8,
-
     #[deku(
-        bits = "0",
-        map = "|_val: u8| -> Result<_, DekuError> {
-            let nucp = match *tc {
-                n if n < 19 => 18 - *tc,
-                20 | 21 => 29 - *tc,
-                _ => 0
-            };
-            Ok(nucp)
-        }"
+        skip,
+        default = "
+        match tc {
+            n if n < 19 => 18 - tc,
+            20 | 21 => 29 - tc,
+            _ => 0
+        }
+        "
     )]
     #[serde(rename = "NUCp")]
     /// The Navigation Uncertainty Category Position (NUCp)
@@ -45,7 +39,7 @@ pub struct AirbornePosition {
     #[deku(
         bits = "1",
         map = "|v| -> Result<_, DekuError> {
-            if *tc<19 {Ok(Some(v))} else {Ok(None)}
+            if tc < 19 { Ok(Some(v)) } else { Ok(None) }
         }"
     )]
     #[serde(rename = "NICb", skip_serializing_if = "Option::is_none")]
@@ -53,13 +47,13 @@ pub struct AirbornePosition {
     /// Navigation Integrity Category Supplement-b (NICb) in ADSB v2
     pub saf_or_nicb: Option<u8>,
 
-    #[deku(reader = "decode_ac12(deku::rest)")]
+    #[deku(reader = "decode_ac12(deku::reader)")]
     #[serde(rename = "altitude")]
     /// Decode the altitude in feet, encoded on 12 bits.
     /// None if not available.
     pub alt: Option<u16>,
 
-    #[deku(reader = "read_source(deku::rest, *tc)")]
+    #[deku(reader = "read_source(tc)")]
     /// Decode the altitude source (GNSS or barometric),
     /// most commonly equal to barometric
     pub source: Source,
@@ -77,21 +71,23 @@ pub struct AirbornePosition {
     #[deku(bits = "17", endian = "big")]
     pub lon_cpr: u32,
 
-    #[deku(bits = "0", map = "|_v: u8| -> Result<_, DekuError> { Ok(None) }")]
+    #[deku(skip, default = "None")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latitude: Option<f64>,
 
-    #[deku(bits = "0", map = "|_v: u8| -> Result<_, DekuError> { Ok(None) }")]
+    #[deku(skip, default = "None")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub longitude: Option<f64>,
 }
 
 /// Decode altitude value encoded on 12 bits
-fn decode_ac12(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, Option<u16>), DekuError> {
-    let (rest, num) =
-        u16::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(12)))?;
+fn decode_ac12<R: std::io::Read>(
+    reader: &mut Reader<R>,
+) -> Result<Option<u16>, DekuError> {
+    let num = u16::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(12)),
+    )?;
 
     let q = num & 0x10;
 
@@ -99,44 +95,28 @@ fn decode_ac12(
         let n = ((num & 0x0fe0) >> 1) | (num & 0x000f);
         let n = n * 25;
         if n > 1000 {
-            Ok((rest, Some(n - 1000)))
+            Ok(Some(n - 1000))
         } else {
-            Ok((rest, None))
+            Ok(None)
         }
     } else {
         let mut n = ((num & 0x0fc0) << 1) | (num & 0x003f);
         n = decode_id13(n);
         if let Ok(n) = gray2alt(n) {
-            Ok((rest, u16::try_from(n * 100).ok()))
+            Ok(u16::try_from(n * 100).ok())
         } else {
-            Ok((rest, None))
+            Ok(None)
         }
     }
 }
 
-fn read_source(
-    rest: &BitSlice<u8, Msb0>,
-    tc: u8,
-) -> Result<(&BitSlice<u8, Msb0>, Source), DekuError> {
+fn read_source(tc: u8) -> Result<Source, DekuError> {
     let source = if tc < 19 {
         Source::Barometric
     } else {
         Source::Gnss
     };
-    Ok((rest, source))
-}
-
-/// This check is irrelevant in ADS-B messages but makes sense when decoding
-/// BDS 0,5 as part of DF20 or DF21 messages.
-fn check_typecode(value: u8) -> Result<u8, DekuError> {
-    if (9..22).contains(&value) && value != 19 {
-        Ok(value)
-    } else {
-        Err(DekuError::Assertion(format!(
-            "Typecode inconsistency {} should be in [9, 18] or [20, 22]",
-            value
-        )))
-    }
+    Ok(source)
 }
 
 impl fmt::Display for AirbornePosition {
@@ -156,7 +136,7 @@ impl fmt::Display for AirbornePosition {
 }
 
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "2")]
+#[deku(id_type = "u8", bits = "2")]
 pub enum SurveillanceStatus {
     NoCondition = 0,
     PermanentAlert = 1,

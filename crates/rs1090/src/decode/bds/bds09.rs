@@ -1,6 +1,5 @@
 #![allow(clippy::suspicious_else_formatting)]
 
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
@@ -83,17 +82,19 @@ pub struct AirborneVelocity {
     /// The sign of the difference between the GNSS height and the barometric altitude
     pub gnss_sign: Sign,
 
-    #[deku(reader = "read_geobaro(deku::rest, *gnss_sign)")]
+    #[deku(reader = "read_geobaro(deku::reader, *gnss_sign)")]
     /// The signed difference between the GNSS height and the barometric altitude
     pub geo_minus_baro: Option<i16>,
 }
 
-fn read_geobaro(
-    rest: &BitSlice<u8, Msb0>,
+fn read_geobaro<R: std::io::Read>(
+    reader: &mut Reader<R>,
     gnss_sign: Sign,
-) -> Result<(&BitSlice<u8, Msb0>, Option<i16>), DekuError> {
-    let (rest, value) =
-        u8::read(rest, (deku::ctx::Endian::Big, deku::ctx::BitSize(7)))?;
+) -> Result<Option<i16>, DekuError> {
+    let value = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(7)),
+    )?;
     let value = if value > 1 {
         match gnss_sign {
             Sign::Positive => Some(25 * (value as i16 - 1)),
@@ -102,7 +103,7 @@ fn read_geobaro(
     } else {
         None
     };
-    Ok((rest, value))
+    Ok(value)
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
@@ -125,7 +126,7 @@ pub enum AirborneVelocitySubType {
 }
 
 #[derive(Debug, PartialEq, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 pub enum Sign {
     Positive = 0,
     Negative = 1,
@@ -174,23 +175,22 @@ pub struct GroundSpeedDecoding {
         endian = "big",
         bits = "10",
         map = "|val: u16| -> Result<_, DekuError> {
-        Ok(f64::from((val as i16 - 1) * ns_sign.value()))
-    }"
+            Ok(f64::from((val as i16 - 1) * ns_sign.value()))
+        }"
     )]
     pub ns_vel: f64,
     #[deku(
-        bits = "0",
-        map = "|_: u8| -> Result<_, DekuError> {
-            Ok(libm::hypot(f64::abs(*ew_vel), f64::abs(*ns_vel)))
-        }"
+        skip,
+        default = "libm::hypot(f64::abs(*ew_vel), f64::abs(*ns_vel))"
     )]
     pub groundspeed: f64,
     #[deku(
-        bits = "0",
-        map = "|_: u8| -> Result<_, DekuError> {
-            let h = libm::atan2(*ew_vel, *ns_vel) * (360.0 / (2.0 * std::f64::consts::PI));
-            if h < 0.0 { Ok( h + 360. ) } else { Ok(h) }
-        }"
+        skip,
+        default = "
+        let h = libm::atan2(*ew_vel, *ns_vel) *
+            (360.0 / (2.0 * std::f64::consts::PI));
+        if h < 0.0 { h + 360. } else { h }
+        "
     )]
     pub track: f64,
 }
@@ -296,7 +296,7 @@ impl Serialize for AirspeedSupersonicDecoding {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 pub enum AirspeedType {
     IAS = 0,
     TAS = 1,
@@ -316,21 +316,21 @@ impl fmt::Display for AirspeedType {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 pub enum DirectionEW {
     WestToEast = 0,
     EastToWest = 1,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 pub enum DirectionNS {
     SouthToNorth = 0,
     NorthToSouth = 1,
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "1")]
+#[deku(id_type = "u8", bits = "1")]
 pub enum VerticalRateSource {
     #[serde(rename = "barometric")]
     BarometricPressureAltitude = 0,
@@ -416,7 +416,7 @@ mod tests {
     #[test]
     fn test_groundspeed_velocity() {
         let bytes = hex!("8D485020994409940838175B284F");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let ME::BDS09(velocity) = adsb_msg.message {
                 if let AirborneVelocitySubType::GroundSpeedDecoding(_gsd) =
@@ -446,7 +446,7 @@ mod tests {
     #[test]
     fn test_format_groundspeed() {
         let bytes = hex!("8D485020994409940838175B284F");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         assert_eq!(
             format!("{msg}"),
             r#" DF17. Extended Squitter
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn test_airspeed_velocity() {
         let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
             if let ME::BDS09(velocity) = adsb_msg.message {
                 if let AirborneVelocitySubType::AirspeedSubsonic(asd) =
@@ -488,7 +488,7 @@ mod tests {
     #[test]
     fn test_format_airspeed() {
         let bytes = hex!("8DA05F219B06B6AF189400CBC33F");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         assert_eq!(
             format!("{msg}"),
             r#" DF17. Extended Squitter

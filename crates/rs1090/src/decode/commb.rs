@@ -13,10 +13,10 @@ use super::bds::bds50::TrackAndTurnReport;
 use super::bds::bds60::HeadingAndSpeedReport;
 use super::bds::bds65::AircraftOperationStatus;
 use super::AC13Field;
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 use std::fmt;
+use tracing::debug;
 
 /**
  * ## Comm-B Data Selector (BDS)
@@ -26,129 +26,99 @@ use std::fmt;
  * and the last two codes (4,4, 4,5) report meteorological information.
  */
 
-#[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
-#[deku(ctx = "ac: AC13Field")] // altitude helps a lot in the validation
+#[derive(Debug, PartialEq, Serialize, Clone, Default)]
 pub struct DF20DataSelector {
-    #[deku(reader = "check_empty_bds(deku::input_bits)")]
     #[serde(skip)]
     /// Set to true if all zeros, then there is no need to parse
     pub is_empty: bool,
 
-    #[deku(reader = "read_bds05(deku::input_bits, *is_empty, ac)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds05: Option<AirbornePosition>,
 
-    #[deku(reader = "read_bds10(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds10: Option<DataLinkCapability>,
 
-    #[deku(reader = "read_bds17(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds17: Option<CommonUsageGICBCapabilityReport>,
 
-    #[deku(reader = "read_bds18(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds18: Option<GICBCapabilityReportPart1>,
 
-    #[deku(reader = "read_bds19(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds19: Option<GICBCapabilityReportPart2>,
 
-    #[deku(reader = "read_bds20(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds20: Option<AircraftIdentification>,
 
-    #[deku(reader = "read_bds21(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds21: Option<AircraftAndAirlineRegistrationMarkings>,
 
-    #[deku(reader = "read_bds30(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds30: Option<ACASResolutionAdvisory>,
 
-    #[deku(reader = "read_bds40(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds40: Option<SelectedVerticalIntention>,
 
-    #[deku(reader = "read_bds44(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds44: Option<MeteorologicalRoutineAirReport>,
 
-    #[deku(reader = "read_bds45(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds45: Option<MeteorologicalHazardReport>,
 
-    #[deku(reader = "read_bds50(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds50: Option<TrackAndTurnReport>,
 
-    #[deku(reader = "read_bds60(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds60: Option<HeadingAndSpeedReport>,
 
-    #[deku(reader = "read_bds65(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds65: Option<AircraftOperationStatus>,
 }
 
-#[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Clone, Default)]
 pub struct DF21DataSelector {
-    #[deku(reader = "check_empty_bds(deku::input_bits)")]
     #[serde(skip)]
     /// Set to true if all zeros, then there is no need to parse
     pub is_empty: bool,
 
     // On purpose: do not try bds05 here.
     // The reason for that is that there is no way to validate the altitude
-    #[deku(reader = "read_bds10(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds10: Option<DataLinkCapability>,
 
-    #[deku(reader = "read_bds17(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds17: Option<CommonUsageGICBCapabilityReport>,
 
-    #[deku(reader = "read_bds18(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds18: Option<GICBCapabilityReportPart1>,
 
-    #[deku(reader = "read_bds19(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds19: Option<GICBCapabilityReportPart2>,
 
-    #[deku(reader = "read_bds20(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds20: Option<AircraftIdentification>,
 
-    #[deku(reader = "read_bds21(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds21: Option<AircraftAndAirlineRegistrationMarkings>,
 
-    #[deku(reader = "read_bds30(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds30: Option<ACASResolutionAdvisory>,
 
-    #[deku(reader = "read_bds40(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds40: Option<SelectedVerticalIntention>,
 
-    #[deku(reader = "read_bds44(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds44: Option<MeteorologicalRoutineAirReport>,
 
-    #[deku(reader = "read_bds45(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds45: Option<MeteorologicalHazardReport>,
 
-    #[deku(reader = "read_bds50(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds50: Option<TrackAndTurnReport>,
 
-    #[deku(reader = "read_bds60(deku::input_bits, *is_empty)")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub bds60: Option<HeadingAndSpeedReport>,
 
-    #[deku(reader = "read_bds65(deku::input_bits, *is_empty)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds65: Option<AircraftOperationStatus>,
 }
@@ -165,274 +135,178 @@ impl fmt::Display for DF20DataSelector {
     }
 }
 
-fn read_bds05(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-    ac: AC13Field,
-) -> Result<(&BitSlice<u8, Msb0>, Option<AirbornePosition>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds05)) = AirbornePosition::from_bytes((bytes, 0)) {
-        match bds05.alt {
-            None => Ok((input, None)),
-            Some(alt) if alt == ac.0 => Ok((input, Some(bds05))),
-            Some(_) => Ok((input, None)),
-        }
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds10(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<DataLinkCapability>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds10)) = DataLinkCapability::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds10)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds17(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<
-    (&BitSlice<u8, Msb0>, Option<CommonUsageGICBCapabilityReport>),
-    DekuError,
-> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds17)) =
-        CommonUsageGICBCapabilityReport::from_bytes((bytes, 0))
+impl DekuReader<'_, AC13Field> for DF20DataSelector {
+    fn from_reader_with_ctx<R: deku::no_std_io::Read>(
+        reader: &mut Reader<R>,
+        ac: AC13Field, // altitude helps a lot in the validation
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
     {
-        Ok((input, Some(bds17)))
-    } else {
-        Ok((input, None))
+        let mut result = Self::default();
+        let res = reader.read_bits(56)?;
+        let bits = res.unwrap();
+        let buf = bits.into_vec();
+        debug!(
+            "Decoding {:?} according to various hypotheses",
+            buf.as_slice()
+        );
+
+        if buf.iter().all(|&x| x == 0) {
+            result.is_empty = true;
+            return Ok(result);
+        }
+
+        // Read the first 5 bits as a u8 and get the typecode
+        let mut cursor = deku::no_std_io::Cursor::new(buf.as_slice());
+        let bds05_reader = &mut Reader::new(&mut cursor);
+
+        let tc = u8::from_reader_with_ctx(bds05_reader, deku::ctx::BitSize(5))?;
+
+        if (9..22).contains(&tc) && tc != 19 {
+            match AirbornePosition::from_reader_with_ctx(bds05_reader, tc) {
+                Ok(bds05) => match bds05.alt {
+                    Some(alt) if alt == ac.0 => result.bds05 = Some(bds05),
+                    _ => (),
+                },
+                Err(e) => debug!("Error BDS05: {}", e.to_string()),
+            }
+        } else {
+            debug!(
+                "Error BDS05: Typecode inconsistency {} should be in [9, 18] or [20, 22]",
+                tc
+            )
+        }
+        match DataLinkCapability::try_from(buf.as_slice()) {
+            Ok(bds10) => result.bds10 = Some(bds10),
+            Err(e) => debug!("Error BDS10: {}", e.to_string()),
+        }
+        match CommonUsageGICBCapabilityReport::try_from(buf.as_slice()) {
+            Ok(bds17) => result.bds17 = Some(bds17),
+            Err(e) => debug!("Error BDS17: {}", e.to_string()),
+        }
+        match GICBCapabilityReportPart1::try_from(buf.as_slice()) {
+            Ok(bds18) => result.bds18 = Some(bds18),
+            Err(e) => debug!("Error BDS18: {}", e.to_string()),
+        }
+        match GICBCapabilityReportPart2::try_from(buf.as_slice()) {
+            Ok(bds19) => result.bds19 = Some(bds19),
+            Err(e) => debug!("Error BDS19: {}", e.to_string()),
+        }
+        match AircraftIdentification::try_from(buf.as_slice()) {
+            Ok(bds20) => result.bds20 = Some(bds20),
+            Err(e) => debug!("Error BDS20: {}", e.to_string()),
+        }
+        match ACASResolutionAdvisory::try_from(buf.as_slice()) {
+            Ok(bds30) => result.bds30 = Some(bds30),
+            Err(e) => debug!("Error BDS30: {}", e.to_string()),
+        }
+        match SelectedVerticalIntention::try_from(buf.as_slice()) {
+            Ok(bds40) => result.bds40 = Some(bds40),
+            Err(e) => debug!("Error BDS40: {}", e.to_string()),
+        }
+        match MeteorologicalRoutineAirReport::try_from(buf.as_slice()) {
+            Ok(bds44) => result.bds44 = Some(bds44),
+            Err(e) => debug!("Error BDS44: {}", e.to_string()),
+        }
+        match MeteorologicalHazardReport::try_from(buf.as_slice()) {
+            Ok(bds45) => result.bds45 = Some(bds45),
+            Err(e) => debug!("Error BDS45: {}", e.to_string()),
+        }
+        match TrackAndTurnReport::try_from(buf.as_slice()) {
+            Ok(bds50) => result.bds50 = Some(bds50),
+            Err(e) => debug!("Error BDS50: {}", e.to_string()),
+        }
+        match HeadingAndSpeedReport::try_from(buf.as_slice()) {
+            Ok(bds60) => result.bds60 = Some(bds60),
+            Err(e) => debug!("Error BDS60: {}", e.to_string()),
+        }
+        match AircraftOperationStatus::try_from(buf.as_slice()) {
+            Ok(bds65) => result.bds65 = Some(bds65),
+            Err(e) => debug!("Error BDS65: {}", e.to_string()),
+        }
+        Ok(result)
     }
 }
-fn read_bds18(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<GICBCapabilityReportPart1>), DekuError>
-{
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
 
-    match GICBCapabilityReportPart1::from_bytes((bytes, 0)) {
-        Ok((_, bds18)) => Ok((input, Some(bds18))),
-        Err(_err) => Ok((input, None)),
-    }
-}
-fn read_bds19(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<GICBCapabilityReportPart2>), DekuError>
-{
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds19)) = GICBCapabilityReportPart2::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds19)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds20(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<AircraftIdentification>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds20)) = AircraftIdentification::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds20)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds21(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<
-    (
-        &BitSlice<u8, Msb0>,
-        Option<AircraftAndAirlineRegistrationMarkings>,
-    ),
-    DekuError,
-> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds21)) =
-        AircraftAndAirlineRegistrationMarkings::from_bytes((bytes, 0))
+impl DekuReader<'_> for DF21DataSelector {
+    fn from_reader_with_ctx<R: deku::no_std_io::Read>(
+        reader: &mut Reader<R>,
+        _: (),
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
     {
-        Ok((input, Some(bds21)))
-    } else {
-        Ok((input, None))
-    }
-}
+        let mut result = Self::default();
+        let res = reader.read_bits(56)?;
+        let buf = res.unwrap().into_vec();
+        debug!(
+            "Decoding {:?} according to various hypotheses",
+            buf.as_slice()
+        );
 
-fn read_bds30(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<ACASResolutionAdvisory>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-
-    if let Ok((_, bds30)) = ACASResolutionAdvisory::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds30)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds40(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<SelectedVerticalIntention>), DekuError>
-{
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-    if let Ok((_, bds40)) = SelectedVerticalIntention::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds40)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds44(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<
-    (&BitSlice<u8, Msb0>, Option<MeteorologicalRoutineAirReport>),
-    DekuError,
-> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-    if let Ok((_, bds44)) =
-        MeteorologicalRoutineAirReport::from_bytes((bytes, 0))
-    {
-        Ok((input, Some(bds44)))
-    } else {
-        Ok((input, None))
-    }
-}
-fn read_bds45(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<MeteorologicalHazardReport>), DekuError>
-{
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-    if let Ok((_, bds45)) = MeteorologicalHazardReport::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds45)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds50(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<TrackAndTurnReport>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-    if let Ok((_, bds50)) = TrackAndTurnReport::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds50)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds60(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<HeadingAndSpeedReport>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-    let (_, bytes, _) = input.domain().region().unwrap();
-    if let Ok((_, bds60)) = HeadingAndSpeedReport::from_bytes((bytes, 0)) {
-        Ok((input, Some(bds60)))
-    } else {
-        Ok((input, None))
-    }
-}
-
-fn read_bds65(
-    input: &BitSlice<u8, Msb0>,
-    empty: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<AircraftOperationStatus>), DekuError> {
-    if empty {
-        return Ok((input, None));
-    }
-
-    let (rest, typecode) =
-        u8::read(input, (deku::ctx::Endian::Big, deku::ctx::BitSize(5)))?;
-
-    if typecode != 31 {
-        return Ok((input, None));
-    }
-
-    let (_, bytes, _) = rest.domain().region().unwrap();
-
-    match AircraftOperationStatus::from_bytes((bytes, 0)) {
-        Ok((_, AircraftOperationStatus::Airborne(bds65))) => {
-            Ok((input, Some(AircraftOperationStatus::Airborne(bds65))))
+        if buf.iter().all(|&x| x == 0) {
+            result.is_empty = true;
+            return Ok(result);
         }
-        Ok(_) => {
-            // Surface and Reserved are considered impossible in for DF20/DF21
-            Ok((input, None))
+        // Do not attempt to decode BDS0,5:
+        // DF21 does not contain any altitude to validate the info
+        /*match AirbornePosition::try_from(buf.as_slice()) {
+            Ok(bds05) => match bds05.alt {
+                None => Ok(None),
+                Some(alt) if alt == ac.0 => Ok(Some(bds05)),
+                Some(_) => Ok(None),
+            },
+            Err(e) => debug!("Error BDS05: {}", e.to_string()),
+        }*/
+        match DataLinkCapability::try_from(buf.as_slice()) {
+            Ok(bds10) => result.bds10 = Some(bds10),
+            Err(e) => debug!("Error BDS10: {}", e.to_string()),
         }
-        Err(_err) => Ok((input, None)),
-    }
-}
-
-fn check_empty_bds(
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(&BitSlice<u8, Msb0>, bool), DekuError> {
-    let mut inside_rest = rest;
-    for _ in 0..=5 {
-        let (for_rest, value) = u8::read(
-            inside_rest,
-            (deku::ctx::Endian::Big, deku::ctx::BitSize(8)),
-        )?;
-        if value != 0 {
-            return Ok((rest, false));
+        match CommonUsageGICBCapabilityReport::try_from(buf.as_slice()) {
+            Ok(bds17) => result.bds17 = Some(bds17),
+            Err(e) => debug!("Error BDS17: {}", e.to_string()),
         }
-        inside_rest = for_rest;
+        match GICBCapabilityReportPart1::try_from(buf.as_slice()) {
+            Ok(bds18) => result.bds18 = Some(bds18),
+            Err(e) => debug!("Error BDS18: {}", e.to_string()),
+        }
+        match GICBCapabilityReportPart2::try_from(buf.as_slice()) {
+            Ok(bds19) => result.bds19 = Some(bds19),
+            Err(e) => debug!("Error BDS19: {}", e.to_string()),
+        }
+        match AircraftIdentification::try_from(buf.as_slice()) {
+            Ok(bds20) => result.bds20 = Some(bds20),
+            Err(e) => debug!("Error BDS20: {}", e.to_string()),
+        }
+        match ACASResolutionAdvisory::try_from(buf.as_slice()) {
+            Ok(bds30) => result.bds30 = Some(bds30),
+            Err(e) => debug!("Error BDS30: {}", e.to_string()),
+        }
+        match SelectedVerticalIntention::try_from(buf.as_slice()) {
+            Ok(bds40) => result.bds40 = Some(bds40),
+            Err(e) => debug!("Error BDS40: {}", e.to_string()),
+        }
+        match MeteorologicalRoutineAirReport::try_from(buf.as_slice()) {
+            Ok(bds44) => result.bds44 = Some(bds44),
+            Err(e) => debug!("Error BDS44: {}", e.to_string()),
+        }
+        match MeteorologicalHazardReport::try_from(buf.as_slice()) {
+            Ok(bds45) => result.bds45 = Some(bds45),
+            Err(e) => debug!("Error BDS45: {}", e.to_string()),
+        }
+        match TrackAndTurnReport::try_from(buf.as_slice()) {
+            Ok(bds50) => result.bds50 = Some(bds50),
+            Err(e) => debug!("Error BDS50: {}", e.to_string()),
+        }
+        match HeadingAndSpeedReport::try_from(buf.as_slice()) {
+            Ok(bds60) => result.bds60 = Some(bds60),
+            Err(e) => debug!("Error BDS60: {}", e.to_string()),
+        }
+        match AircraftOperationStatus::try_from(buf.as_slice()) {
+            Ok(bds65) => result.bds65 = Some(bds65),
+            Err(e) => debug!("Error BDS65: {}", e.to_string()),
+        }
+        Ok(result)
     }
-    Ok((rest, true))
 }

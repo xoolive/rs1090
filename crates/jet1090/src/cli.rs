@@ -1,15 +1,24 @@
 use std::str::FromStr;
 
+use radarcape::BeastSource;
 use rs1090::decode::{cpr::Position, TimedMessage};
 use rs1090::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
+use tracing::error;
+use url::Url;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Address {
+    Tcp(String),
+    Udp(String),
+    Websocket(String),
+    Rtlsdr,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {
-    host: String,
-    port: u16,
-    rtlsdr: bool,
+    address: Address,
     pub airport: Option<String>,
     pub reference: Option<Position>,
     #[serde(skip)]
@@ -22,50 +31,64 @@ impl FromStr for Source {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.split('@').map(|p| p.trim()).collect();
+        let s = s.replace("@", "?"); // retro-compatibility
+        let default_tcp = Url::parse("tcp://").unwrap();
 
-        let mut source = Source::default();
-        if parts.len() == 2 {
-            if !parts[1].contains(',') {
-                source.airport = Some(parts[1].to_string());
-            }
-            source.reference = Position::from_str(parts[1]).ok()
+        let url = default_tcp.join(&s).map_err(|e| e.to_string())?;
+
+        let address = match url.scheme() {
+            "tcp" => Address::Tcp(format!(
+                "{}:{}",
+                url.host_str().unwrap_or("0.0.0.0"),
+                match url.host() {
+                    Some(_) => url.port_or_known_default().unwrap_or(10003),
+                    None => {
+                        // deals with ":4003?LFBO" (parsed as "tcp:///:4003?LFBO")
+                        url.path()
+                            .strip_prefix("/:")
+                            .unwrap()
+                            .parse::<u16>()
+                            .expect("A port number was expected")
+                    }
+                }
+            )),
+            "udp" => Address::Udp(format!(
+                "{}:{}",
+                url.host_str().unwrap_or("0.0.0.0"),
+                url.port_or_known_default().unwrap()
+            )),
+            "rtlsdr" => Address::Rtlsdr,
+            "ws" => Address::Websocket(format!(
+                "ws://{}:{}/{}",
+                url.host_str().unwrap_or("0.0.0.0"),
+                url.port_or_known_default().unwrap(),
+                url.path().strip_prefix("/").unwrap()
+            )),
+            _ => return Err("unsupported scheme".to_string()),
         };
 
-        let parts: Vec<&str> = parts[0].split(':').map(|p| p.trim()).collect();
-        if parts.len() == 1 {
-            match parts[0] {
-                "rtlsdr" => {
-                    source.rtlsdr = true;
-                }
-                s if {
-                    if let Ok(s) = s.parse::<u16>() {
-                        source.host = "0.0.0.0".to_string();
-                        source.port = s;
-                        true
-                    } else {
-                        false
-                    }
-                } => {}
-                _ => {
-                    return Err("unparsable".to_string());
-                }
+        let mut source = Source {
+            address,
+            airport: None,
+            reference: None,
+            count: 0,
+            last: 0,
+        };
+
+        if let Some(query) = url.query() {
+            if !query.contains(',') {
+                source.airport = Some(query.to_string());
             }
-        } else {
-            source.host = parts[0].to_string();
-            if let Ok(port) = parts[1].parse::<u16>() {
-                source.port = port;
-            } else {
-                return Err("unparsable port".to_string());
-            }
-        }
+            source.reference = Position::from_str(query).ok()
+        };
+
         Ok(source)
     }
 }
 
 impl Source {
     pub async fn receiver(&self, tx: Sender<TimedMessage>, idx: usize) {
-        if self.rtlsdr {
+        if self.address == Address::Rtlsdr {
             #[cfg(not(feature = "rtlsdr"))]
             {
                 eprintln!(
@@ -79,8 +102,15 @@ impl Source {
                 rtlsdr::receiver(tx, idx).await
             }
         } else {
-            let server_address = format!("{}:{}", self.host, self.port);
-            radarcape::receiver(server_address, tx, idx).await
+            let server_address = match &self.address {
+                Address::Tcp(s) => BeastSource::TCP(s.to_owned()),
+                Address::Udp(s) => BeastSource::UDP(s.to_owned()),
+                Address::Websocket(s) => BeastSource::Websocket(s.to_owned()),
+                Address::Rtlsdr => unreachable!(),
+            };
+            if let Err(e) = radarcape::receiver(server_address, tx, idx).await {
+                error!("{}", e.to_string());
+            }
         }
     }
 }
@@ -91,80 +121,72 @@ mod test {
 
     #[test]
     fn test_source() {
-        let source = Source::from_str("rtlsdr");
+        let source = Source::from_str("rtlsdr:");
         assert!(source.is_ok());
-        if let Ok(Source { rtlsdr, .. }) = source {
-            assert!(rtlsdr);
+        if let Ok(Source { address, .. }) = source {
+            assert_eq!(address, Address::Rtlsdr);
         }
 
-        let source = Source::from_str("rtlsdr@LFBO");
+        let source = Source::from_str("rtlsdr:@LFBO");
         assert!(source.is_ok());
         if let Ok(Source {
-            rtlsdr,
+            address,
             airport,
             reference: Some(pos),
             ..
         }) = source
         {
-            assert!(rtlsdr);
+            assert_eq!(address, Address::Rtlsdr);
             assert_eq!(airport, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
-        let source = Source::from_str("foo@LFBO");
+
+        let source = Source::from_str("http://default");
         assert!(source.is_err());
 
-        let source = Source::from_str("4003");
+        let source = Source::from_str(":4003");
         assert!(source.is_ok());
         if let Ok(Source {
-            host,
-            port,
-            rtlsdr,
+            address: Address::Tcp(path),
             airport,
             reference,
             ..
         }) = source
         {
-            assert!(!rtlsdr);
-            assert_eq!(host, "0.0.0.0");
-            assert_eq!(port, 4003);
+            assert_eq!(path, "0.0.0.0:4003");
             assert_eq!(airport, None);
             assert_eq!(reference, None);
         }
 
-        let source = Source::from_str("4003@LFBO");
+        let source = Source::from_str(":4003?LFBO");
         assert!(source.is_ok());
         if let Ok(Source {
-            host,
-            port,
-            rtlsdr,
+            address: Address::Tcp(path),
             airport,
             reference: Some(pos),
             ..
         }) = source
         {
-            assert!(!rtlsdr);
-            assert_eq!(host, "0.0.0.0");
-            assert_eq!(port, 4003);
+            assert_eq!(path, "0.0.0.0:4003");
             assert_eq!(airport, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
 
-        let source = Source::from_str("1.2.3.4:4003@LFBO");
+        let source = Source::from_str("ws://1.2.3.4:4003/get?LFBO");
         assert!(source.is_ok());
         if let Ok(Source {
-            host,
-            port,
-            rtlsdr,
+            address,
             airport,
             reference: Some(pos),
             ..
         }) = source
         {
-            assert!(!rtlsdr);
-            assert_eq!(host, "1.2.3.4");
-            assert_eq!(port, 4003);
+            assert_eq!(
+                address,
+                Address::Websocket("ws://1.2.3.4:4003/get".to_string())
+            );
             assert_eq!(airport, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);

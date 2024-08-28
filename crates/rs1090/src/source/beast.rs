@@ -1,7 +1,12 @@
 use async_stream::stream;
-use futures_util::stream::Stream;
+use futures::stream::SplitStream;
+use futures_util::stream::{Stream, StreamExt};
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpStream, UdpSocket};
+use tokio_tungstenite::{
+    tungstenite::protocol::Message, MaybeTlsStream, WebSocketStream,
+};
+use tracing::{debug, error};
 
 use std::collections::HashSet;
 
@@ -18,9 +23,12 @@ use std::collections::HashSet;
 /// Decoding the timestamp:
 /// <https://wiki.modesbeast.com/Radarcape:Firmware_Versions#The_GPS_timestamp>
 
+pub type WsStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
+
 pub enum DataSource {
     Tcp(TcpStream),
     Udp(UdpSocket),
+    Ws(WsStream),
 }
 
 pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
@@ -39,7 +47,7 @@ pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
                     Ok(0) => break, // Connection closed by peer
                     Ok(n) => n,
                     Err(e) => {
-                        println!("Error reading from socket: {}", e);
+                        error!("Error reading from socket: {}", e);
                         break;
                     }
                 }
@@ -48,8 +56,21 @@ pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
                 match udp_socket.recv_from(&mut buffer).await {
                     Ok((n, _)) => n,
                     Err(e) => {
-                        println!("Error reading from socket: {}", e);
+                        error!("Error reading from socket: {}", e);
                         break;
+                    }
+                }
+            }
+            DataSource::Ws(ws_receive) => {
+                match ws_receive.next().await {
+                    Some(Ok(Message::Binary(data))) => {
+                        debug!("Received {:?}", data);
+                        let len = data.len().min(buffer.len());
+                        buffer[..len].copy_from_slice(&data[..len]);
+                        len
+                    }
+                    _ => {
+                        error!("Error reading from websocket");break;
                     }
                 }
             }

@@ -8,33 +8,36 @@ authors.workspace = true
 version.workspace = true
 license.workspace = true
 edition.workspace = true
+homepage.workspace = true
 
 [features]
 rtlsdr = ['rs1090/rtlsdr']
 
 [dependencies]
 chrono = "0.4.37"
-clap = { version = "4.5.11", features = ["color", "derive", "wrap_help"] }
-clap_complete = "4.5.8"
-crossterm = { version = "0.27.0", features = ["event-stream"] }
-deku = "0.16.0"
+clap = { version = "4.5.16", features = ["color", "derive", "wrap_help"] }
+clap_complete = "4.5.23"
+crossterm = { version = "0.28.1", features = ["event-stream"] }
+deku = "0.17.0"
 dirs = "5.0.1"
 dotenv = "0.15.0"
 futures = "0.3.30"
 futures-util = "0.3.30"
 hex = "0.4.3"
-ratatui = "0.27.0"
+ratatui = "0.28.1"
 reqwest = "0.12.5"
-rs1090 = { version = "0.2.5", path = "../rs1090" }
-rusqlite = { version = "0.32.0", features = ["bundled"] }
-serde = { version = "1.0.204", features = ["derive"] }
-serde_json = "1.0.121"
+rs1090 = { version = "0.3.4", path = "../rs1090" }
+rusqlite = { version = "0.32.1", features = ["bundled"] }
+serde = { version = "1.0.209", features = ["derive"] }
+serde_json = "1.0.127"
 soapysdr = { version = "0.4.0", optional = true }
-tokio = { version = "1.39.2", features = ["full"] }
-toml = "0.8.15"
+tokio = { version = "1.39.3", features = ["full"] }
+toml = "0.8.19"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+url = "2.5.2"
 warp = "0.3.6"
-zip = "2.1.5"
-
+zip = "2.1.6"
 
 [[bin]]
 name = "jet1090"

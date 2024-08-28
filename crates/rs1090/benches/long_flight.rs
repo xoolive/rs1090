@@ -12,7 +12,7 @@ fn first_lines(n: usize) {
         let _ts = parts.next().unwrap().parse::<f64>().expect("not a float");
         let msg = parts.next().unwrap();
         let hex = &mut msg.to_string()[18..].to_string();
-        let bytes = hex::decode(&hex).unwrap();
+        let bytes = hex::decode(hex).unwrap();
         let (_, _msg) = Message::from_bytes((&bytes, 0)).unwrap();
     }
 }
@@ -63,7 +63,7 @@ fn long_flight() -> Vec<Vec<Message>> {
                     parts.next().unwrap().parse::<f64>().expect("not a float");
                 let msg = parts.next().unwrap();
                 let hex = &mut msg.to_string()[18..].to_string();
-                let bytes = hex::decode(&hex).unwrap();
+                let bytes = hex::decode(hex).unwrap();
                 let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
                 res.push(msg);
             }

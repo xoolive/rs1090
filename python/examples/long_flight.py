@@ -1,6 +1,6 @@
 # ruff: noqa: E402
 # %%
-import pandas as pd
+import pandas as pd  # type: ignore
 
 from rs1090 import decode
 

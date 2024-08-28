@@ -190,7 +190,7 @@ fn is_false(value: &bool) -> bool {
 fn fail_if_true(value: bool) -> Result<bool, DekuError> {
     if value {
         Err(DekuError::Assertion(
-            "Field is most probably false in BDS 1,9".to_string(),
+            "Field is most probably false in BDS 1,9".into(),
         ))
     } else {
         Ok(value)

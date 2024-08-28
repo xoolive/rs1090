@@ -192,7 +192,7 @@ fn fail_if_false(value: bool) -> Result<bool, DekuError> {
         Ok(value)
     } else {
         Err(DekuError::Assertion(
-            "BDS 1,7, 1,8, 1,9 and 2,0 are always valid in BDS 1,8".to_string(),
+            "BDS 1,7, 1,8, 1,9 and 2,0 are always valid in BDS 1,8".into(),
         ))
     }
 }
@@ -200,7 +200,7 @@ fn fail_if_false(value: bool) -> Result<bool, DekuError> {
 fn fail_if_true(value: bool) -> Result<bool, DekuError> {
     if value {
         Err(DekuError::Assertion(
-            "Field is most probably false in BDS 1,8".to_string(),
+            "Field is most probably false in BDS 1,8".into(),
         ))
     } else {
         Ok(value)

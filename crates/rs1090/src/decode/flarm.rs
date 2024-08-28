@@ -1,6 +1,5 @@
 use std::fmt;
 
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -146,7 +145,7 @@ pub struct Flarm {
     /// A flag set to true if the address is an icao24 address
     pub is_icao24: bool,
 
-    #[deku(reader = "Self::decode_btea(deku::rest, *icao24, *timestamp)")]
+    #[deku(reader = "Self::decode_btea(deku::reader, *icao24, *timestamp)")]
     #[serde(skip)]
     /// Decrypted information (as a table 5 u32 integers)
     pub decoded: Vec<u32>,
@@ -284,13 +283,11 @@ fn magic_value(v: u8) -> Result<bool, DekuError> {
     if v == 0x20 {
         return Ok(false);
     };
-    Err(DekuError::Assertion(
-        "Magic must be 0x10 or 0x20".to_string(),
-    ))
+    Err(DekuError::Assertion("Magic must be 0x10 or 0x20".into()))
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
-#[deku(type = "u8", bits = "4", endian = "big")]
+#[deku(id_type = "u8", bits = "4", endian = "big")]
 pub enum AircraftType {
     Unknown = 0,
     Glider,
@@ -311,23 +308,23 @@ pub enum AircraftType {
 }
 
 impl Flarm {
-    fn decode_btea(
-        rest: &BitSlice<u8, Msb0>,
+    fn decode_btea<R: std::io::Read>(
+        reader: &mut Reader<R>,
         icao24: Address,
         timestamp: u32,
-    ) -> Result<(&BitSlice<u8, Msb0>, Vec<u32>), DekuError> {
+    ) -> Result<Vec<u32>, DekuError> {
         let addr = (icao24.0 << 8) & 0xffffff;
         let key = make_key(timestamp as i64, addr as i64);
 
-        let (rest, p1) = u32::read(rest, deku::ctx::Endian::Little)?;
-        let (rest, p2) = u32::read(rest, deku::ctx::Endian::Little)?;
-        let (rest, p3) = u32::read(rest, deku::ctx::Endian::Little)?;
-        let (rest, p4) = u32::read(rest, deku::ctx::Endian::Little)?;
-        let (rest, p5) = u32::read(rest, deku::ctx::Endian::Little)?;
+        let p1 = u32::from_reader_with_ctx(reader, deku::ctx::Endian::Little)?;
+        let p2 = u32::from_reader_with_ctx(reader, deku::ctx::Endian::Little)?;
+        let p3 = u32::from_reader_with_ctx(reader, deku::ctx::Endian::Little)?;
+        let p4 = u32::from_reader_with_ctx(reader, deku::ctx::Endian::Little)?;
+        let p5 = u32::from_reader_with_ctx(reader, deku::ctx::Endian::Little)?;
         let mut decoded = vec![p1, p2, p3, p4, p5];
         btea(&mut decoded, key.as_ref());
 
-        Ok((rest, decoded))
+        Ok(decoded)
     }
 
     fn decode_latitude(decoded: u32, ref_lat: f64) -> Result<f64, DekuError> {

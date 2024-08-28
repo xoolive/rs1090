@@ -142,7 +142,7 @@ pub struct ACASResolutionAdvisory {
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
-#[deku(type = "u8", bits = "2")]
+#[deku(id_type = "u8", bits = "2")]
 #[serde(untagged)]
 pub enum ThreatType {
     #[deku(id = "0")]
@@ -209,7 +209,7 @@ fn fail_if_not30(value: u8) -> Result<u8, DekuError> {
         Ok(value)
     } else {
         Err(DekuError::Assertion(
-            "First bits must be 0x30 in BDS 3,0".to_string(),
+            "First bits must be 0x30 in BDS 3,0".into(),
         ))
     }
 }

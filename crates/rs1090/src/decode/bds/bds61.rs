@@ -26,7 +26,7 @@ impl fmt::Display for AircraftStatus {
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "3")]
+#[deku(id_type = "u8", bits = "3")]
 #[serde(rename_all = "snake_case")]
 pub enum AircraftStatusType {
     #[deku(id = "0")]
@@ -42,7 +42,7 @@ pub enum AircraftStatusType {
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-#[deku(type = "u8", bits = "3")]
+#[deku(id_type = "u8", bits = "3")]
 #[serde(rename_all = "snake_case")]
 pub enum EmergencyState {
     None = 0,

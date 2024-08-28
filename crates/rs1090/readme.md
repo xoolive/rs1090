@@ -59,7 +59,7 @@ use rs1090::prelude::*;
 fn main() {
     let bytes: [u8; 14] = hex!("8c4841753a9a153237aef0f275be");
     // ADS-B decoding
-    if let Ok((_, msg)) = Message::from_bytes((&bytes, 0)) {
+    if let Ok(msg) = Message::try_from(bytes.as_slice()) {
         // JSON output
         let json = serde_json::to_string(&msg).expect("JSON error");
         println!("{}", json);
@@ -132,4 +132,24 @@ Usage is available with the help command.
 
 ```sh
 decode1090 --help
+```
+
+## jet1090
+
+Prebuilt binaries are available on the [Releases page](https://github.com/xoolive/rs1090/releases?q=jet1090).  
+Usage is available with the help command.
+
+```sh
+jet1090 --help
+```
+
+## nix
+
+This repository provides a Nix flake configuration for building and managing this project.
+
+```sh
+nix develop  # open a shell with the proper environment to compile rs1090
+nix build  # build the jet1090 executable
+nix run  # run the jet1090 executable
+nix profile install  # install jet1090 and decode1090 in your PATH
 ```

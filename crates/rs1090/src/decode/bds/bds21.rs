@@ -1,4 +1,3 @@
-use deku::bitvec::{BitSlice, Msb0};
 use deku::prelude::*;
 use regex::Regex;
 use serde::Serialize;
@@ -17,7 +16,7 @@ pub struct AircraftAndAirlineRegistrationMarkings {
     #[serde(skip)]
     pub ac_status: bool,
 
-    #[deku(reader = "aircraft_registration_read(deku::rest, *ac_status)")]
+    #[deku(reader = "aircraft_registration_read(deku::reader, *ac_status)")]
     #[serde(rename = "registration")]
     pub aircraft_registration: Option<String>,
 
@@ -25,7 +24,7 @@ pub struct AircraftAndAirlineRegistrationMarkings {
     #[serde(skip)]
     pub al_status: bool,
 
-    #[deku(reader = "airline_registration_read(deku::rest, *al_status)")]
+    #[deku(reader = "airline_registration_read(deku::reader, *al_status)")]
     #[serde(rename = "airline", skip_serializing_if = "Option::is_none")]
     pub airline_registration: Option<String>,
 }
@@ -33,19 +32,16 @@ pub struct AircraftAndAirlineRegistrationMarkings {
 const CHAR_LOOKUP: &[u8; 64] =
     b"#ABCDEFGHIJKLMNOPQRSTUVWXYZ##### ###############0123456789######";
 
-pub fn aircraft_registration_read(
-    rest: &BitSlice<u8, Msb0>,
+pub fn aircraft_registration_read<R: std::io::Read>(
+    reader: &mut Reader<R>,
     status: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<String>), DekuError> {
-    let mut inside_rest = rest;
-
+) -> Result<Option<String>, DekuError> {
     let mut chars = vec![];
     for _ in 0..=6 {
-        let (for_rest, c) = <u8>::read(inside_rest, deku::ctx::BitSize(6))?;
+        let c = u8::from_reader_with_ctx(reader, deku::ctx::BitSize(6))?;
         if c != 32 {
             chars.push(c);
         }
-        inside_rest = for_rest;
     }
 
     let all_zeros = chars.iter().all(|&x| x == 0);
@@ -57,36 +53,35 @@ pub fn aircraft_registration_read(
     if status {
         let re = Regex::new(r"^[A-Z0-9]+[\s#]?[A-Z0-9]+$").unwrap();
         if re.is_match(&encoded) {
-            Ok((inside_rest, Some(encoded)))
+            Ok(Some(encoded))
         } else {
-            Err(DekuError::Assertion(format!(
-                "Invalid aircraft registration {}",
-                encoded
-            )))
+            Err(DekuError::Assertion(
+                format!("Invalid aircraft registration {}", encoded).into(),
+            ))
         }
     } else if all_zeros {
-        Ok((inside_rest, None))
+        Ok(None)
     } else {
-        Err(DekuError::Assertion(format!(
-            "Non-null value after invalid aircraft registration status: {}",
-            encoded
-        )))
+        Err(DekuError::Assertion(
+            format!(
+                "Non-null value after invalid aircraft registration status: {}",
+                encoded
+            )
+            .into(),
+        ))
     }
 }
 
-pub fn airline_registration_read(
-    rest: &BitSlice<u8, Msb0>,
+pub fn airline_registration_read<R: std::io::Read>(
+    reader: &mut Reader<R>,
     status: bool,
-) -> Result<(&BitSlice<u8, Msb0>, Option<String>), DekuError> {
-    let mut inside_rest = rest;
-
+) -> Result<Option<String>, DekuError> {
     let mut chars = vec![];
     for _ in 0..=2 {
-        let (for_rest, c) = <u8>::read(inside_rest, deku::ctx::BitSize(6))?;
+        let c = u8::from_reader_with_ctx(reader, deku::ctx::BitSize(6))?;
         if c != 32 {
             chars.push(c);
         }
-        inside_rest = for_rest;
     }
     let all_zeros = chars.iter().all(|&x| x == 0);
     let encoded = chars
@@ -96,17 +91,23 @@ pub fn airline_registration_read(
 
     if status {
         // Ok((inside_rest, Some(encoded)))
-        Err(DekuError::Assertion(format!(
-            "Most transponders don't implement this field. (value = {})",
-            encoded
-        )))
+        Err(DekuError::Assertion(
+            format!(
+                "Most transponders don't implement this field. (value = {})",
+                encoded
+            )
+            .into(),
+        ))
     } else if all_zeros {
-        Ok((inside_rest, None))
+        Ok(None)
     } else {
-        Err(DekuError::Assertion(format!(
-            "Non-null value after invalid airline registration status: {}",
-            encoded
-        )))
+        Err(DekuError::Assertion(
+            format!(
+                "Non-null value after invalid airline registration status: {}",
+                encoded
+            )
+            .into(),
+        ))
     }
 }
 
@@ -119,7 +120,7 @@ mod tests {
     #[test]
     fn test_valid_bds21() {
         let bytes = hex!("a00002bf940f19680c0000000000");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             let AircraftAndAirlineRegistrationMarkings {
                 aircraft_registration,
@@ -131,7 +132,7 @@ mod tests {
         }
 
         let bytes = hex!("a00002988230c3b470a000000000");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             let AircraftAndAirlineRegistrationMarkings {
                 aircraft_registration,
@@ -142,7 +143,7 @@ mod tests {
             unreachable!();
         }
         let bytes = hex!("a0000793ac45ab164c0000000000");
-        let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let CommBAltitudeReply { bds, .. } = msg.df {
             let AircraftAndAirlineRegistrationMarkings {
                 aircraft_registration,
