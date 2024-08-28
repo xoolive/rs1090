@@ -86,13 +86,13 @@ pub struct DF21DataSelector {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds10: Option<DataLinkCapability>,
 
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds17: Option<CommonUsageGICBCapabilityReport>,
 
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds18: Option<GICBCapabilityReportPart1>,
 
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds19: Option<GICBCapabilityReportPart2>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -101,22 +101,22 @@ pub struct DF21DataSelector {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds21: Option<AircraftAndAirlineRegistrationMarkings>,
 
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds30: Option<ACASResolutionAdvisory>,
 
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds40: Option<SelectedVerticalIntention>,
 
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds44: Option<MeteorologicalRoutineAirReport>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds45: Option<MeteorologicalHazardReport>,
 
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds50: Option<TrackAndTurnReport>,
 
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bds60: Option<HeadingAndSpeedReport>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
