@@ -159,10 +159,13 @@ fn fail_if_false(value: bool) -> Result<bool, DekuError> {
 fn check_zeros<R: std::io::Read>(
     reader: &mut Reader<R>,
 ) -> Result<bool, DekuError> {
-    for _ in 0..=3 {
+    for i in 0..=3 {
         let value = u8::from_reader_with_ctx(
             reader,
-            (deku::ctx::Endian::Big, deku::ctx::BitSize(8)),
+            (
+                deku::ctx::Endian::Big,
+                deku::ctx::BitSize(if i == 0 { 3 } else { 8 }),
+            ),
         )?;
         if value != 0 {
             return Err(DekuError::InvalidParam(

@@ -8,10 +8,12 @@ use rayon::prelude::*;
 use regex::Regex;
 use rs1090::data::patterns::PATTERNS;
 use rs1090::data::tail::tail;
+use rs1090::decode::bds::bds05::bds05_from_bytes;
 use rs1090::decode::bds::bds10::DataLinkCapability;
 use rs1090::decode::bds::bds17::CommonUsageGICBCapabilityReport;
 use rs1090::decode::bds::bds18::GICBCapabilityReportPart1;
 use rs1090::decode::bds::bds19::GICBCapabilityReportPart2;
+use rs1090::decode::bds::bds20::AircraftIdentification;
 use rs1090::decode::bds::bds21::AircraftAndAirlineRegistrationMarkings;
 use rs1090::decode::bds::bds30::ACASResolutionAdvisory;
 use rs1090::decode::bds::bds40::SelectedVerticalIntention;
@@ -46,7 +48,7 @@ fn transform_error(e: DekuError) -> PyResult<Vec<u8>> {
 #[pyfunction]
 fn decode_bds05(msg: String) -> PyResult<Vec<u8>> {
     let bytes = hex::decode(msg).unwrap();
-    match AirbornePosition::from_bytes((&bytes[4..], 0)) {
+    match bds05_from_bytes((&bytes[4..], 0)) {
         Ok((_, msg)) => {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)

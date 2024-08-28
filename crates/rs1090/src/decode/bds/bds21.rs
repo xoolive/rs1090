@@ -1,6 +1,7 @@
 use deku::prelude::*;
 use regex::Regex;
 use serde::Serialize;
+use tracing::{debug, trace};
 
 /**
  * ## Aircraft and airline registration markings (BDS 2,1)
@@ -39,6 +40,7 @@ pub fn aircraft_registration_read<R: std::io::Read>(
     let mut chars = vec![];
     for _ in 0..=6 {
         let c = u8::from_reader_with_ctx(reader, deku::ctx::BitSize(6))?;
+        trace!("Reading letter {}", CHAR_LOOKUP[c as usize] as char);
         if c != 32 {
             chars.push(c);
         }
@@ -49,6 +51,7 @@ pub fn aircraft_registration_read<R: std::io::Read>(
         .into_iter()
         .map(|b| CHAR_LOOKUP[b as usize] as char)
         .collect::<String>();
+    debug!("Decoded registration: {}", encoded);
 
     if status {
         let re = Regex::new(r"^[A-Z0-9]+[\s#]?[A-Z0-9]+$").unwrap();
@@ -77,8 +80,9 @@ pub fn airline_registration_read<R: std::io::Read>(
     status: bool,
 ) -> Result<Option<String>, DekuError> {
     let mut chars = vec![];
-    for _ in 0..=2 {
+    for _ in 0..2 {
         let c = u8::from_reader_with_ctx(reader, deku::ctx::BitSize(6))?;
+        trace!("Reading letter {}", CHAR_LOOKUP[c as usize] as char);
         if c != 32 {
             chars.push(c);
         }

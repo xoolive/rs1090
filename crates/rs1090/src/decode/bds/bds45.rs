@@ -1,5 +1,6 @@
 use deku::prelude::*;
 use serde::Serialize;
+use tracing::trace;
 
 /**
  * ## Meteorological Hazard Report (BDS 4,5)
@@ -17,6 +18,10 @@ pub struct MeteorologicalHazardReport {
     pub wind_shear: Option<Level>,
 
     #[deku(reader = "read_level(deku::reader)")]
+    /// Microburst
+    pub microburst: Option<Level>,
+
+    #[deku(reader = "read_level(deku::reader)")]
     /// Icing
     pub icing: Option<Level>,
 
@@ -26,7 +31,7 @@ pub struct MeteorologicalHazardReport {
 
     #[deku(reader = "read_temperature(deku::reader)")]
     /// Static air temperature (in °C)
-    pub static_temperature: f64,
+    pub static_temperature: Option<f64>,
 
     #[deku(reader = "read_pressure(deku::reader)")]
     /// Average static pressure (in hPa)
@@ -36,7 +41,7 @@ pub struct MeteorologicalHazardReport {
     /// Radio height (in ft)
     pub radio_height: Option<u32>,
 
-    #[deku(bits = "8", map = "fail_if_not_zero")]
+    #[deku(bits = "5", map = "fail_if_not_zero")]
     #[serde(skip)]
     pub reserved: u8,
 }
@@ -61,6 +66,8 @@ fn read_level<R: std::io::Read>(
         (deku::ctx::Endian::Big, deku::ctx::BitSize(2)),
     )?;
 
+    trace!("Reading status {} value {}", status, value);
+
     match (status, value) {
         (true, 0) => Ok(Some(Level::Nil)),
         (true, 1) => Ok(Some(Level::Light)),
@@ -74,7 +81,11 @@ fn read_level<R: std::io::Read>(
 
 fn read_temperature<R: std::io::Read>(
     reader: &mut Reader<R>,
-) -> Result<f64, DekuError> {
+) -> Result<Option<f64>, DekuError> {
+    let status = bool::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
+    )?;
     let sign = bool::from_reader_with_ctx(
         reader,
         (deku::ctx::Endian::Big, deku::ctx::BitSize(1)),
@@ -89,12 +100,24 @@ fn read_temperature<R: std::io::Read>(
         false => value as f64 * 0.25,
     };
 
-    if !(-80. ..=60.).contains(&temperature) {
-        return Err(DekuError::Assertion(
-            "Static temperature between -80 and +60".into(),
-        ));
+    trace!(
+        "Reading temperature status {} value {}",
+        status,
+        temperature
+    );
+
+    match (status, value, temperature) {
+        (true, _, temperature) if (-80. ..=60.).contains(&temperature) => {
+            Ok(Some(temperature))
+        }
+        (true, _, _) => Err(DekuError::Assertion(
+            "Temperature {} should be between -80 and +60".into(),
+        )),
+        //(false, _) => Ok(None),
+        // In practice, I see quite some pressure fields with invalid status but non zero values
+        (false, 0, _) => Ok(None),
+        (false, _, _) => Err(DekuError::Assertion("invalid data".into())),
     }
-    Ok(temperature)
 }
 
 fn read_pressure<R: std::io::Read>(
@@ -109,12 +132,14 @@ fn read_pressure<R: std::io::Read>(
         (deku::ctx::Endian::Big, deku::ctx::BitSize(11)),
     )?;
 
+    trace!("Reading pressure status {} value {}", status, value);
+
     match (status, value) {
         (true, value) => Ok(Some(value)),
-        (false, _) => Ok(None),
+        //(false, _) => Ok(None),
         // In practice, I see quite some pressure fields with invalid status but non zero values
-        // (false, 0) => Ok((None)),
-        // (false, _) => Err(DekuError::Assertion("invalid data".into())),
+        (false, 0) => Ok(None),
+        (false, _) => Err(DekuError::Assertion("invalid data".into())),
     }
 }
 
@@ -129,6 +154,8 @@ fn read_height<R: std::io::Read>(
         reader,
         (deku::ctx::Endian::Big, deku::ctx::BitSize(12)),
     )?;
+
+    trace!("Reading height status {} value {}", status, value);
 
     match (status, value) {
         (true, value) => Ok(Some(value * 16)),
@@ -152,7 +179,7 @@ mod tests {
     use hexlit::hex;
 
     #[test]
-    fn test_valid_bds44() {
+    fn test_valid_bds45() {
         let bytes = hex!("a00004190001fb80000000000000");
         // let bytes = hex!("a00005b30001f940000000000000");
         let msg = Message::from_bytes((&bytes, 0)).unwrap().1;
@@ -171,8 +198,8 @@ mod tests {
             assert_eq!(wind_shear, None);
             assert_eq!(icing, None);
             assert_eq!(wake_vortex, None);
-            assert_eq!(static_temperature, 31.5);
-            assert_eq!(static_pressure, Some(1536));
+            assert_eq!(static_temperature, Some(-4.5));
+            assert_eq!(static_pressure, None);
             assert_eq!(radio_height, None);
         } else {
             unreachable!();

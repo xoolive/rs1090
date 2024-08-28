@@ -2,7 +2,7 @@ use crate::decode::cpr::CPRFormat;
 use crate::decode::{decode_id13, gray2alt};
 use deku::prelude::*;
 use serde::Serialize;
-use std::fmt;
+use std::fmt::{self, Debug};
 
 /**
  * ## Airborne Position (BDS 0,5)
@@ -17,12 +17,15 @@ use std::fmt;
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(ctx = "tc: u8")]
 pub struct AirbornePosition {
+    #[deku(skip, default = "tc")]
+    pub tc: u8,
+
     #[deku(
         skip,
         default = "
-        match tc {
-            n if n < 19 => 18 - tc,
-            20 | 21 => 29 - tc,
+        match *tc {
+            n if n < 19 => 18 - *tc,
+            20 | 21 => 29 - *tc,
             _ => 0
         }
         "
@@ -39,7 +42,7 @@ pub struct AirbornePosition {
     #[deku(
         bits = "1",
         map = "|v| -> Result<_, DekuError> {
-            if tc < 19 { Ok(Some(v)) } else { Ok(None) }
+            if *tc < 19 { Ok(Some(v)) } else { Ok(None) }
         }"
     )]
     #[serde(rename = "NICb", skip_serializing_if = "Option::is_none")]
@@ -53,7 +56,7 @@ pub struct AirbornePosition {
     /// None if not available.
     pub alt: Option<u16>,
 
-    #[deku(reader = "read_source(tc)")]
+    #[deku(reader = "read_source(*tc)")]
     /// Decode the altitude source (GNSS or barometric),
     /// most commonly equal to barometric
     pub source: Source,
@@ -132,6 +135,39 @@ impl fmt::Display for AirbornePosition {
         writeln!(f, "  CPR latitude:  ({})", self.lat_cpr)?;
         writeln!(f, "  CPR longitude: ({})", self.lon_cpr)?;
         Ok(())
+    }
+}
+
+// This function is only useful from the Python binding
+pub fn bds05_from_bytes(
+    input: (&[u8], usize),
+) -> Result<((&[u8], usize), AirbornePosition), DekuError> {
+    let mut cursor = deku::no_std_io::Cursor::new(input.0);
+    let reader = &mut Reader::new(&mut cursor);
+    if input.1 != 0 {
+        reader.skip_bits(input.1)?;
+    }
+
+    // Skip the first bits
+    reader.skip_bits(4 * 8)?;
+
+    // Then read the typecode
+    let tc = u8::from_reader_with_ctx(reader, deku::ctx::BitSize(5))?;
+    if (9..22).contains(&tc) && tc != 19 {
+        let value = AirbornePosition::from_reader_with_ctx(reader, tc)?;
+        let read_whole_byte = (reader.bits_read % 8) == 0;
+        let idx = if read_whole_byte {
+            reader.bits_read / 8
+        } else {
+            (reader.bits_read - (reader.bits_read % 8)) / 8
+        };
+        Ok(((&input.0[idx..], reader.bits_read % 8), value))
+    } else {
+        let msg = format!(
+            "Error BDS05: Typecode {} should be in [9, 18] or [20, 22]",
+            tc
+        );
+        Err(DekuError::Assertion(msg.into()))
     }
 }
 
