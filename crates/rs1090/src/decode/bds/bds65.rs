@@ -38,6 +38,36 @@ impl fmt::Display for AircraftOperationStatus {
     }
 }
 
+// This function is only useful from the Python binding
+pub fn bds65_from_bytes(
+    input: (&[u8], usize),
+) -> Result<((&[u8], usize), AircraftOperationStatus), DekuError> {
+    let mut cursor = deku::no_std_io::Cursor::new(input.0);
+    let reader = &mut Reader::new(&mut cursor);
+    if input.1 != 0 {
+        reader.skip_bits(input.1)?;
+    }
+
+    // Skip the first bits
+    reader.skip_bits(4 * 8)?;
+
+    // Then read the typecode
+    let tc = u8::from_reader_with_ctx(reader, deku::ctx::BitSize(5))?;
+    if tc == 31 {
+        let value = AircraftOperationStatus::from_reader_with_ctx(reader, ())?;
+        let read_whole_byte = (reader.bits_read % 8) == 0;
+        let idx = if read_whole_byte {
+            reader.bits_read / 8
+        } else {
+            (reader.bits_read - (reader.bits_read % 8)) / 8
+        };
+        Ok(((&input.0[idx..], reader.bits_read % 8), value))
+    } else {
+        let msg = format!("Error BDS65: Typecode {} should be in 31", tc);
+        Err(DekuError::Assertion(msg.into()))
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct OperationStatusAirborne {
     /// The capacity class

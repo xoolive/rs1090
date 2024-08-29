@@ -21,7 +21,7 @@ use rs1090::decode::bds::bds44::MeteorologicalRoutineAirReport;
 use rs1090::decode::bds::bds45::MeteorologicalHazardReport;
 use rs1090::decode::bds::bds50::TrackAndTurnReport;
 use rs1090::decode::bds::bds60::HeadingAndSpeedReport;
-use rs1090::decode::bds::bds65::AircraftOperationStatus;
+use rs1090::decode::bds::bds65::bds65_from_bytes;
 use rs1090::decode::cpr::{decode_positions, Position};
 use rs1090::decode::flarm::Flarm;
 use rs1090::decode::TimeSource;
@@ -203,7 +203,7 @@ fn decode_bds60(msg: String) -> PyResult<Vec<u8>> {
 #[pyfunction]
 fn decode_bds65(msg: String) -> PyResult<Vec<u8>> {
     let bytes = hex::decode(msg).unwrap();
-    match AircraftOperationStatus::from_bytes((&bytes[4..], 0)) {
+    match bds65_from_bytes((&bytes[4..], 0)) {
         Ok((_, msg)) => {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
