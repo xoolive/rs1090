@@ -38,6 +38,36 @@ impl fmt::Display for AircraftOperationStatus {
     }
 }
 
+// This function is only useful from the Python binding
+pub fn bds65_from_bytes(
+    input: (&[u8], usize),
+) -> Result<((&[u8], usize), AircraftOperationStatus), DekuError> {
+    let mut cursor = deku::no_std_io::Cursor::new(input.0);
+    let reader = &mut Reader::new(&mut cursor);
+    if input.1 != 0 {
+        reader.skip_bits(input.1)?;
+    }
+
+    // Skip the first bits
+    reader.skip_bits(4 * 8)?;
+
+    // Then read the typecode
+    let tc = u8::from_reader_with_ctx(reader, deku::ctx::BitSize(5))?;
+    if tc == 31 {
+        let value = AircraftOperationStatus::from_reader_with_ctx(reader, ())?;
+        let read_whole_byte = (reader.bits_read % 8) == 0;
+        let idx = if read_whole_byte {
+            reader.bits_read / 8
+        } else {
+            (reader.bits_read - (reader.bits_read % 8)) / 8
+        };
+        Ok(((&input.0[idx..], reader.bits_read % 8), value))
+    } else {
+        let msg = format!("Error BDS65: Typecode {} should be in 31", tc);
+        Err(DekuError::Assertion(msg.into()))
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct OperationStatusAirborne {
     /// The capacity class
@@ -362,7 +392,7 @@ pub struct AirborneV2 {
 #[serde(tag = "version")]
 pub enum ADSBVersionSurface {
     #[deku(id = "0")]
-    #[serde(skip)]
+    #[serde(rename = "0")]
     /// ADS-B version 0 (BDS 6,5 undefined, so these messages should not happen)
     DOC9871AppendixA(Empty),
     #[deku(id = "1")]
@@ -374,7 +404,7 @@ pub enum ADSBVersionSurface {
     /// ADS-B version 2 (2012)
     DOC9871AppendixC(SurfaceV2),
     #[deku(id_pat = "3..=7")]
-    #[serde(skip)]
+    #[serde(rename = "3to7")]
     Reserved { id: u8 },
 }
 
@@ -445,9 +475,3 @@ pub struct SurfaceV2 {
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct Empty {}
-
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-pub struct EmptyU8 {
-    pub id: u8,
-    pub unused: u8,
-}

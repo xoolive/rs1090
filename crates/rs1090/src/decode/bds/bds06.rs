@@ -25,6 +25,9 @@ use tracing::debug;
 #[derive(Debug, PartialEq, DekuRead, Serialize, Copy, Clone)]
 #[deku(ctx = "tc: u8")]
 pub struct SurfacePosition {
+    #[deku(skip, default = "tc")]
+    pub tc: u8,
+
     #[deku(skip, default = "14 - tc")]
     #[serde(rename = "NUCp")]
     /// Navigation Uncertainty Category (position), based on the typecode
@@ -135,7 +138,6 @@ mod tests {
 
     #[test]
     fn test_surface_position() {
-        tracing_subscriber::fmt::init();
         let bytes = hex!("8c4841753a9a153237aef0f275be");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
