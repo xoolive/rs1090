@@ -120,7 +120,9 @@ pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
                     }
 
                     let msg = data.drain(..msg_size).collect::<Vec<u8>>();
-                    yield msg
+                    if msg_type != 0x34 {
+                        yield msg
+                    }
                 } else {
                     // Probably corrupted message
                     data = data.split_off(1);

@@ -371,9 +371,7 @@ impl DekuReader<'_> for Message {
                 // Restart reading by creating a new cursor/reader (with context)
                 let mut input = deku::no_std_io::Cursor::new(&remaining_bytes);
                 let mut reader = Reader::new(&mut input);
-                debug!("reach here?");
                 let df = DF::from_reader_with_ctx(&mut reader, crc).unwrap();
-                debug!("reach here?");
                 Ok(Self { crc, df })
             }
         }
