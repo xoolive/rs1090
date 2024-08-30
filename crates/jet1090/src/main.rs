@@ -85,7 +85,7 @@ struct Options {
     redis_url: Option<String>,
 
     /// Redis topic for the messages, default to "jet1090"
-    #[arg(short, long, value_name = "REDIS TOPIC")]
+    #[arg(long, value_name = "REDIS TOPIC")]
     redis_topic: Option<String>,
 }
 
