@@ -12,6 +12,7 @@ use clap_complete::{generate, Generator, Shell};
 use cli::Source;
 use crossterm::event::KeyCode;
 use ratatui::widgets::*;
+use redis::AsyncCommands;
 use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::prelude::*;
 use serde::Deserialize;
@@ -75,6 +76,17 @@ struct Options {
     /// logging file, use "-" for stdout (only in non-interactive mode)
     #[arg(short, long, value_name = "FILE")]
     log_file: Option<String>,
+
+    /// Publish messages to a Redis pubsub
+    /// Setup Redis stack by:
+    ///   `docker run -d --rm --name redis -p 6379:6379 -p 8001:8001 redis/redis-stack:latest`
+    /// then check localhost:8001 for the RedisInsight web interface, the this would be `redis://localhost:6379`
+    #[arg(short, long, value_name = "REDIS")]
+    redis_url: Option<String>,
+
+    /// Redis topic for the messages, default to "jet1090"
+    #[arg(long, value_name = "REDIS TOPIC")]
+    redis_topic: Option<String>,
 }
 
 #[tokio::main]
@@ -125,6 +137,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli_options.update_position {
         options.update_position = cli_options.update_position;
     }
+    if cli_options.redis_url.is_some() {
+        options.redis_url = cli_options.redis_url;
+    }
+    if cli_options.redis_topic.is_some() {
+        options.redis_topic = cli_options.redis_topic;
+    }
+
+    let mut redis_connect = match options
+        .redis_url
+        .map(|url| redis::Client::open(url).unwrap())
+    {
+        Some(c) => Some(c.get_multiplexed_async_connection().await?),
+        None => None,
+    };
+    let redis_topic = options.redis_topic.unwrap_or("jet1090".to_string());
+
     options.sources.append(&mut cli_options.sources);
 
     // example: RUST_LOG=rs1090=DEBUG
@@ -356,6 +384,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(file) = &mut file {
                     file.write_all(json.as_bytes()).await?;
                     file.write_all("\n".as_bytes()).await?;
+                }
+
+                if let Some(c) = &mut redis_connect {
+                    c.publish(redis_topic.clone(), json).await?;
                 }
             }
 
