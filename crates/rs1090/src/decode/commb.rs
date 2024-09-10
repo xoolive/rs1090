@@ -57,7 +57,7 @@ impl fmt::Display for DataSelector {
 }
 
 impl DekuReader<'_> for DataSelector {
-    fn from_reader_with_ctx<R: deku::no_std_io::Read>(
+    fn from_reader_with_ctx<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         reader: &mut Reader<R>,
         _: (),
     ) -> Result<Self, DekuError>

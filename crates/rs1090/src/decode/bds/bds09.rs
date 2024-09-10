@@ -87,7 +87,7 @@ pub struct AirborneVelocity {
     pub geo_minus_baro: Option<i16>,
 }
 
-fn read_geobaro<R: std::io::Read>(
+fn read_geobaro<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
     gnss_sign: Sign,
 ) -> Result<Option<i16>, DekuError> {

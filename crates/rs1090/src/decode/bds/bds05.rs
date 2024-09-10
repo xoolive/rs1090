@@ -81,7 +81,7 @@ pub struct AirbornePosition {
 }
 
 /// Decode altitude value encoded on 12 bits
-fn decode_ac12<R: std::io::Read>(
+fn decode_ac12<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<u16>, DekuError> {
     let num = u16::from_reader_with_ctx(

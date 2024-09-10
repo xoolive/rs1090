@@ -193,7 +193,7 @@ pub fn wake_vortex(tc: Typecode, ca: u8) -> Result<WakeVortex, DekuError> {
 const CHAR_LOOKUP: &[u8; 64] =
     b"#ABCDEFGHIJKLMNOPQRSTUVWXYZ##### ###############0123456789######";
 
-pub fn callsign_read<R: std::io::Read>(
+pub fn callsign_read<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<String, DekuError> {
     let mut chars = vec![];

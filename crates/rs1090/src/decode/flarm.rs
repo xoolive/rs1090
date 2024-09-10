@@ -308,7 +308,7 @@ pub enum AircraftType {
 }
 
 impl Flarm {
-    fn decode_btea<R: std::io::Read>(
+    fn decode_btea<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         reader: &mut Reader<R>,
         icao24: Address,
         timestamp: u32,

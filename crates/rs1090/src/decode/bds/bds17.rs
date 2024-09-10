@@ -152,7 +152,7 @@ fn fail_if_false(value: bool) -> Result<bool, DekuError> {
     }
 }
 
-fn check_zeros<R: std::io::Read>(
+fn check_zeros<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<bool, DekuError> {
     for _ in 0..=3 {

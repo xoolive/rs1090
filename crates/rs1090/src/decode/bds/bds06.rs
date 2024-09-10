@@ -80,7 +80,7 @@ pub struct SurfacePosition {
  * ensure that a lower speed can be encoded with a improved precision than a
  * higher speed.
  */
-fn read_groundspeed<R: std::io::Read>(
+fn read_groundspeed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<f64>, DekuError> {
     let mov = u8::from_reader_with_ctx(

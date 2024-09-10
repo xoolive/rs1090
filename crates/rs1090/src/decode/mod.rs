@@ -291,7 +291,7 @@ pub struct Message {
 }
 
 impl DekuContainerRead<'_> for Message {
-    fn from_reader<R: deku::no_std_io::Read>(
+    fn from_reader<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         input: (&mut R, usize),
     ) -> Result<(usize, Self), DekuError>
     where
@@ -331,7 +331,7 @@ impl DekuContainerRead<'_> for Message {
 }
 
 impl DekuReader<'_> for Message {
-    fn from_reader_with_ctx<R: deku::no_std_io::Read>(
+    fn from_reader_with_ctx<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         reader: &mut Reader<R>,
         _: (),
     ) -> Result<Self, DekuError>
@@ -612,7 +612,7 @@ impl core::str::FromStr for ICAO {
 pub struct IdentityCode(#[deku(reader = "Self::read(deku::reader)")] pub u16);
 
 impl IdentityCode {
-    fn read<R: std::io::Read>(
+    fn read<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         reader: &mut Reader<R>,
     ) -> Result<u16, DekuError> {
         let num = u16::from_reader_with_ctx(
@@ -652,7 +652,7 @@ impl Serialize for IdentityCode {
 pub struct AC13Field(#[deku(reader = "Self::read(deku::reader)")] pub u16);
 
 impl AC13Field {
-    fn read<R: std::io::Read>(
+    fn read<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         reader: &mut Reader<R>,
     ) -> Result<u16, DekuError> {
         let ac13field = u16::from_reader_with_ctx(

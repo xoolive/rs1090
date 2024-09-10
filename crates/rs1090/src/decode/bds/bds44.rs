@@ -45,7 +45,7 @@ pub enum Turbulence {
     Severe,
 }
 
-fn read_wind_speed<R: std::io::Read>(
+fn read_wind_speed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<u16>, DekuError> {
     let status = bool::from_reader_with_ctx(
@@ -71,7 +71,7 @@ fn read_wind_speed<R: std::io::Read>(
     Ok(Some(value))
 }
 
-fn read_wind_direction<R: std::io::Read>(
+fn read_wind_direction<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
     speed: Option<u16>,
 ) -> Result<Option<f64>, DekuError> {
@@ -91,7 +91,7 @@ fn read_wind_direction<R: std::io::Read>(
     Ok(Some(value as f64 * 180. / 256.))
 }
 
-fn read_temperature<R: std::io::Read>(
+fn read_temperature<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<f64, DekuError> {
     let sign = u8::from_reader_with_ctx(
@@ -115,7 +115,7 @@ fn read_temperature<R: std::io::Read>(
     Ok(temp)
 }
 
-fn read_pressure<R: std::io::Read>(
+fn read_pressure<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<u16>, DekuError> {
     let status = bool::from_reader_with_ctx(
@@ -141,7 +141,7 @@ fn read_pressure<R: std::io::Read>(
     // return Ok((rest, Some(value)));
 }
 
-fn read_turbulence<R: std::io::Read>(
+fn read_turbulence<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<Turbulence>, DekuError> {
     let status = bool::from_reader_with_ctx(
@@ -172,7 +172,7 @@ fn read_turbulence<R: std::io::Read>(
     Ok(value)
 }
 
-fn read_humidity<R: std::io::Read>(
+fn read_humidity<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<f64>, DekuError> {
     let status = bool::from_reader_with_ctx(
