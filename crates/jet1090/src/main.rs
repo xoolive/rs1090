@@ -387,7 +387,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 if let Some(c) = &mut redis_connect {
-                    c.publish(redis_topic.clone(), json).await?;
+                    let _: () = c.publish(redis_topic.clone(), json).await?;
                 }
             }
 
