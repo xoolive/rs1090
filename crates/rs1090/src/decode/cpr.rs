@@ -433,7 +433,7 @@ pub fn decode_position(
         even_msg: None,
     });
     match message {
-        ME::BDS05 { me: airborne, .. } => {
+        ME::BDS05(airborne) => {
             let mut pos: Option<Position> = None;
 
             let latest_timestamp = match airborne.parity {
@@ -511,7 +511,7 @@ pub fn decode_position(
                 }
             }
         }
-        ME::BDS06 { me: surface, .. } => {
+        ME::BDS06(surface) => {
             let mut pos = None;
             if let Some(latest_pos) = latest.pos {
                 let surface_pos = surface_position_with_reference(
@@ -597,9 +597,7 @@ mod tests {
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
                 match (msg1.message, msg2.message) {
-                    (ME::BDS05 { me: m1, .. }, ME::BDS05 { me: m2, .. }) => {
-                        (m1, m2)
-                    }
+                    (ME::BDS05(m1), ME::BDS05(m2)) => (m1, m2),
                     _ => unreachable!(),
                 }
             }
@@ -623,9 +621,7 @@ mod tests {
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
                 match (msg1.message, msg2.message) {
-                    (ME::BDS05 { me: m1, .. }, ME::BDS05 { me: m2, .. }) => {
-                        (m1, m2)
-                    }
+                    (ME::BDS05(m1), ME::BDS05(m2)) => (m1, m2),
                     _ => unreachable!(),
                 }
             }
@@ -648,7 +644,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS05 { me, .. } => me,
+                ME::BDS05(me) => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -667,7 +663,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS05 { me, .. } => me,
+                ME::BDS05(me) => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -689,7 +685,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS06 { me, .. } => me,
+                ME::BDS06(me) => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),

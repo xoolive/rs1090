@@ -15,12 +15,14 @@ use std::fmt;
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
-#[deku(ctx = "tc: u8")]
 pub struct AirbornePosition {
+    #[deku(bits = 5)]
+    tc: u8,
+
     #[deku(
         skip,
         default = "
-        match tc {
+        match *tc {
             n if n < 19 => 18 - tc,
             20 | 21 => 29 - tc,
             _ => 0
@@ -39,7 +41,7 @@ pub struct AirbornePosition {
     #[deku(
         bits = "1",
         map = "|v| -> Result<_, DekuError> {
-            if tc < 19 { Ok(Some(v)) } else { Ok(None) }
+            if *tc < 19 { Ok(Some(v)) } else { Ok(None) }
         }"
     )]
     #[serde(rename = "NICb", skip_serializing_if = "Option::is_none")]
@@ -53,7 +55,7 @@ pub struct AirbornePosition {
     /// None if not available.
     pub alt: Option<u16>,
 
-    #[deku(reader = "read_source(tc)")]
+    #[deku(reader = "read_source(*tc)")]
     /// Decode the altitude source (GNSS or barometric),
     /// most commonly equal to barometric
     pub source: Source,
