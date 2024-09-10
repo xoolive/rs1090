@@ -29,7 +29,7 @@ pub struct TrackAndTurnReport {
     pub true_airspeed: Option<u16>,
 }
 
-fn read_roll<R: std::io::Read>(
+fn read_roll<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<f64>, DekuError> {
     let status = bool::from_reader_with_ctx(
@@ -64,7 +64,7 @@ fn read_roll<R: std::io::Read>(
     Ok(Some(roll))
 }
 
-fn read_track<R: std::io::Read>(
+fn read_track<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<f64>, DekuError> {
     let status = bool::from_reader_with_ctx(
@@ -101,7 +101,7 @@ fn read_track<R: std::io::Read>(
     Ok(Some(track))
 }
 
-fn read_groundspeed<R: std::io::Read>(
+fn read_groundspeed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<u16>, DekuError> {
     let status = bool::from_reader_with_ctx(
@@ -128,7 +128,7 @@ fn read_groundspeed<R: std::io::Read>(
     Ok(Some(gs))
 }
 
-fn read_rate<R: std::io::Read>(
+fn read_rate<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
     roll: Option<f64>,
 ) -> Result<Option<f64>, DekuError> {
@@ -174,7 +174,7 @@ fn read_rate<R: std::io::Read>(
     Ok(Some(rate))
 }
 
-fn read_tas<R: std::io::Read>(
+fn read_tas<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
     gs: Option<u16>,
 ) -> Result<Option<u16>, DekuError> {

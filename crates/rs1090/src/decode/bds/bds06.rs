@@ -23,8 +23,10 @@ use tracing::debug;
  */
 
 #[derive(Debug, PartialEq, DekuRead, Serialize, Copy, Clone)]
-#[deku(ctx = "tc: u8")]
 pub struct SurfacePosition {
+    #[deku(bits = 5)]
+    pub tc: u8,
+
     #[deku(skip, default = "14 - tc")]
     #[serde(rename = "NUCp")]
     /// Navigation Uncertainty Category (position), based on the typecode
@@ -80,7 +82,7 @@ pub struct SurfacePosition {
  * ensure that a lower speed can be encoded with a improved precision than a
  * higher speed.
  */
-fn read_groundspeed<R: std::io::Read>(
+fn read_groundspeed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<f64>, DekuError> {
     let mov = u8::from_reader_with_ctx(
@@ -139,13 +141,9 @@ mod tests {
         let bytes = hex!("8c4841753a9a153237aef0f275be");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
-            if let ME::BDS06 {
-                me:
-                    SurfacePosition {
-                        track, groundspeed, ..
-                    },
-                ..
-            } = adsb_msg.message
+            if let ME::BDS06(SurfacePosition {
+                track, groundspeed, ..
+            }) = adsb_msg.message
             {
                 assert_eq!(track, Some(92.8125));
                 assert_eq!(groundspeed, Some(17.));

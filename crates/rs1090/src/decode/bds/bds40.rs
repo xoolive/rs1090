@@ -89,7 +89,7 @@ impl TargetSource {
     }
 }
 
-fn read_selected<R: std::io::Read>(
+fn read_selected<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<u16>, DekuError> {
     let status = bool::from_reader_with_ctx(
@@ -118,7 +118,7 @@ fn read_selected<R: std::io::Read>(
     Ok(Some(value))
 }
 
-fn read_qnh<R: std::io::Read>(
+fn read_qnh<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<f64>, DekuError> {
     let status = bool::from_reader_with_ctx(

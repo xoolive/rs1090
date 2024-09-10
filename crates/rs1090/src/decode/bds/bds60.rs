@@ -51,7 +51,7 @@ pub struct HeadingAndSpeedReport {
     pub inertial_vertical_velocity: Option<i16>,
 }
 
-fn read_heading<R: std::io::Read>(
+fn read_heading<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<f64>, DekuError> {
     let status = bool::from_reader_with_ctx(
@@ -88,7 +88,7 @@ fn read_heading<R: std::io::Read>(
     Ok(Some(heading))
 }
 
-fn read_ias<R: std::io::Read>(
+fn read_ias<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<u16>, DekuError> {
     let status = bool::from_reader_with_ctx(
@@ -114,7 +114,7 @@ fn read_ias<R: std::io::Read>(
     Ok(Some(value))
 }
 
-fn read_mach<R: std::io::Read>(
+fn read_mach<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
     ias: Option<u16>,
 ) -> Result<Option<f64>, DekuError> {
@@ -160,7 +160,7 @@ fn read_mach<R: std::io::Read>(
     Ok(Some(mach))
 }
 
-fn read_vertical<R: std::io::Read>(
+fn read_vertical<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<i16>, DekuError> {
     let status = bool::from_reader_with_ctx(
