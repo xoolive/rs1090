@@ -144,10 +144,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         options.redis_topic = cli_options.redis_topic;
     }
 
-    let client = options
+    let mut redis_connect = match options
         .redis_url
-        .map(|url| redis::Client::open(url).unwrap());
-    let mut conn = match client {
+        .map(|url| redis::Client::open(url).unwrap())
+    {
         Some(c) => Some(c.get_multiplexed_async_connection().await?),
         None => None,
     };
@@ -386,7 +386,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     file.write_all("\n".as_bytes()).await?;
                 }
 
-                if let Some(c) = &mut conn {
+                if let Some(c) = &mut redis_connect {
                     c.publish(redis_topic.clone(), json).await?;
                 }
             }
