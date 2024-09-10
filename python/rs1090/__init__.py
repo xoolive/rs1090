@@ -130,11 +130,11 @@ def decode(
         if timestamp is not None and len(timestamp) != len(msg):
             raise ValueError("`msg` and `timestamp` must be of the same length")
 
-        batches = list(batched(msg, batch))
+        batches = list(batched(msg, batch))  # type: ignore
         if timestamp is None:
             payload = decode_1090_vec(batches)
         else:
-            ts = list(batched(timestamp, batch))
+            ts = list(batched(timestamp, batch))  # type: ignore
             payload = decode_1090t_vec(batches, ts, reference)
 
     return pickle.loads(bytes(payload))  # type: ignore
@@ -153,20 +153,20 @@ def flarm(
 
 @overload
 def flarm(
-    msg: Sequence[str],
-    timestamp: Sequence[int],
-    reference_latitude: Sequence[float],
-    reference_longitude: Sequence[float],
+    msg: Sequence[str] | pd.Series,
+    timestamp: Sequence[int] | pd.Series,
+    reference_latitude: Sequence[float] | pd.Series,
+    reference_longitude: Sequence[float] | pd.Series,
     *,
     batch: int = 1000,
 ) -> list[Flarm]: ...
 
 
 def flarm(
-    msg: str | Sequence[str],
-    timestamp: int | Sequence[int],
-    reference_latitude: float | Sequence[float],
-    reference_longitude: float | Sequence[float],
+    msg: str | Sequence[str] | pd.Series,
+    timestamp: int | Sequence[int] | pd.Series,
+    reference_latitude: float | Sequence[float] | pd.Series,
+    reference_longitude: float | Sequence[float] | pd.Series,
     *,
     batch: int = 1000,
 ) -> Flarm | list[Flarm]:
@@ -176,19 +176,19 @@ def flarm(
         assert isinstance(reference_longitude, (int, float))
         payload = decode_flarm(
             msg,
-            timestamp,
+            timestamp,  # type: ignore
             reference_latitude,
             reference_longitude,
         )
     else:
-        batches = list(batched(msg, batch))
+        batches = list(batched(msg, batch))  # type: ignore
         assert not isinstance(timestamp, (int, float))
         assert not isinstance(reference_latitude, (int, float))
         assert not isinstance(reference_longitude, (int, float))
 
-        t = list(batched(timestamp, batch))
-        reflat = list(batched(reference_latitude, batch))
-        reflon = list(batched(reference_longitude, batch))
+        t = list(batched(timestamp, batch))  # type: ignore
+        reflat = list(batched(reference_latitude, batch))  # type: ignore
+        reflon = list(batched(reference_longitude, batch))  # type: ignore
 
         payload = decode_flarm_vec(batches, t, reflat, reflon)
 

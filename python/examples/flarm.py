@@ -66,7 +66,7 @@ flight = flight.assign(
 
 
 # %%
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # type: ignore
 from cartes.crs import Lambert93, PlateCarree  # type: ignore
 from cartes.osm import Overpass  # type: ignore
 
@@ -86,7 +86,7 @@ flight.query("gs < 20000").plot(
 )
 ax.spines["geo"].set_visible(False)
 ax.yaxis.set_visible(False)
-ax.set_extent((5.1, 5.16, 43.59, 43.64))
+ax.set_extent((5.1, 5.16, 43.59, 43.64))  # type: ignore
 fig.savefig("flarm.png")
 
 # %%

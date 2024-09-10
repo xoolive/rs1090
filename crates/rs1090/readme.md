@@ -15,7 +15,7 @@ The directions ambitioned by rs1090 boil down to:
 
 If you just want to decode ADS-B messages from your Raspberry and visualize the data on a map, you may want to stick to one of the dump0190 implementations.
 
-The rs1090 library comes with a companion application [decode1090](https://crates.io/crates/decode1090) and a Python binding [rs1090](https://pypi.org/project/rs1090).
+The rs1090 library comes with a companion application [decode1090](https://crates.io/crates/decode1090), a live decoder [jet1090](https://crates.io/crates/jet1090), and a Python binding [rs1090](https://pypi.org/project/rs1090).
 
 ## Performance
 
@@ -31,7 +31,7 @@ The Python script for benchmarking is in [python/examples](python/examples/bench
 The Rust benchmark is executed with `cargo bench`.  
 Both scripts are run on an Intel(R) Core(TM) i7-10850H CPU @ 2.70GHz.
 
-![](./python/examples/benchmark.svg)
+![Benchmark image](./python/examples/benchmark.svg)
 
 > [!NOTE]  
 > The default out-of-the-box mode of `rs1090` is an execution distributed on all your cores. This benchmark was performed on a regular laptop. It can be much faster on supercomputers, but considering that most laptops now have at least 4 cores, this benchmark yields the speed-up you should get on your own computer.

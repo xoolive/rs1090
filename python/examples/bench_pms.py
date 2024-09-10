@@ -1,6 +1,6 @@
 from typing import Any
 
-from pyModeS import adsb, bds, commb, py_common
+from pyModeS import adsb, bds, commb, py_common  # type: ignore
 
 
 def decode(msg: str, common: Any = py_common) -> dict[str, Any]:
