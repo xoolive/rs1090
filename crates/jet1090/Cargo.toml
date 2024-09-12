@@ -39,6 +39,13 @@ url = "2.5.2"
 warp = "0.3.6"
 zip = "2.1.6"
 redis = { version = "0.26.1", features = ["tokio-comp"] }
+tokio-stream = "0.1.15"
+tokio-tungstenite = "0.23.0"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.5", features = ["fs", "trace"] }
+uuid = { version = "1.8.0", features = ["v4"] }
+serde_tuple = "0.5.0"
+evalexpr = { version = "11.3", features = ["serde"] }
 
 [[bin]]
 name = "jet1090"

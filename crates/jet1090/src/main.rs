@@ -15,7 +15,7 @@ use ratatui::widgets::*;
 use redis::AsyncCommands;
 use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io;
 use std::sync::Arc;
@@ -28,6 +28,21 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
+mod channel;
+mod websocket;
+
+use crate::channel::{ChannelControl, ChannelMessage};
+use crate::websocket::{
+    jet1090_data_task, on_connected, system_datetime_task, State,
+};
+use futures::SinkExt;
+use futures::StreamExt;
+use std::fmt::{Display, Error};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_tungstenite::connect_async;
+use tracing::{debug, error, info};
+
+// use uuid::Uuid;
 
 #[derive(Default, Deserialize, Parser)]
 #[command(
@@ -275,6 +290,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // rs1090 data items (TimeedMessage) are sent to timed_message_tx
+    // a thread reads from timed_message_stream and relay them to channels
+    let (timed_message_tx, timed_message_rx) =
+        tokio::sync::mpsc::unbounded_channel();
+    let timed_message_stream = UnboundedReceiverStream::new(timed_message_rx);
+
+    let channel_control = ChannelControl::new();
+    channel_control.new_channel("phoenix".into(), None).await; // channel for server to publish heartbeat
+    channel_control.new_channel("system".into(), None).await;
+    channel_control.new_channel("jet1090".into(), None).await;
+
+    let state = Arc::new(State {
+        ctl: Mutex::new(channel_control),
+    });
+    if options.serve_port.is_some() {
+        tokio::spawn(system_datetime_task(state.clone(), "system"));
+        tokio::spawn(jet1090_data_task(
+            state.clone(),
+            timed_message_stream,
+            "jet1090",
+            "data",
+        ));
+    }
+
     if let Some(port) = options.serve_port {
         tokio::spawn(async move {
             let app_home = app_web.clone();
@@ -312,10 +351,59 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let cors = warp::cors()
                 .allow_any_origin()
                 .allow_headers(vec!["*"])
-                .allow_methods(vec!["GET"]);
+                .allow_methods(vec!["GET", "POST"]);
+
+            let ws_state = state.clone();
+            let ws_route = warp::path("websocket")
+                .and(warp::ws())
+                .and(warp::any().map(move || ws_state.clone()))
+                .map(|ws: warp::ws::Ws, state| {
+                    ws.on_upgrade(move |websocket| {
+                        on_connected(websocket, state)
+                    })
+                });
+
+            let channels_assets = warp::path("channels")
+                .and(warp::fs::dir("./crates/jet1090/src/assets"));
+
+            #[derive(Debug, Clone, Serialize, Deserialize)]
+            struct Code {
+                agent_id: String,
+                channel_name: String,
+                code: String,
+            }
+            let channel_control_state = state.clone();
+            let update_filter_route = warp::path!("channels" / "filters")
+                .and(warp::post())
+                .and(warp::body::json())
+                .and(warp::any().map(move || channel_control_state.clone()))
+                .and_then(|code: Code, state: Arc<State>| async move {
+                    state
+                        .ctl
+                        .lock()
+                        .await
+                        .channel_map
+                        .lock()
+                        .await
+                        .get(code.channel_name.as_str())
+                        .unwrap()
+                        .send(ChannelMessage::ReloadFilter {
+                            agent_id: code.agent_id,
+                            code: code.code,
+                        })
+                        .unwrap();
+                    Ok::<_, std::convert::Infallible>(warp::reply::json(&0))
+                });
 
             let routes = warp::get()
-                .and(home.or(all).or(track).or(receivers))
+                .and(
+                    home.or(all)
+                        .or(track)
+                        .or(receivers)
+                        .or(channels_assets)
+                        .or(ws_route),
+                )
+                .or(update_filter_route)
                 .recover(web::handle_rejection)
                 .with(cors);
 
@@ -376,6 +464,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
+
+            if options.serve_port.is_some() {
+                // http server is enabled
+                // send the message to channel `jet1090` event `data`
+                // on the other side, thread `rs1090_data_task` receives and publishes the message to all clients
+                timed_message_tx.send(msg.clone())?;
+            }
 
             if let Ok(json) = serde_json::to_string(&msg) {
                 if options.verbose {
