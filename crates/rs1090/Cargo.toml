@@ -15,7 +15,7 @@ rtlsdr = ['soapysdr']
 [dependencies]
 ansi_term = "0.12.1"
 async-stream = "0.3.5"
-deku = { version = "0.18.0", features = ["logging"] }
+deku = { version = "0.18.1", features = ["logging"] }
 futures = "0.3.30"
 futures-util = "0.3.30"
 hex = "0.4.3"
