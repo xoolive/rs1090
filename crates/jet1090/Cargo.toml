@@ -38,7 +38,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 url = "2.5.2"
 warp = "0.3.6"
 zip = "2.1.6"
-redis = { version = "0.26.1", features = ["tokio-comp"] }
+redis = { version = "0.27.2", features = ["tokio-comp"] }
 
 [[bin]]
 name = "jet1090"
