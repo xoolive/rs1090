@@ -18,7 +18,7 @@ chrono = "0.4.37"
 clap = { version = "4.5.17", features = ["color", "derive", "wrap_help"] }
 clap_complete = "4.5.26"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
-deku = "0.18.0"
+deku = "0.18.1"
 dirs = "5.0.1"
 dotenv = "0.15.0"
 futures = "0.3.30"
