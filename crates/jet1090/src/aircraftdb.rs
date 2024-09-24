@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
-use std::io::{copy, BufReader, Cursor};
+use std::io::{copy, BufReader, Cursor, Write};
 use zip::read::ZipArchive;
 
 #[derive(Debug)]
@@ -19,6 +19,7 @@ async fn download_file(url: &str, destination: &str) -> Result<()> {
     let mut file = File::create(destination)?;
     let mut content = Cursor::new(response);
     copy(&mut content, &mut file)?;
+    file.flush()?; // this only seems necessary for windows
     Ok(())
 }
 
