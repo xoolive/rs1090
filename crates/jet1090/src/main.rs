@@ -73,6 +73,10 @@ struct Options {
     // - `reference` can be LFPG for major airports, `43.3,1.35` otherwise
     sources: Vec<cli::Source>,
 
+    #[cfg(feature = "rtlsdr")]
+    #[arg(long, value_name = "ARGS")]
+    discover: Option<String>,
+
     /// logging file, use "-" for stdout (only in non-interactive mode)
     #[arg(short, long, value_name = "FILE")]
     log_file: Option<String>,
@@ -106,7 +110,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Ok(config_file) = std::env::var("JET1090_CONFIG") {
-        let string = fs::read_to_string(config_file).await.ok().unwrap();
+        let string = fs::read_to_string(config_file)
+            .await
+            .expect("Configuration file not found");
         options = toml::from_str(&string).unwrap();
     }
 
@@ -144,15 +150,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         options.redis_topic = cli_options.redis_topic;
     }
 
-    let mut redis_connect = match options
-        .redis_url
-        .map(|url| redis::Client::open(url).unwrap())
-    {
-        Some(c) => Some(c.get_multiplexed_async_connection().await?),
-        None => None,
-    };
-    let redis_topic = options.redis_topic.unwrap_or("jet1090".to_string());
-
     options.sources.append(&mut cli_options.sources);
 
     // example: RUST_LOG=rs1090=DEBUG
@@ -175,6 +172,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             subscriber.init(); // no logging
         }
     }
+
+    #[cfg(feature = "rtlsdr")]
+    if let Some(args) = cli_options.discover {
+        rtlsdr::enumerate(&format!("driver={args}"));
+        return Ok(());
+    }
+
+    let mut redis_connect = match options
+        .redis_url
+        .map(|url| redis::Client::open(url).unwrap())
+    {
+        Some(c) => Some(c.get_multiplexed_async_connection().await?),
+        None => None,
+    };
+    let redis_topic = options.redis_topic.unwrap_or("jet1090".to_string());
 
     let mut file = if let Some(output_path) = options.output {
         Some(
@@ -324,8 +336,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // I am not sure whether this size calibration is relevant, but let's try...
+    // adding one in order to avoid the stupid error when you set a size = 0
     let multiplier = options.sources.len();
-    let (tx, mut rx) = tokio::sync::mpsc::channel(100 * multiplier);
+    let (tx, mut rx) = tokio::sync::mpsc::channel(100 * multiplier + 1);
 
     for (idx, source) in options.sources.into_iter().enumerate() {
         let tx_copy = tx.clone();

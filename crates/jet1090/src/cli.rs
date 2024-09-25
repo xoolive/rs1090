@@ -98,8 +98,7 @@ impl Source {
             }
             #[cfg(feature = "rtlsdr")]
             {
-                rtlsdr::discover();
-                rtlsdr::receiver(tx, idx).await
+                rtlsdr::receiver::<&str>(tx, None, idx).await
             }
         } else {
             let server_address = match &self.address {

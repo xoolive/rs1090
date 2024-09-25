@@ -2,11 +2,12 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use num_complex::Complex;
-use soapysdr::{Device, Direction};
+use soapysdr::{Args, Device, Direction};
 use tokio::sync::mpsc;
 
 use crate::decode::crc::modes_checksum;
 use crate::decode::{TimeSource, TimedMessage};
+use log::{error, info};
 use std::fmt::{self, Display, Formatter};
 
 const DIRECTION: Direction = Direction::Rx;
@@ -19,11 +20,22 @@ const MODES_SHORT_MSG_BYTES: usize = 7;
 const MODES_MAG_BUF_SAMPLES: usize = 131_072;
 const TRAILING_SAMPLES: usize = 326;
 
-pub async fn receiver(tx: mpsc::Sender<TimedMessage>, idx: usize) {
-    let device = match Device::new("rtlsdr") {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("SoapySDR error: {}", e);
+pub async fn receiver<A: Into<Args>>(
+    tx: mpsc::Sender<TimedMessage>,
+    args: Option<A>,
+    idx: usize,
+) {
+    let device = match args {
+        None => Device::new("device=rtlsdr"),
+        Some(args) => Device::new(args),
+    };
+    let device = match device {
+        Ok(device) => {
+            info!("{:#}", device.hardware_info().unwrap());
+            device
+        }
+        Err(error) => {
+            eprintln!("SoapySDR error: {}", error);
             std::process::exit(127);
         }
     };
@@ -69,7 +81,7 @@ pub async fn receiver(tx: mpsc::Sender<TimedMessage>, idx: usize) {
                 }
             }
             Err(e) => {
-                eprintln!("SoapySDR read error: {}", e);
+                error!("SoapySDR read error: {}", e);
             }
         }
     }
@@ -288,7 +300,7 @@ pub fn icao_filter_add(addr: u32) {
         {
             h = (h + 1) & (ICAO_FILTER_SIZE - 1);
             if h == h0 {
-                eprintln!("icao24 hash table full");
+                error!("icao24 hash table full");
                 return;
             }
         }
@@ -654,17 +666,17 @@ fn print_channel_info(
         Direction::Rx => "Rx",
         Direction::Tx => "Tx",
     };
-    eprintln!("{} Channel {}", dir_s, channel);
+    info!("{} Channel {}", dir_s, channel);
 
     let freq_range = dev.frequency_range(dir, channel)?;
-    eprintln!("Freq range: {}", DisplayRange(freq_range));
+    info!("Freq range: {}", DisplayRange(freq_range));
 
     let sample_rates = dev.get_sample_rate_range(dir, channel)?;
-    eprintln!("Sample rates: {}", DisplayRange(sample_rates));
+    info!("Sample rates: {}", DisplayRange(sample_rates));
 
-    eprintln!("Antennas: ");
+    info!("Antennas: ");
     for antenna in dev.antennas(dir, channel)? {
-        eprintln!("{}", antenna);
+        info!("{}", antenna);
     }
 
     Ok(())
@@ -691,23 +703,24 @@ impl Display for DisplayRange {
     }
 }
 
-pub fn discover() {
+pub fn enumerate(args: &str) {
     for devargs in
-        soapysdr::enumerate("").expect("SoapySDR: Error listing devices")
+        soapysdr::enumerate(args).expect("SoapySDR: Error listing devices")
     {
-        eprintln!("{}", devargs);
+        info!("Device: {}", devargs);
 
-        let dev =
-            soapysdr::Device::new(devargs).expect("Failed to open device");
+        if let Ok(dev) = soapysdr::Device::new(devargs) {
+            info!("Hardware info: {:#}", dev.hardware_info().unwrap());
 
-        for channel in 0..(dev.num_channels(Direction::Rx).unwrap_or(0)) {
-            print_channel_info(&dev, Direction::Rx, channel)
-                .expect("Failed to get channel info");
-        }
+            for channel in 0..(dev.num_channels(Direction::Rx).unwrap_or(0)) {
+                print_channel_info(&dev, Direction::Rx, channel)
+                    .expect("Failed to get channel info");
+            }
 
-        for channel in 0..(dev.num_channels(Direction::Tx).unwrap_or(0)) {
-            print_channel_info(&dev, Direction::Tx, channel)
-                .expect("Failed to get channel info");
+            for channel in 0..(dev.num_channels(Direction::Tx).unwrap_or(0)) {
+                print_channel_info(&dev, Direction::Tx, channel)
+                    .expect("Failed to get channel info");
+            }
         }
     }
 }
