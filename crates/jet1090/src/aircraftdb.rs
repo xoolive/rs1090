@@ -39,7 +39,9 @@ pub async fn aircraft() -> BTreeMap<String, Aircraft> {
     // Check if the zip file exists
     if !cache_path.exists() {
         println!("Downloading basestation.zip...");
-        let _ = download_file(zip_url, cache_path.to_str().unwrap()).await;
+        download_file(zip_url, cache_path.to_str().unwrap())
+            .await
+            .expect("Failed to download basestation.zip");
     }
 
     // Open the zip file
