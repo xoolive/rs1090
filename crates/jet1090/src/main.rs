@@ -74,6 +74,7 @@ struct Options {
     sources: Vec<cli::Source>,
 
     #[cfg(feature = "rtlsdr")]
+    /// List the detected devices, for now, only --discover rtlsdr is fully supported
     #[arg(long, value_name = "ARGS")]
     discover: Option<String>,
 

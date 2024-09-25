@@ -7,8 +7,8 @@ use tokio::sync::mpsc;
 
 use crate::decode::crc::modes_checksum;
 use crate::decode::{TimeSource, TimedMessage};
-use log::{error, info};
 use std::fmt::{self, Display, Formatter};
+use tracing::{error, info};
 
 const DIRECTION: Direction = Direction::Rx;
 const MODES_FREQ: f64 = 1.09e9;
@@ -81,7 +81,7 @@ pub async fn receiver<A: Into<Args>>(
                 }
             }
             Err(e) => {
-                error!("SoapySDR read error: {}", e);
+                eprintln!("SoapySDR read error: {}", e);
             }
         }
     }
