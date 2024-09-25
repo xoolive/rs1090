@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use std::collections::BTreeMap;
 use std::fs::{self, File};
-use std::io::{copy, BufReader, Cursor, Write};
+use std::io::{copy, BufReader, Cursor};
 use zip::read::ZipArchive;
 
 #[derive(Debug)]
@@ -19,7 +19,6 @@ async fn download_file(url: &str, destination: &str) -> Result<()> {
     let mut file = File::create(destination)?;
     let mut content = Cursor::new(response);
     copy(&mut content, &mut file)?;
-    file.flush()?; // this only seems necessary for windows
     Ok(())
 }
 
@@ -40,7 +39,9 @@ pub async fn aircraft() -> BTreeMap<String, Aircraft> {
     // Check if the zip file exists
     if !cache_path.exists() {
         println!("Downloading basestation.zip...");
-        let _ = download_file(zip_url, cache_path.to_str().unwrap()).await;
+        download_file(zip_url, cache_path.to_str().unwrap())
+            .await
+            .expect("Failed to download basestation.zip");
     }
 
     // Open the zip file
