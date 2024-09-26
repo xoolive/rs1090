@@ -11,7 +11,7 @@ on:
       - main
       - master
     tags:
-      - '*'
+      - "*"
   pull_request:
   workflow_dispatch:
 
@@ -79,7 +79,7 @@ jobs:
           working-directory: python
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: 'true'
+          sccache: "true"
           manylinux: musllinux_1_2
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -108,7 +108,7 @@ jobs:
           working-directory: python
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: 'true'
+          sccache: "true"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -161,7 +161,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || ${{ github.event_name == 'workflow_dispatch' }}
     needs: [linux, musllinux, windows, macos, sdist]
     steps:
       - uses: actions/download-artifact@v4
@@ -174,4 +174,4 @@ jobs:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-          args: --non-interactive --skip-existing wheels-*/*
+          args: --non-interactive --skip-existing **/wheels-*/*
