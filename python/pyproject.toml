@@ -1,7 +1,3 @@
-[build-system]
-requires = ["maturin>=1.4,<2.0"]
-build-backend = "maturin"
-
 [project]
 name = "rs1090"
 requires-python = ">=3.9"
@@ -16,9 +12,19 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[project.urls]
+repository = "https://github.com/xoolive/rs1090"
+
 [tool.maturin]
 module-name = "rs1090._rust"
 features = ["pyo3/extension-module"]
+
+[tool.uv]
+dev-dependencies = [
+  "mypy>=1.8.0",
+  "pytest>=8.0.2",
+  "ruff>=0.3.0"
+]
 
 [tool.ruff]
 line-length = 80
@@ -40,15 +46,9 @@ warn_redundant_casts = true
 warn_unused_configs = true
 warn_unused_ignores = true
 
-[project.optional-dependencies]
-dev = [
-  "mypy>=1.8.0",
-  "pytest>=8.0.2",
-  "ruff>=0.3.0"
-]
-
 [tool.pytest.ini_options]
 addopts = "--log-level=INFO --color=yes"
 
-[project.urls]
-repository = "https://github.com/xoolive/rs1090"
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
