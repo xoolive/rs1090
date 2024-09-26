@@ -22,6 +22,7 @@ features = ["pyo3/extension-module"]
 [tool.uv]
 dev-dependencies = [
   "mypy>=1.8.0",
+  "pip",
   "pytest>=8.0.2",
   "ruff>=0.3.0"
 ]
