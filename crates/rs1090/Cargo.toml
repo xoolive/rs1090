@@ -22,7 +22,7 @@ hex = "0.4.3"
 libm = "0.2.8"
 log = "0.4.17"
 num-complex = "0.4.5"
-once_cell = "1.19.0"
+once_cell = "1.20.1"
 rayon = "1.9.0"
 regex = "1.10.5"
 serde = { version = "1.0.210", features = ["derive"] }
