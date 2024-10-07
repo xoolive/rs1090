@@ -13,7 +13,7 @@ homepage.workspace = true
 [dependencies]
 clap = { version = "4.5.18", features = ["color", "derive", "wrap_help"] }
 deku = "0.18.1"
-futures-util = "0.3.30"
+futures-util = "0.3.31"
 hex = "0.4.3"
 rs1090 = { version = "0.3.6", path = "../rs1090" }
 serde = { version = "1.0.210", features = ["derive"] }
