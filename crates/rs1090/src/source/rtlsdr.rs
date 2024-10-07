@@ -26,7 +26,7 @@ pub async fn receiver<A: Into<Args>>(
     idx: usize,
 ) {
     let device = match args {
-        None => Device::new("device=rtlsdr"),
+        None => Device::new("driver=rtlsdr"),
         Some(args) => Device::new(args),
     };
     let device = match device {
