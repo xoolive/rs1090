@@ -302,7 +302,7 @@ impl DekuContainerRead<'_> for Message {
             reader.skip_bits(input.1)?;
         }
 
-        let value = Self::from_reader_with_ctx(reader, ()).unwrap();
+        let value = Self::from_reader_with_ctx(reader, ())?;
 
         Ok((reader.bits_read, value))
     }
