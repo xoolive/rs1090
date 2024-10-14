@@ -16,7 +16,7 @@ rtlsdr = ['soapysdr']
 ansi_term = "0.12.1"
 async-stream = "0.3.6"
 deku = { version = "0.18.1", features = ["logging"] }
-futures = "0.3.30"
+futures = "0.3.31"
 futures-util = "0.3.31"
 hex = "0.4.3"
 libm = "0.2.8"
