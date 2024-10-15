@@ -224,6 +224,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         state: TableState::default().with_selected(0),
         scroll_state: ScrollbarState::new(0),
         should_quit: false,
+        should_clear: false,
         state_vectors: BTreeMap::new(),
         sort_key: SortKey::default(),
         sort_asc: false,
@@ -237,11 +238,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::spawn(async move {
             loop {
                 if let Ok(event) = events.next().await {
-                    let _ = update(&mut app_tui.lock().await, event);
+                    update(&mut app_tui.lock().await, event)?;
                 }
                 let mut app = app_tui.lock().await;
                 if app.should_quit {
                     break;
+                }
+                if app.should_clear {
+                    terminal.clear()?;
+                    app.should_clear = false;
                 }
                 terminal.draw(|frame| table::build_table(frame, &mut app))?;
             }
@@ -348,8 +353,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    let mut first_msg = true;
     while let Some(tmsg) = rx.recv().await {
         let frame = hex::decode(&tmsg.frame).unwrap();
+        if first_msg {
+            // This workaround results from soapysdr writing directly on stdout.
+            // The best thing would be to not write to stdout in the first
+            // place. A better workaround would be to condition that clear to
+            // the first message received from rtlsdr.
+
+            app_dec.lock().await.should_clear = true;
+            first_msg = false;
+        }
         if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
             let mut msg = TimedMessage {
                 timestamp: tmsg.timestamp,
@@ -421,6 +436,7 @@ pub struct Jet1090 {
     items: Vec<String>,
     scroll_state: ScrollbarState,
     should_quit: bool,
+    should_clear: bool,
     state_vectors: BTreeMap<String, snapshot::StateVectors>,
     sort_key: SortKey,
     sort_asc: bool,
