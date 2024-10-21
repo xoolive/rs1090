@@ -11,45 +11,9 @@ authors = ["Xavier Olive <git@xoolive.org>"]
 homepage = "https://github.com/xoolive/rs1090"
 documentation = "https://crates.io/crates/rs1090"
 
-# Config for 'cargo dist'
-[workspace.metadata.dist]
-# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.21.1"
-# CI backends to support
-ci = "github"
-# The installers to generate for each app
-installers = ["shell", "powershell", "homebrew"]
-# A GitHub repo to push Homebrew formulas to
-tap = "xoolive/homebrew-homebrew"
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
-# Which actions to run on pull requests
-pr-run-mode = "plan"
-# Publish jobs to run in CI
-publish-jobs = ["homebrew"]
-# Whether to pass --all-features to cargo build
-all-features = true
-# Allow to edit the release.yml file (see Windows dependencies)
-allow-dirty = ["ci"]
-# Path that installers should place binaries in
-install-path = "CARGO_HOME"
-# Whether to install an updater program
-install-updater = true
-
 [workspace.metadata.release]
 shared-version = true
 tag-name = "v{{version}}"
-
-[workspace.metadata.dist.dependencies.apt]
-libsoapysdr-dev = "*"
-soapysdr-module-rtlsdr = "*"
-
-[workspace.metadata.dist.dependencies.homebrew]
-soapysdr = { stage = ["build", "run"] }
-soapyrtlsdr = { stage = ["run"] }
-
-[workspace.metadata.dist.github-custom-runners]
-aarch64-apple-darwin = "macos-14"
 
 [profile.release]
 lto = true
