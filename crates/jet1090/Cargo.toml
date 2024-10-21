@@ -25,7 +25,7 @@ futures = "0.3.31"
 futures-util = "0.3.31"
 hex = "0.4.3"
 ratatui = "0.28.1"
-reqwest = "0.12.5"
+reqwest = "0.12.8"
 rs1090 = { version = "0.3.8", path = "../rs1090" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 serde = { version = "1.0.210", features = ["derive"] }
