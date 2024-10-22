@@ -184,7 +184,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .redis_url
         .map(|url| redis::Client::open(url).unwrap())
     {
-        Some(c) => Some(c.get_multiplexed_async_connection().await?),
+        // map is not possible because of the .await (the async context thing)
+        Some(c) => Some(
+            c.get_multiplexed_async_connection()
+                .await
+                .expect("Unable to connect to the Redis server"),
+        ),
         None => None,
     };
     let redis_topic = options.redis_topic.unwrap_or("jet1090".to_string());
