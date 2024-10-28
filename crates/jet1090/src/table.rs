@@ -226,7 +226,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
                 .borders(Borders::ALL),
         )
         .bg(colors.buffer_bg)
-        .highlight_style(
+        .row_highlight_style(
             Style::default()
                 .add_modifier(Modifier::REVERSED)
                 .fg(colors.selected_style_fg),
