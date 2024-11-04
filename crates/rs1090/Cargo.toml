@@ -19,7 +19,7 @@ deku = { version = "0.18.1", features = ["logging"] }
 futures = "0.3.31"
 futures-util = "0.3.31"
 hex = "0.4.3"
-libm = "0.2.9"
+libm = "0.2.11"
 log = "0.4.17"
 num-complex = "0.4.5"
 once_cell = "1.20.2"
