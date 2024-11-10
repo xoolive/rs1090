@@ -24,7 +24,9 @@ dotenv = "0.15.0"
 futures = "0.3.31"
 futures-util = "0.3.31"
 hex = "0.4.3"
+keepawake = "0.5.1"
 ratatui = "0.29.0"
+redis = { version = "0.27.5", features = ["tokio-comp"] }
 reqwest = "0.12.9"
 rs1090 = { version = "0.3.8", path = "../rs1090" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
@@ -38,7 +40,6 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 url = "2.5.2"
 warp = "0.3.6"
 zip = "2.1.6"
-redis = { version = "0.27.5", features = ["tokio-comp"] }
 
 [[bin]]
 name = "jet1090"

@@ -57,8 +57,12 @@ struct Options {
     #[arg(long, short = 'x')]
     expire: Option<u64>,
 
+    /// Prevent the computer sleeping when decoding is in progress
+    #[arg(long, default_value=None)]
+    prevent_sleep: bool,
+
     /// Should we update the reference positions (if the receiver is moving)
-    #[arg(short, long, default_value = "false")]
+    #[arg(short, long, default_value=None)]
     update_position: bool,
 
     /// Shell completion generation
@@ -141,6 +145,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli_options.expire.is_some() {
         options.expire = cli_options.expire;
     }
+    if cli_options.prevent_sleep {
+        options.prevent_sleep = cli_options.prevent_sleep;
+    }
     if cli_options.update_position {
         options.update_position = cli_options.update_position;
     }
@@ -207,6 +214,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let aircraftdb = aircraftdb::aircraft().await;
+
+    let _awake = match options.prevent_sleep {
+        true => Some(
+            keepawake::Builder::default()
+                .display(false)
+                .idle(true)
+                .sleep(true)
+                .reason("jet1090 decoding in progress")
+                .app_name("jet1090")
+                .app_reverse_domain("io.github.jet1090")
+                .create()?,
+        ),
+        false => None,
+    };
 
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
 
