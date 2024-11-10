@@ -595,6 +595,7 @@ mod tests {
             interactive = true
             serve_port = 8080
             expire = 1
+            prevent_sleep = false
             update_position = false
 
             [[sources]]
