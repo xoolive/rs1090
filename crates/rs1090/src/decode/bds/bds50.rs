@@ -47,7 +47,9 @@ fn read_roll<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 5,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: roll angle".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -59,7 +61,9 @@ fn read_roll<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         value as f64 * 45. / 256.
     };
     if roll.abs() > 50. {
-        return Err(DekuError::Assertion("BDS 5,0 status".into()));
+        return Err(DekuError::Assertion(
+            format!("Roll angle: abs({}) > 50", roll).into(),
+        ));
     }
     Ok(Some(roll))
 }
@@ -82,7 +86,9 @@ fn read_track<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 5,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: track angle".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -115,7 +121,9 @@ fn read_groundspeed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 5,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: groundspeed".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -123,7 +131,9 @@ fn read_groundspeed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     let gs = value * 2;
     if gs > 600 {
-        return Err(DekuError::Assertion("BDS 5,0 status".into()));
+        return Err(DekuError::Assertion(
+            format!("Groundspeed value: {} > 600", gs).into(),
+        ));
     }
     Ok(Some(gs))
 }
@@ -147,7 +157,9 @@ fn read_rate<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 5,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: track rate".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -167,7 +179,13 @@ fn read_rate<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     if let Some(roll) = roll {
         if roll * rate < 0. {
             // signs must agree: left wing down = turn left
-            return Err(DekuError::Assertion("BDS 5,0 status".into()));
+            return Err(DekuError::Assertion(
+                format!(
+                    "Roll angle {} and track rate {} signs do not agree.",
+                    roll, rate
+                )
+                .into(),
+            ));
         }
     }
 
@@ -189,7 +207,9 @@ fn read_tas<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 5,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: true air speed".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -199,7 +219,10 @@ fn read_tas<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if let Some(gs) = gs {
         if !(80..=500).contains(&tas) | ((gs as i16 - tas as i16).abs() > 200) {
-            return Err(DekuError::Assertion("BDS 5,0 status".into()));
+            return Err(DekuError::Assertion(format!(
+                "TAS = {} must be within [80, 500] and abs(GS - TAS) = {} < 200",
+                tas, gs
+            ).into()));
         }
     }
     Ok(Some(tas))

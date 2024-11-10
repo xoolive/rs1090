@@ -6,7 +6,7 @@ pub mod crc;
 pub mod flarm;
 
 use adsb::{ADSB, ME};
-use commb::DataSelector;
+use commb::{DF20DataSelector, DF21DataSelector};
 use crc::modes_checksum;
 use deku::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -223,7 +223,8 @@ pub enum DF {
         ac: AC13Field,
         /// BDS Message, Comm-B
         #[serde(flatten)]
-        bds: DataSelector,
+        #[deku(ctx = "*ac")]
+        bds: DF20DataSelector,
         /// address/parity
         #[serde(rename = "icao24")]
         #[deku(ctx = "crc")]
@@ -248,7 +249,7 @@ pub enum DF {
         id: IdentityCode,
         /// BDS Message, Comm-B
         #[serde(flatten)]
-        bds: DataSelector,
+        bds: DF21DataSelector,
         /// Address/Parity
         #[serde(rename = "icao24")]
         #[deku(ctx = "crc")]

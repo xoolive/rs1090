@@ -12,7 +12,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[serde(tag = "bds", rename = "17")]
-pub struct GICBCapabilityReport {
+pub struct CommonUsageGICBCapabilityReport {
     #[deku(bits = "1")]
     #[serde(skip_serializing_if = "is_false")]
     /// Extended squitter airborne position
@@ -133,6 +133,10 @@ pub struct GICBCapabilityReport {
     /// Heading and speed report
     pub bds60: bool,
 
+    #[deku(bits = "5")]
+    #[serde(skip)]
+    pub reserved: u8,
+
     #[deku(reader = "check_zeros(deku::reader)")]
     #[serde(skip)]
     pub check_flag: bool,
@@ -155,10 +159,13 @@ fn fail_if_false(value: bool) -> Result<bool, DekuError> {
 fn check_zeros<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<bool, DekuError> {
-    for _ in 0..=3 {
+    for i in 0..=3 {
         let value = u8::from_reader_with_ctx(
             reader,
-            (deku::ctx::Endian::Big, deku::ctx::BitSize(8)),
+            (
+                deku::ctx::Endian::Big,
+                deku::ctx::BitSize(if i == 0 { 3 } else { 8 }),
+            ),
         )?;
         if value != 0 {
             return Err(DekuError::InvalidParam(
@@ -182,7 +189,7 @@ mod tests {
         if let CommBAltitudeReply { bds, .. } = msg.df {
             assert_eq!(
                 bds.bds17,
-                Some(GICBCapabilityReport {
+                Some(CommonUsageGICBCapabilityReport {
                     bds05: true,
                     bds06: true,
                     bds07: true,
@@ -207,6 +214,7 @@ mod tests {
                     bds56: false,
                     bds5f: false,
                     bds60: true,
+                    reserved: 0,
                     check_flag: true
                 })
             );
