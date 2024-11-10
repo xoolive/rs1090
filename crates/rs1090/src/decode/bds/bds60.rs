@@ -69,7 +69,9 @@ fn read_heading<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 6,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: heading".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -102,14 +104,19 @@ fn read_ias<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 6,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: IAS".into(),
+            ));
         } else {
             return Ok(None);
         }
     }
 
     if (value == 0) | (value > 500) {
-        return Err(DekuError::Assertion("BDS 6,0 status".into()));
+        return Err(DekuError::Assertion(
+            format!("IAS value {} is equal to 0 or greater than 500", value)
+                .into(),
+        ));
     }
     Ok(Some(value))
 }
@@ -129,7 +136,9 @@ fn read_mach<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 6,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: Mach".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -138,7 +147,9 @@ fn read_mach<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     let mach = value as f64 * 2.048 / 512.;
 
     if (mach == 0.) | (mach > 1.) {
-        return Err(DekuError::Assertion("BDS 6,0 status".into()));
+        return Err(DekuError::Assertion(
+            format!("Mach value {} equal to 0 or greater than 1 ", mach).into(),
+        ));
     }
     if let Some(ias) = ias {
         /*
@@ -147,14 +158,26 @@ fn read_mach<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
          *
          * Let's do this:
          * 10000 ft has IAS max to 250, i.e. Mach 0.45
-         * forbid IAS > 250 and Mach < .5
+         * forbid IAS > 250 and Mach < 0.5
          */
         if (ias > 250) & (mach < 0.4) {
-            return Err(DekuError::Assertion("BDS 6,0 status".into()));
+            return Err(DekuError::Assertion(
+                format!(
+                    "IAS: {} and Mach: {} (250kts is Mach 0.45 at 10,000 ft)",
+                    ias, mach
+                )
+                .into(),
+            ));
         }
         // this one is easy IAS = 150 (close to take-off) at FL 400 is Mach 0.5
         if (ias < 150) & (mach > 0.5) {
-            return Err(DekuError::Assertion("BDS 6,0 status".into()));
+            return Err(DekuError::Assertion(
+                format!(
+                    "IAS: {} and Mach: {} (150kts is Mach 0.5 at FL400)",
+                    ias, mach
+                )
+                .into(),
+            ));
         }
     }
     Ok(Some(mach))
@@ -178,7 +201,9 @@ fn read_vertical<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if (sign != 0) | (value != 0) {
-            return Err(DekuError::Assertion("BDS 6,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Non-null value with invalid status: vertical rate".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -195,7 +220,10 @@ fn read_vertical<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     };
 
     if value.abs() > 6000 {
-        Err(DekuError::Assertion("BDS 6,0 status".into()))
+        Err(DekuError::Assertion(
+            format!("Vertical rate absolute value {} > 6000", value.abs())
+                .into(),
+        ))
     } else {
         Ok(Some(value))
     }

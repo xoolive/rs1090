@@ -1,7 +1,7 @@
 use deku::prelude::*;
 use serde::Serialize;
 use std::fmt;
-use tracing::debug;
+use tracing::{debug, trace};
 
 /**
  * ## Aircraft Identification and Category (BDS 0,8)
@@ -202,7 +202,7 @@ pub fn callsign_read<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     let mut chars = vec![];
     for _ in 1..=8 {
         let c = u8::from_reader_with_ctx(reader, deku::ctx::BitSize(6))?;
-        debug!("Reading letter {}", CHAR_LOOKUP[c as usize] as char);
+        trace!("Reading letter {}", CHAR_LOOKUP[c as usize] as char);
         if c != 32 {
             chars.push(c);
         }

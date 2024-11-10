@@ -8,6 +8,148 @@ from typing_extensions import (
 )
 
 
+class BDS05(TypedDict):
+    bds: Literal["05"]
+    NUCp: int
+    NICb: int
+    altitude: int
+    source: str
+    parity: Literal["odd", "even"]
+    lat_cpr: int
+    lon_cpr: int
+    latitude: NotRequired[float]
+    longitude: NotRequired[float]
+
+
+class BDS10(TypedDict):
+    bds: Literal["10"]
+    config: bool
+    ovc: bool
+    acas: bool
+    subnet: int
+    level5: bool
+    mode_s: bool
+    identification: bool
+    squitter: bool
+    sic: bool
+    gicb: bool
+    acas_hybrid: bool
+    acas_ra: bool
+    dte: int
+
+
+class BDS17(TypedDict):
+    bds: Literal["17"]
+    bds05: NotRequired[Literal[True]]
+    bds06: NotRequired[Literal[True]]
+    bds07: NotRequired[Literal[True]]
+    bds08: NotRequired[Literal[True]]
+    bds09: NotRequired[Literal[True]]
+    bds0a: NotRequired[Literal[True]]
+    bds20: Literal[True]
+    bds40: NotRequired[Literal[True]]
+    bds41: NotRequired[Literal[True]]
+    bds42: NotRequired[Literal[True]]
+    bds43: NotRequired[Literal[True]]
+    bds44: NotRequired[Literal[True]]
+    bds45: NotRequired[Literal[True]]
+    bds48: NotRequired[Literal[True]]
+    bds50: NotRequired[Literal[True]]
+    bds51: NotRequired[Literal[True]]
+    bds52: NotRequired[Literal[True]]
+    bds53: NotRequired[Literal[True]]
+    bds54: NotRequired[Literal[True]]
+    bds55: NotRequired[Literal[True]]
+    bds56: NotRequired[Literal[True]]
+    bds5f: NotRequired[Literal[True]]
+    bds60: NotRequired[Literal[True]]
+
+
+class BDS20(TypedDict):
+    bds: Literal["20"]
+    callsign: str
+    icao24: str
+
+
+class BDS21(TypedDict):
+    bds: Literal["21"]
+    registration: None | str
+    airline: None | str
+
+
+class BDS30(TypedDict):
+    bds: Literal["30"]
+    issued_ra: bool
+    corrective: NotRequired[bool]
+    downward_sense: NotRequired[bool]
+    increased_rate: NotRequired[bool]
+    sense_reversal: NotRequired[bool]
+    altitude_crossing: NotRequired[bool]
+    positive: NotRequired[bool]
+    no_below: NotRequired[bool]
+    no_above: NotRequired[bool]
+    no_left: NotRequired[bool]
+    no_right: NotRequired[bool]
+    terminated: NotRequired[bool]
+    multiple: NotRequired[bool]
+    threat_identity: NotRequired[str]
+    threat_altitude: NotRequired[int]
+    threat_range: NotRequired[float]
+    threat_bearing: NotRequired[int]
+
+
+class BDS40(TypedDict):
+    bds: Literal["40"]
+    selected_mcp: NotRequired[int]
+    selected_fms: NotRequired[int]
+    barometric_setting: NotRequired[float]
+    target_source: Literal[
+        "AircraftAltitude", "FcpMcuSelectedAltitude", "FmsSelectedAltitude"
+    ]
+
+
+class BDS44(TypedDict):
+    bds: Literal["44"]
+    issued_ra: bool
+    terminated: bool
+    multiple: bool
+    wind_speed: None | int
+    wind_direction: None | float
+    temperature: float
+    pressure: None | int
+    turbulence: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    humidity: None | float
+
+
+class BDS45(TypedDict):
+    bds: Literal["45"]
+    turbulence: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    wind_shear: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    icing: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    wake_vortex: Literal[None, "Nil", "Light", "Moderate", "Severe"]
+    static_temperature: float
+    static_pressure: int
+    radio_hein: None | int
+
+
+class BDS50(TypedDict):
+    bds: Literal["50"]
+    roll: None | float
+    track: None | float
+    groundspeed: None | int
+    track_rate: None | float
+    TAS: None | int
+
+
+class BDS60(TypedDict):
+    bds: Literal["60"]
+    heading: NotRequired[float]
+    IAS: NotRequired[int]
+    Mach: NotRequired[float]
+    vrate_barometric: NotRequired[int]
+    vrate_inertial: NotRequired[int]
+
+
 class DF0(TypedDict):
     timestamp: float
     df: Literal["0"]
@@ -307,306 +449,43 @@ class DF18_Unknown(TypedDict):
     bds: Literal["?"]
 
 
-class DF20_BDS10(TypedDict):
-    timestamp: float
-    df: Literal["20"]
-    altitude: int
-    bds: Literal["10"]
-    config: bool
-    ovc: bool
-    acas: bool
-    subnet: int
-    level5: bool
-    mode_s: bool
-    identification: bool
-    squitter: bool
-    sic: bool
-    gicb: bool
-    acas_hybrid: bool
-    acas_ra: bool
-    dte: int
-    icao24: str
-
-
-class DF20_BDS17(TypedDict):
-    timestamp: float
-    df: Literal["20"]
-    altitude: int
-    bds: Literal["17"]
-    bds05: NotRequired[Literal[True]]
-    bds06: NotRequired[Literal[True]]
-    bds07: NotRequired[Literal[True]]
-    bds08: NotRequired[Literal[True]]
-    bds09: NotRequired[Literal[True]]
-    bds0a: NotRequired[Literal[True]]
-    bds20: Literal[True]
-    bds40: NotRequired[Literal[True]]
-    bds41: NotRequired[Literal[True]]
-    bds42: NotRequired[Literal[True]]
-    bds43: NotRequired[Literal[True]]
-    bds44: NotRequired[Literal[True]]
-    bds45: NotRequired[Literal[True]]
-    bds48: NotRequired[Literal[True]]
-    bds50: NotRequired[Literal[True]]
-    bds51: NotRequired[Literal[True]]
-    bds52: NotRequired[Literal[True]]
-    bds53: NotRequired[Literal[True]]
-    bds54: NotRequired[Literal[True]]
-    bds55: NotRequired[Literal[True]]
-    bds56: NotRequired[Literal[True]]
-    bds5f: NotRequired[Literal[True]]
-    bds60: NotRequired[Literal[True]]
-    icao24: str
-
-
-class DF20_BDS20(TypedDict):
-    timestamp: float
-    df: Literal["20"]
-    altitude: int
-    bds: Literal["20"]
-    callsign: str
-    icao24: str
-
-
-class DF20_BDS30(TypedDict):
-    timestamp: float
-    df: Literal["20"]
-    altitude: int
-    bds: Literal["30"]
-    issued_ra: bool
-    corrective: NotRequired[bool]
-    downward_sense: NotRequired[bool]
-    increased_rate: NotRequired[bool]
-    sense_reversal: NotRequired[bool]
-    altitude_crossing: NotRequired[bool]
-    positive: NotRequired[bool]
-    no_below: NotRequired[bool]
-    no_above: NotRequired[bool]
-    no_left: NotRequired[bool]
-    no_right: NotRequired[bool]
-    terminated: NotRequired[bool]
-    multiple: NotRequired[bool]
-    threat_identity: NotRequired[str]
-    threat_altitude: NotRequired[int]
-    threat_range: NotRequired[float]
-    threat_bearing: NotRequired[int]
-    icao24: str
-
-
-class DF20_BDS40(TypedDict):
-    timestamp: float
-    df: Literal["20"]
-    altitude: int
-    bds: Literal["40"]
-    selected_mcp: NotRequired[int]
-    selected_fms: NotRequired[int]
-    barometric_setting: NotRequired[float]
-    target_source: Literal[
-        "AircraftAltitude", "FcpMcuSelectedAltitude", "FmsSelectedAltitude"
-    ]
-    icao24: str
-
-
-class DF20_BDS44(TypedDict):
-    timestamp: float
-    df: Literal["20"]
-    altitude: int
-    bds: Literal["44"]
-    issued_ra: bool
-    terminated: bool
-    multiple: bool
-    wind_speed: None | int
-    wind_direction: None | float
-    temperature: float
-    pressure: None | int
-    turbulence: Literal[None, "Nil", "Light", "Moderate", "Severe"]
-    humidity: None | float
-    icao24: str
-
-
-class DF20_BDS50(TypedDict):
-    timestamp: float
-    df: Literal["20"]
-    altitude: int
-    bds: Literal["50"]
-    roll: None | float
-    track: None | float
-    groundspeed: None | int
-    track_rate: None | float
-    TAS: None | int
-    icao24: str
-
-
-class DF20_BDS60(TypedDict):
-    timestamp: float
-    df: Literal["20"]
-    altitude: int
-    bds: Literal["60"]
-    heading: NotRequired[float]
-    IAS: NotRequired[int]
-    Mach: NotRequired[float]
-    vrate_barometric: NotRequired[int]
-    vrate_inertial: NotRequired[int]
-    icao24: str
-
-
-class DF20_Unknown(TypedDict):
+class DF20(TypedDict):
     timestamp: float
     df: Literal["20"]
     altitude: int
     icao24: str
-    bds: Literal["?"]
+    bds05: None | BDS05
+    bds10: None | BDS10
+    bds17: None | BDS17
+    # bds18: None | BDS18
+    # bds19: None | BDS19
+    bds20: None | BDS20
+    bds21: None | BDS21
+    bds30: None | BDS30
+    bds40: None | BDS40
+    bds44: None | BDS44
+    bds45: None | BDS45
+    bds50: None | BDS50
+    bds60: None | BDS60
 
 
-class DF21_BDS10(TypedDict):
-    timestamp: float
-    df: Literal["21"]
-    squawk: str
-    bds: Literal["10"]
-    config: bool
-    ovc: bool
-    acas: bool
-    subnet: int
-    level5: bool
-    mode_s: bool
-    identification: bool
-    squitter: bool
-    sic: bool
-    gicb: bool
-    acas_hybrid: bool
-    acas_ra: bool
-    dte: int
-    icao24: str
-
-
-class DF21_BDS17(TypedDict):
-    timestamp: float
-    df: Literal["21"]
-    squawk: str
-    bds: Literal["17"]
-    bds05: NotRequired[Literal[True]]
-    bds06: NotRequired[Literal[True]]
-    bds07: NotRequired[Literal[True]]
-    bds08: NotRequired[Literal[True]]
-    bds09: NotRequired[Literal[True]]
-    bds0a: NotRequired[Literal[True]]
-    bds20: Literal[True]
-    bds40: NotRequired[Literal[True]]
-    bds41: NotRequired[Literal[True]]
-    bds42: NotRequired[Literal[True]]
-    bds43: NotRequired[Literal[True]]
-    bds44: NotRequired[Literal[True]]
-    bds45: NotRequired[Literal[True]]
-    bds48: NotRequired[Literal[True]]
-    bds50: NotRequired[Literal[True]]
-    bds51: NotRequired[Literal[True]]
-    bds52: NotRequired[Literal[True]]
-    bds53: NotRequired[Literal[True]]
-    bds54: NotRequired[Literal[True]]
-    bds55: NotRequired[Literal[True]]
-    bds56: NotRequired[Literal[True]]
-    bds5f: NotRequired[Literal[True]]
-    bds60: NotRequired[Literal[True]]
-    icao24: str
-
-
-class DF21_BDS20(TypedDict):
-    timestamp: float
-    df: Literal["21"]
-    squawk: str
-    bds: Literal["20"]
-    callsign: str
-    icao24: str
-
-
-class DF21_BDS30(TypedDict):
-    timestamp: float
-    df: Literal["21"]
-    squawk: str
-    bds: Literal["30"]
-    issued_ra: bool
-    corrective: NotRequired[bool]
-    downward_sense: NotRequired[bool]
-    increased_rate: NotRequired[bool]
-    sense_reversal: NotRequired[bool]
-    altitude_crossing: NotRequired[bool]
-    positive: NotRequired[bool]
-    no_below: NotRequired[bool]
-    no_above: NotRequired[bool]
-    no_left: NotRequired[bool]
-    no_right: NotRequired[bool]
-    terminated: NotRequired[bool]
-    multiple: NotRequired[bool]
-    threat_identity: NotRequired[str]
-    threat_altitude: NotRequired[int]
-    threat_range: NotRequired[float]
-    threat_bearing: NotRequired[int]
-    icao24: str
-
-
-class DF21_BDS40(TypedDict):
-    timestamp: float
-    df: Literal["21"]
-    squawk: str
-    bds: Literal["40"]
-    selected_mcp: NotRequired[int]
-    selected_fms: NotRequired[int]
-    barometric_setting: NotRequired[float]
-    target_source: Literal[
-        "AircraftAltitude", "FcpMcuSelectedAltitude", "FmsSelectedAltitude"
-    ]
-    icao24: str
-
-
-class DF21_BDS44(TypedDict):
-    timestamp: float
-    df: Literal["21"]
-    squawk: str
-    bds: Literal["44"]
-    issued_ra: bool
-    terminated: bool
-    multiple: bool
-    wind_speed: None | int
-    wind_direction: None | float
-    temperature: float
-    pressure: None | int
-    turbulence: Literal[None, "Nil", "Light", "Moderate", "Severe"]
-    humidity: None | float
-    icao24: str
-
-
-class DF21_BDS50(TypedDict):
-    timestamp: float
-    df: Literal["21"]
-    squawk: str
-    bds: Literal["50"]
-    roll: None | float
-    track: None | float
-    groundspeed: None | int
-    track_rate: None | float
-    TAS: None | int
-    icao24: str
-
-
-class DF21_BDS60(TypedDict):
-    timestamp: float
-    df: Literal["21"]
-    squawk: str
-    bds: Literal["60"]
-    heading: NotRequired[float]
-    IAS: NotRequired[int]
-    Mach: NotRequired[float]
-    vrate_barometric: NotRequired[int]
-    vrate_inertial: NotRequired[int]
-    icao24: str
-
-
-class DF21_Unknown(TypedDict):
+class DF21(TypedDict):
     timestamp: float
     df: Literal["21"]
     squawk: str
     icao24: str
-    bds: Literal["?"]
+    bds10: None | BDS10
+    bds17: None | BDS17
+    # bds18: None | BDS18
+    # bds19: None | BDS19
+    bds20: None | BDS20
+    bds21: None | BDS21
+    bds30: None | BDS30
+    bds40: None | BDS40
+    bds44: None | BDS44
+    bds45: None | BDS45
+    bds50: None | BDS50
+    bds60: None | BDS60
 
 
 DF17 = Union[
@@ -627,29 +506,6 @@ DF18 = Union[
     DF18_BDS65,
 ]
 
-DF20 = Union[
-    DF20_Unknown,
-    DF20_BDS10,
-    DF20_BDS17,
-    DF20_BDS20,
-    DF20_BDS30,
-    DF20_BDS40,
-    DF20_BDS44,
-    DF20_BDS50,
-    DF20_BDS60,
-]
-
-DF21 = Union[
-    DF21_Unknown,
-    DF21_BDS10,
-    DF21_BDS17,
-    DF21_BDS20,
-    DF21_BDS30,
-    DF21_BDS40,
-    DF21_BDS44,
-    DF21_BDS50,
-    DF21_BDS60,
-]
 
 Message = Union[DF0, DF4, DF5, DF11, DF16, DF17, DF18, DF20, DF21]
 
@@ -691,7 +547,7 @@ def is_df21(message: Message) -> TypeGuard[DF21]:
 
 
 def is_bds05(message: DF17) -> TypeGuard[DF17_BDS05]:
-    return message["bds"] == "05"
+    return message.get("bds", None) == "05" or "bds05" in message
 
 
 @overload
@@ -699,7 +555,7 @@ def is_bds06(message: DF17) -> TypeGuard[DF17_BDS06]: ...
 @overload
 def is_bds06(message: DF18) -> TypeGuard[DF18_BDS06]: ...
 def is_bds06(message: DF17 | DF18) -> TypeGuard[DF17_BDS06 | DF18_BDS06]:
-    return message["bds"] == "06"
+    return message.get("bds", None) == "06" or "bds06" in message
 
 
 @overload
@@ -707,87 +563,55 @@ def is_bds08(message: DF17) -> TypeGuard[DF17_BDS08]: ...
 @overload
 def is_bds08(message: DF18) -> TypeGuard[DF18_BDS08]: ...
 def is_bds08(message: DF17 | DF18) -> TypeGuard[DF17_BDS08 | DF18_BDS08]:
-    return message["bds"] == "08"
+    return message.get("bds", None) == "08" or "bds08" in message
 
 
 def is_bds09(message: DF17) -> TypeGuard[DF17_BDS09]:
-    return message["bds"] == "09"
+    return message.get("bds", None) == "09" or "bds09" in message
 
 
-@overload
-def is_bds10(message: DF20) -> TypeGuard[DF20_BDS10]: ...
-@overload
-def is_bds10(message: DF21) -> TypeGuard[DF21_BDS10]: ...
-def is_bds10(message: DF20 | DF21) -> TypeGuard[DF20_BDS10 | DF21_BDS10]:
-    return message["bds"] == "10"
+def is_bds10(message: DF20 | DF21) -> bool:
+    return message.get("bds", None) == "10" or "bds10" in message
 
 
-@overload
-def is_bds17(message: DF20) -> TypeGuard[DF20_BDS17]: ...
-@overload
-def is_bds17(message: DF21) -> TypeGuard[DF21_BDS17]: ...
-def is_bds17(message: DF20 | DF21) -> TypeGuard[DF20_BDS17 | DF21_BDS17]:
-    return message["bds"] == "17"
+def is_bds17(message: DF20 | DF21) -> bool:
+    return message.get("bds", None) == "17" or "bds17" in message
 
 
-@overload
-def is_bds20(message: DF20) -> TypeGuard[DF20_BDS20]: ...
-@overload
-def is_bds20(message: DF21) -> TypeGuard[DF21_BDS20]: ...
-def is_bds20(message: DF20 | DF21) -> TypeGuard[DF20_BDS20 | DF21_BDS20]:
-    return message["bds"] == "20"
+def is_bds20(message: DF20 | DF21) -> bool:
+    return message.get("bds", None) == "20" or "bds20" in message
 
 
-@overload
-def is_bds30(message: DF20) -> TypeGuard[DF20_BDS30]: ...
-@overload
-def is_bds30(message: DF21) -> TypeGuard[DF21_BDS30]: ...
-def is_bds30(message: DF20 | DF21) -> TypeGuard[DF20_BDS30 | DF21_BDS30]:
-    return message["bds"] == "30"
+def is_bds30(message: DF20 | DF21) -> bool:
+    return message.get("bds", None) == "30" or "bds30" in message
 
 
-@overload
-def is_bds40(message: DF20) -> TypeGuard[DF20_BDS40]: ...
-@overload
-def is_bds40(message: DF21) -> TypeGuard[DF21_BDS40]: ...
-def is_bds40(message: DF20 | DF21) -> TypeGuard[DF20_BDS40 | DF21_BDS40]:
-    return message["bds"] == "40"
+def is_bds40(message: DF20 | DF21) -> bool:
+    return message.get("bds", None) == "40" or "bds40" in message
 
 
-@overload
-def is_bds44(message: DF20) -> TypeGuard[DF20_BDS44]: ...
-@overload
-def is_bds44(message: DF21) -> TypeGuard[DF21_BDS44]: ...
-def is_bds44(message: DF20 | DF21) -> TypeGuard[DF20_BDS44 | DF21_BDS44]:
-    return message["bds"] == "44"
+def is_bds44(message: DF20 | DF21) -> bool:
+    return message.get("bds", None) == "44" or "bds44" in message
 
 
-@overload
-def is_bds50(message: DF20) -> TypeGuard[DF20_BDS50]: ...
-@overload
-def is_bds50(message: DF21) -> TypeGuard[DF21_BDS50]: ...
-def is_bds50(message: DF20 | DF21) -> TypeGuard[DF20_BDS50 | DF21_BDS50]:
-    return message["bds"] == "50"
+def is_bds50(message: DF20 | DF21) -> bool:
+    return message.get("bds", None) == "50" or "bds50" in message
 
 
-@overload
-def is_bds60(message: DF20) -> TypeGuard[DF20_BDS60]: ...
-@overload
-def is_bds60(message: DF21) -> TypeGuard[DF21_BDS60]: ...
-def is_bds60(message: DF20 | DF21) -> TypeGuard[DF20_BDS60 | DF21_BDS60]:
-    return message["bds"] == "60"
+def is_bds60(message: DF20 | DF21) -> bool:
+    return message.get("bds", None) == "60" or "bds60" in message
 
 
 def is_bds61(message: DF17) -> TypeGuard[DF17_BDS61]:
-    return message["bds"] == "61"
+    return message.get("bds", None) == "61" or "bds61" in message
 
 
 def is_bds62(message: DF17) -> TypeGuard[DF17_BDS62]:
-    return message["bds"] == "62"
+    return message.get("bds", None) == "62" or "bds62" in message
 
 
 def is_bds65(message: DF17) -> TypeGuard[DF17_BDS65]:
-    return message["bds"] == "65"
+    return message.get("bds", None) == "65" or "bds65" in message
 
 
 class Flarm(TypedDict):

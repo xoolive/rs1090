@@ -2,11 +2,26 @@
 
 use std::collections::HashMap;
 
+use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
 use rs1090::data::patterns::PATTERNS;
 use rs1090::data::tail::tail;
+use rs1090::decode::bds::bds05::AirbornePosition;
+use rs1090::decode::bds::bds10::DataLinkCapability;
+use rs1090::decode::bds::bds17::CommonUsageGICBCapabilityReport;
+use rs1090::decode::bds::bds18::GICBCapabilityReportPart1;
+use rs1090::decode::bds::bds19::GICBCapabilityReportPart2;
+use rs1090::decode::bds::bds20::AircraftIdentification;
+use rs1090::decode::bds::bds21::AircraftAndAirlineRegistrationMarkings;
+use rs1090::decode::bds::bds30::ACASResolutionAdvisory;
+use rs1090::decode::bds::bds40::SelectedVerticalIntention;
+use rs1090::decode::bds::bds44::MeteorologicalRoutineAirReport;
+use rs1090::decode::bds::bds45::MeteorologicalHazardReport;
+use rs1090::decode::bds::bds50::TrackAndTurnReport;
+use rs1090::decode::bds::bds60::HeadingAndSpeedReport;
+use rs1090::decode::bds::bds65::AircraftOperationStatus;
 use rs1090::decode::cpr::{decode_positions, Position};
 use rs1090::decode::flarm::Flarm;
 use rs1090::decode::TimeSource;
@@ -20,6 +35,180 @@ fn decode_1090(msg: String) -> PyResult<Vec<u8>> {
         Ok(pkl)
     } else {
         Ok([128, 4, 78, 46].to_vec()) // None
+    }
+}
+
+fn transform_error(e: DekuError) -> PyResult<Vec<u8>> {
+    match e {
+        DekuError::Assertion(msg) => Err(PyAssertionError::new_err(msg)),
+        _ => Err(PyValueError::new_err(e.to_string())),
+    }
+}
+
+#[pyfunction]
+fn decode_bds05(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match AirbornePosition::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds10(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match DataLinkCapability::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds17(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match CommonUsageGICBCapabilityReport::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds18(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match GICBCapabilityReportPart1::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds19(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match GICBCapabilityReportPart2::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds20(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match AircraftIdentification::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds21(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match AircraftAndAirlineRegistrationMarkings::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds30(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match ACASResolutionAdvisory::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds40(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match SelectedVerticalIntention::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds44(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match MeteorologicalRoutineAirReport::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+#[pyfunction]
+fn decode_bds45(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match MeteorologicalHazardReport::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds50(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match TrackAndTurnReport::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds60(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match HeadingAndSpeedReport::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
+    }
+}
+
+#[pyfunction]
+fn decode_bds65(msg: String) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    match AircraftOperationStatus::from_bytes((&bytes[4..], 0)) {
+        Ok((_, msg)) => {
+            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+            Ok(pkl)
+        }
+        Err(e) => transform_error(e),
     }
 }
 
@@ -78,13 +267,11 @@ fn decode_1090t_vec(
         .flat_map(|v: Vec<TimedMessage>| v)
         .collect();
 
-    if let Some([latitude, longitude]) = reference {
-        let position = Some(Position {
-            latitude,
-            longitude,
-        });
-        decode_positions(&mut res, position);
-    }
+    let position = reference.map(|[latitude, longitude]| Position {
+        latitude,
+        longitude,
+    });
+    decode_positions(&mut res, position);
 
     let pkl = serde_pickle::to_vec(&res, Default::default()).unwrap();
     Ok(pkl)
@@ -227,6 +414,22 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_1090t_vec, m)?)?;
     m.add_function(wrap_pyfunction!(decode_flarm, m)?)?;
     m.add_function(wrap_pyfunction!(decode_flarm_vec, m)?)?;
+
+    // Comm-B BDS inference
+    m.add_function(wrap_pyfunction!(decode_bds05, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds10, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds17, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds18, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds19, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds20, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds21, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds30, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds40, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds44, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds45, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds50, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds60, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_bds65, m)?)?;
 
     // icao24 functions
     m.add_function(wrap_pyfunction!(aircraft_information, m)?)?;

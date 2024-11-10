@@ -362,7 +362,7 @@ pub struct AirborneV2 {
 #[serde(tag = "version")]
 pub enum ADSBVersionSurface {
     #[deku(id = "0")]
-    #[serde(skip)]
+    #[serde(rename = "0")]
     /// ADS-B version 0 (BDS 6,5 undefined, so these messages should not happen)
     DOC9871AppendixA(Empty),
     #[deku(id = "1")]
@@ -374,7 +374,7 @@ pub enum ADSBVersionSurface {
     /// ADS-B version 2 (2012)
     DOC9871AppendixC(SurfaceV2),
     #[deku(id_pat = "3..=7")]
-    #[serde(skip)]
+    #[serde(rename = "3to7")]
     Reserved { id: u8 },
 }
 
