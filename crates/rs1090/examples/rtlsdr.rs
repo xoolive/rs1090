@@ -1,6 +1,5 @@
 #[cfg(feature = "rtlsdr")]
 use soapysdr::{enumerate, Device};
-#[cfg(feature = "rtlsdr")]
 use tracing::info;
 
 #[cfg(feature = "rtlsdr")]
@@ -21,4 +20,9 @@ fn main() {
         };
         println!("{:#}", device.hardware_info().unwrap());
     }
+}
+
+#[cfg(not(feature = "rtlsdr"))]
+fn main() {
+    info!("rtlsdr feature not activated");
 }

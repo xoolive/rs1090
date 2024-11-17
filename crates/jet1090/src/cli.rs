@@ -91,9 +91,11 @@ impl Source {
         if let Address::Rtlsdr(args) = &self.address {
             #[cfg(not(feature = "rtlsdr"))]
             {
-                eprintln!(
-                    "Not compiled with RTL-SDR support, use the rtlsdr feature"
+                error!(
+                    "rtlsdr://{} ignored",
+                    args.clone().unwrap_or("".to_string())
                 );
+                eprintln!("Compile jet1090 with the rtlsdr feature");
                 std::process::exit(127);
             }
             #[cfg(feature = "rtlsdr")]
