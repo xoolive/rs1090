@@ -21,7 +21,7 @@ jobs:
     - name: Install Linux dependencies
       run: |
         sudo apt update
-        sudo apt-get install -y --no-install-recommends libsoapysdr-dev
+        sudo apt-get install -y --no-install-recommends libsoapysdr-dev protobuf-compiler
 
     - name: Code linting
       run: cargo clippy --workspace --all-targets --all-features -- -D warnings

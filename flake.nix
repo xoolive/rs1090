@@ -58,7 +58,7 @@
             pname = "rs1090";
             version = version;
 
-            nativeBuildInputs = with pkgs; [ pkg-config openssl python3 bzip2 soapysdr ] ++
+            nativeBuildInputs = with pkgs; [ pkg-config openssl python3 bzip2 soapysdr protobuf ] ++
               lib.optionals pkgs.stdenv.isLinux [ clang mold ]
             ;
             buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin
