@@ -3,6 +3,8 @@ use std::str::FromStr;
 use radarcape::BeastSource;
 use rs1090::decode::{cpr::Position, TimedMessage};
 use rs1090::prelude::*;
+#[cfg(feature = "sero")]
+use rs1090::source::sero::SeroClient;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tracing::error;
@@ -14,6 +16,8 @@ pub enum Address {
     Udp(String),
     Websocket(String),
     Rtlsdr(Option<String>),
+    #[cfg(feature = "sero")]
+    Sero(SeroClient),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,6 +110,37 @@ impl Source {
                     .await
             }
         } else {
+            #[cfg(feature = "sero")]
+            {
+                if let Address::Sero(sero) = self.address.clone() {
+                    let mut stream = sero.rawstream().await.unwrap();
+                    let tx_copy = tx.clone();
+                    tokio::spawn(async move {
+                        while let Some(response) = stream.next().await {
+                            if let Ok(msg) = response {
+                                let bytes = msg.reply.as_slice();
+                                if let Err(e) = tx_copy
+                                    .send(TimedMessage {
+                                        timestamp: msg.receptions[0]
+                                            .sensor_timestamp
+                                            as f64
+                                            * 1e-3,
+                                        timesource: rs1090::decode::TimeSource::Radarcape,
+                                        rssi: None,
+                                        frame: hex::encode(bytes),
+                                        message: None,
+                                        idx: 0,
+                                    })
+                                    .await
+                                {
+                                    error!("{}", e.to_string());
+                                }
+                            }
+                        }
+                    });
+                    return;
+                }
+            }
             let server_address = match &self.address {
                 Address::Tcp(s) => BeastSource::TCP(s.to_owned()),
                 Address::Udp(s) => BeastSource::UDP(s.to_owned()),
