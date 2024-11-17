@@ -1,6 +1,9 @@
+#[cfg(feature = "rtlsdr")]
 use soapysdr::{enumerate, Device};
+#[cfg(feature = "rtlsdr")]
 use tracing::info;
 
+#[cfg(feature = "rtlsdr")]
 fn main() {
     let device = enumerate("driver=rtlsdr").unwrap();
     for arg in device {
