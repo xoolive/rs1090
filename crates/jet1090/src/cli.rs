@@ -13,7 +13,7 @@ pub enum Address {
     Tcp(String),
     Udp(String),
     Websocket(String),
-    Rtlsdr,
+    Rtlsdr(Option<String>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,7 +57,7 @@ impl FromStr for Source {
                 url.host_str().unwrap_or("0.0.0.0"),
                 url.port_or_known_default().unwrap()
             )),
-            "rtlsdr" => Address::Rtlsdr,
+            "rtlsdr" => Address::Rtlsdr(url.host_str().map(|s| s.to_string())),
             "ws" => Address::Websocket(format!(
                 "ws://{}:{}/{}",
                 url.host_str().unwrap_or("0.0.0.0"),
@@ -88,7 +88,7 @@ impl FromStr for Source {
 
 impl Source {
     pub async fn receiver(&self, tx: Sender<TimedMessage>, idx: usize) {
-        if self.address == Address::Rtlsdr {
+        if let Address::Rtlsdr(args) = &self.address {
             #[cfg(not(feature = "rtlsdr"))]
             {
                 eprintln!(
@@ -98,14 +98,14 @@ impl Source {
             }
             #[cfg(feature = "rtlsdr")]
             {
-                rtlsdr::receiver::<&str>(tx, None, idx).await
+                rtlsdr::receiver::<&str>(tx, args.as_deref(), idx).await
             }
         } else {
             let server_address = match &self.address {
                 Address::Tcp(s) => BeastSource::TCP(s.to_owned()),
                 Address::Udp(s) => BeastSource::UDP(s.to_owned()),
                 Address::Websocket(s) => BeastSource::Websocket(s.to_owned()),
-                Address::Rtlsdr => unreachable!(),
+                _ => unreachable!(),
             };
             if let Err(e) = radarcape::receiver(server_address, tx, idx).await {
                 error!("{}", e.to_string());
@@ -123,7 +123,16 @@ mod test {
         let source = Source::from_str("rtlsdr:");
         assert!(source.is_ok());
         if let Ok(Source { address, .. }) = source {
-            assert_eq!(address, Address::Rtlsdr);
+            assert_eq!(address, Address::Rtlsdr(None));
+        }
+
+        let source = Source::from_str("rtlsdr://serial=00000001");
+        assert!(source.is_ok());
+        if let Ok(Source { address, .. }) = source {
+            assert_eq!(
+                address,
+                Address::Rtlsdr(Some("serial=00000001".to_string()))
+            );
         }
 
         let source = Source::from_str("rtlsdr:@LFBO");
@@ -135,7 +144,7 @@ mod test {
             ..
         }) = source
         {
-            assert_eq!(address, Address::Rtlsdr);
+            assert_eq!(address, Address::Rtlsdr(None));
             assert_eq!(airport, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);

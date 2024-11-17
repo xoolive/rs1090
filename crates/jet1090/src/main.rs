@@ -186,7 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(feature = "rtlsdr")]
     if let Some(args) = cli_options.discover {
-        rtlsdr::enumerate(&format!("driver={args}"));
+        rtlsdr::enumerate(&args.to_string());
         return Ok(());
     }
 
