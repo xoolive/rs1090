@@ -154,6 +154,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli_options.update_position {
         options.update_position = cli_options.update_position;
     }
+    if cli_options.log_file.is_some() {
+        options.log_file = cli_options.log_file;
+    }
     if cli_options.redis_url.is_some() {
         options.redis_url = cli_options.redis_url;
     }
@@ -167,7 +170,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = EnvFilter::from_default_env();
 
     let subscriber = tracing_subscriber::registry().with(env_filter);
-    match cli_options.log_file.as_deref() {
+    match options.log_file.as_deref() {
         Some("-") if !cli_options.interactive => {
             // when it's interactive, logs will disrupt the display
             subscriber.with(fmt::layer().pretty()).init();
