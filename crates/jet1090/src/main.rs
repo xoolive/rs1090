@@ -6,6 +6,7 @@ mod snapshot;
 mod table;
 mod tui;
 mod web;
+mod websocket;
 
 use clap::{Command, CommandFactory, Parser, ValueHint};
 use clap_complete::{generate, Generator, Shell};
@@ -24,10 +25,14 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use tui::Event;
 use warp::Filter;
 use web::TrackQuery;
+use websocket::{
+    jet1090_data_task, on_ws_connected, ChannelControl, ChannelState,
+};
 
 #[derive(Default, Deserialize, Parser)]
 #[command(
@@ -322,6 +327,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // rs1090 data items (TimedMessage) are sent to timed_message_tx
+    // a thread reads from timed_message_stream and relay them to channels
+    let (timed_message_tx, timed_message_rx) =
+        tokio::sync::mpsc::unbounded_channel();
+
     if let Some(port) = options.serve_port {
         tokio::spawn(async move {
             let app_home = app_web.clone();
@@ -332,14 +342,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 });
 
             let app_all = app_web.clone();
-            let all = warp::path("all")
+            let all_route = warp::path("all")
                 .and(warp::any().map(move || app_all.clone()))
                 .and_then(|app: Arc<Mutex<Jet1090>>| async move {
                     web::all(&app).await
                 });
 
             let app_track = app_web.clone();
-            let track = warp::get()
+            let trk_route = warp::get()
                 .and(warp::path("track"))
                 .and(warp::any().map(move || app_track.clone()))
                 .and(warp::query::<TrackQuery>())
@@ -350,11 +360,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
 
             let app_receivers = app_web.clone();
-            let receivers = warp::path("receivers")
+            let rcv_stats_route = warp::path("receivers")
                 .and(warp::any().map(move || app_receivers.clone()))
                 .and_then(|app: Arc<Mutex<Jet1090>>| async move {
                     web::receivers(&app).await
                 });
+
+            /* Websockets */
+
+            let timed_message_stream =
+                UnboundedReceiverStream::new(timed_message_rx);
+
+            let channel_control = ChannelControl::new();
+            channel_control.new_channel("jet1090".into(), None).await;
+            // TODO more channels for receivers stats
+
+            let channel_state = Arc::new(ChannelState {
+                ctl: Mutex::new(channel_control),
+            });
+
+            if options.serve_port.is_some() {
+                tokio::spawn(jet1090_data_task(
+                    channel_state.clone(),
+                    timed_message_stream,
+                    "jet1090",
+                    "data",
+                ));
+            }
+
+            let ws_route = warp::path("ws")
+                .and(warp::ws())
+                .and(warp::any().map(move || channel_state.clone()))
+                .map(|ws: warp::ws::Ws, channel_state| {
+                    ws.on_upgrade(move |socket| {
+                        on_ws_connected(socket, channel_state)
+                    })
+                });
+
+            /* End of websockets */
 
             let cors = warp::cors()
                 .allow_any_origin()
@@ -362,7 +405,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .allow_methods(vec!["GET"]);
 
             let routes = warp::get()
-                .and(home.or(all).or(track).or(receivers))
+                .and(
+                    home.or(all_route)
+                        .or(trk_route)
+                        .or(rcv_stats_route)
+                        .or(ws_route),
+                )
                 .recover(web::handle_rejection)
                 .with(cors);
 
@@ -446,6 +494,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 if let Some(c) = &mut redis_connect {
                     let _: () = c.publish(redis_topic.clone(), json).await?;
+                }
+
+                if options.serve_port.is_some() {
+                    // Send to the websocket
+                    timed_message_tx.send(msg.clone())?;
                 }
             }
 
