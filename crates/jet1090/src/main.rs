@@ -105,7 +105,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut options = Options::default();
 
-    let mut cfg_path = dirs::config_dir().unwrap_or_default();
+    let mut cfg_path = match std::env::var("XDG_CONFIG_HOME") {
+        Ok(xdg_config) => std::path::PathBuf::from(xdg_config),
+        Err(_) => dirs::config_dir().unwrap_or_default(),
+    };
     cfg_path.push("jet1090");
     cfg_path.push("config.toml");
 
