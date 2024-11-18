@@ -20,11 +20,17 @@ const MODES_SHORT_MSG_BYTES: usize = 7;
 const MODES_MAG_BUF_SAMPLES: usize = 131_072;
 const TRAILING_SAMPLES: usize = 326;
 
-pub async fn receiver<A: Into<Args>>(
+pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
     tx: mpsc::Sender<TimedMessage>,
     args: Option<A>,
     idx: usize,
 ) {
+    match args {
+        Some(args) => {
+            info!("Trying to connect rtlsdr with options: {:?}", args)
+        }
+        None => info!("Trying to connect rtlsdr with options: driver=rtlsdr"),
+    }
     let device = match args {
         None => Device::new("driver=rtlsdr"),
         Some(args) => Device::new(args),
