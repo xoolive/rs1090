@@ -198,4 +198,4 @@ jobs:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-          args: --non-interactive --skip-existing *.whl
+          args: --non-interactive --skip-existing *.whl *.tar.gz
