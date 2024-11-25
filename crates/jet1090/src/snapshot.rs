@@ -4,7 +4,7 @@ use rs1090::decode::bds::bds09::AirborneVelocitySubType::{
     AirspeedSubsonic, GroundSpeedDecoding,
 };
 use rs1090::decode::bds::bds09::AirspeedType::{IAS, TAS};
-use rs1090::decode::IdentityCode;
+use rs1090::decode::{IdentityCode, SensorMetadata};
 use rs1090::prelude::*;
 use serde::Serialize;
 use tokio::sync::Mutex;
@@ -59,9 +59,8 @@ impl StateVectors {
             roll: None,
             heading: None,
             nacp: None,
-            idx: 0,
-            airport: None,
             count: 0,
+            metadata: vec![],
         };
         StateVectors {
             cur,
@@ -92,9 +91,8 @@ pub struct Snapshot {
     pub roll: Option<f64>,
     pub heading: Option<f64>,
     pub nacp: Option<u8>,
-    pub idx: usize,
-    pub airport: Option<String>,
     pub count: usize,
+    pub metadata: Vec<SensorMetadata>,
 }
 
 fn icao24(msg: &Message) -> Option<String> {
@@ -120,7 +118,7 @@ pub async fn update_snapshot(
     if let TimedMessage {
         timestamp,
         message: Some(message),
-        idx,
+        metadata,
         ..
     } = msg
     {
@@ -135,7 +133,7 @@ pub async fn update_snapshot(
                         aircraftdb,
                     ));
             aircraft.cur.last = *timestamp as u64;
-            aircraft.cur.idx = *idx;
+            aircraft.cur.metadata = metadata.to_vec();
             aircraft.cur.count += 1;
 
             match &mut message.df {
@@ -311,10 +309,9 @@ pub async fn store_history(
 ) {
     if let TimedMessage {
         timestamp,
-        timesource,
-        rssi,
         message: Some(message),
-        idx,
+        metadata,
+        decode_time,
         ..
     } = msg
     {
@@ -336,11 +333,10 @@ pub async fn store_history(
                 | CommBIdentityReply { .. } => {
                     aircraft.hist.push(TimedMessage {
                         timestamp,
-                        timesource,
-                        rssi,
-                        frame: "".to_string(),
+                        frame: vec![],
                         message: Some(message),
-                        idx,
+                        metadata,
+                        decode_time,
                     })
                 }
                 _ => {}

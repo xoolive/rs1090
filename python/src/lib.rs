@@ -24,7 +24,6 @@ use rs1090::decode::bds::bds60::HeadingAndSpeedReport;
 use rs1090::decode::bds::bds65::AircraftOperationStatus;
 use rs1090::decode::cpr::{decode_positions, Position};
 use rs1090::decode::flarm::Flarm;
-use rs1090::decode::TimeSource;
 use rs1090::prelude::*;
 
 #[pyfunction]
@@ -252,11 +251,10 @@ fn decode_1090t_vec(
                     if let Ok((_, message)) = Message::from_bytes((&bytes, 0)) {
                         Some(TimedMessage {
                             timestamp,
-                            timesource: TimeSource::External,
-                            rssi: None,
-                            frame: msg.to_string(),
+                            frame: bytes,
                             message: Some(message),
-                            idx: 0,
+                            metadata: vec![],
+                            decode_time: None,
                         })
                     } else {
                         None

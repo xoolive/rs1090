@@ -6,7 +6,7 @@ use soapysdr::{Args, Device, Direction};
 use tokio::sync::mpsc;
 
 use crate::decode::crc::modes_checksum;
-use crate::decode::{TimeSource, TimedMessage};
+use crate::prelude::*;
 use std::fmt::{self, Display, Formatter};
 use tracing::{error, info};
 
@@ -23,7 +23,8 @@ const TRAILING_SAMPLES: usize = 326;
 pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
     tx: mpsc::Sender<TimedMessage>,
     args: Option<A>,
-    idx: usize,
+    serial: u64,
+    name: Option<String>,
 ) {
     match args {
         Some(args) => {
@@ -73,15 +74,27 @@ pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
                         .duration_since(UNIX_EPOCH)
                         .expect("SystemTime before unix epoch")
                         .as_micros();
-                    let msg = TimedMessage {
-                        timestamp: timestamp as f64 * 1e-6,
-                        timesource: TimeSource::System,
+
+                    let metadata = SensorMetadata {
+                        system_timestamp: timestamp as f64 * 1e-6,
+                        gnss_timestamp: None,
                         rssi: Some(10. * data.signal_level.log10()),
-                        frame: hex::encode(data.msg),
-                        message: None,
-                        idx,
+                        serial,
+                        name: name.clone(),
                     };
-                    if tx.send(msg).await.is_err() {
+                    let mut tmsg = TimedMessage {
+                        timestamp: timestamp as f64 * 1e-6,
+                        frame: data.msg.to_vec(),
+                        message: None,
+                        metadata: vec![metadata],
+                        decode_time: None,
+                    };
+                    if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0))
+                    {
+                        tmsg.message = Some(msg);
+                    }
+
+                    if tx.send(tmsg).await.is_err() {
                         break 'receive;
                     }
                 }

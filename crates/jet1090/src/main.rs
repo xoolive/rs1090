@@ -18,6 +18,7 @@ use rs1090::prelude::*;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::io;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::fs;
@@ -53,9 +54,9 @@ struct Options {
     #[arg(long, default_value=None)]
     serve_port: Option<u16>,
 
-    /// How much history to expire (in minutes)
+    /// How much history to expire (in minutes), 0 for no history
     #[arg(long, short = 'x')]
-    expire: Option<u64>,
+    history_expire: Option<u64>,
 
     /// Prevent the computer sleeping when decoding is in progress
     #[arg(long, default_value=None)]
@@ -98,6 +99,17 @@ struct Options {
     redis_topic: Option<String>,
 }
 
+fn expanduser(path: PathBuf) -> PathBuf {
+    // Check if the path starts with "~"
+    if let Some(stripped) = path.to_str().and_then(|p| p.strip_prefix("~")) {
+        if let Some(home_dir) = dirs::home_dir() {
+            // Join the home directory with the rest of the path
+            return home_dir.join(stripped.trim_start_matches('/'));
+        }
+    }
+    path
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load environment variables from a .env file
@@ -106,7 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut options = Options::default();
 
     let mut cfg_path = match std::env::var("XDG_CONFIG_HOME") {
-        Ok(xdg_config) => std::path::PathBuf::from(xdg_config),
+        Ok(xdg_config) => expanduser(PathBuf::from(xdg_config)),
         Err(_) => dirs::config_dir().unwrap_or_default(),
     };
     cfg_path.push("jet1090");
@@ -118,7 +130,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Ok(config_file) = std::env::var("JET1090_CONFIG") {
-        let string = fs::read_to_string(config_file)
+        let path = expanduser(PathBuf::from(config_file));
+        let string = fs::read_to_string(path)
             .await
             .expect("Configuration file not found");
         options = toml::from_str(&string).unwrap();
@@ -145,8 +158,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli_options.serve_port.is_some() {
         options.serve_port = cli_options.serve_port;
     }
-    if cli_options.expire.is_some() {
-        options.expire = cli_options.expire;
+    if cli_options.history_expire.is_some() {
+        options.history_expire = cli_options.history_expire;
     }
     if cli_options.prevent_sleep {
         options.prevent_sleep = cli_options.prevent_sleep;
@@ -208,6 +221,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let redis_topic = options.redis_topic.unwrap_or("jet1090".to_string());
 
     let mut file = if let Some(output_path) = options.output {
+        let output_path = expanduser(PathBuf::from(output_path));
         Some(
             fs::OpenOptions::new()
                 .append(true)
@@ -286,43 +300,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    if let Some(minutes) = options.expire {
-        tokio::spawn(async move {
-            let app_expire = app_exp.clone();
-            loop {
-                sleep(Duration::from_secs(60)).await;
-                {
-                    let mut app = app_expire.lock().await;
-                    let now = SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .expect("SystemTime before unix epoch")
-                        .as_secs();
+    if let Some(minutes) = options.history_expire {
+        // No need to start this task if we don't store history
+        if minutes > 0 {
+            tokio::spawn(async move {
+                let app_expire = app_exp.clone();
+                loop {
+                    sleep(Duration::from_secs(60)).await;
+                    {
+                        let mut app = app_expire.lock().await;
+                        let now = SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .expect("SystemTime before unix epoch")
+                            .as_secs();
 
-                    let remove_keys = app
-                        .state_vectors
-                        .iter()
-                        .filter(|(_key, value)| {
-                            now > value.cur.last + minutes * 60
-                        })
-                        .map(|(key, _)| key.to_string())
-                        .collect::<Vec<String>>();
-
-                    for key in remove_keys {
-                        app.state_vectors.remove(&key);
-                    }
-
-                    let _ = app
-                        .state_vectors
-                        .iter_mut()
-                        .map(|(_key, value)| {
-                            value.hist.retain(|elt| {
-                                now < (elt.timestamp as u64) + minutes * 60
+                        let remove_keys = app
+                            .state_vectors
+                            .iter()
+                            .filter(|(_key, value)| {
+                                now > value.cur.last + minutes * 60
                             })
-                        })
-                        .collect::<Vec<()>>();
+                            .map(|(key, _)| key.to_string())
+                            .collect::<Vec<String>>();
+
+                        for key in remove_keys {
+                            app.state_vectors.remove(&key);
+                        }
+
+                        let _ = app
+                            .state_vectors
+                            .iter_mut()
+                            .map(|(_key, value)| {
+                                value.hist.retain(|elt| {
+                                    now < (elt.timestamp as u64) + minutes * 60
+                                })
+                            })
+                            .collect::<Vec<()>>();
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     if let Some(port) = options.serve_port {
@@ -378,16 +395,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let multiplier = options.sources.len();
     let (tx, mut rx) = tokio::sync::mpsc::channel(100 * multiplier + 1);
 
-    for (idx, source) in options.sources.into_iter().enumerate() {
+    let sources = app_dec.lock().await.sources.clone();
+    for (serial, source) in sources.into_iter().enumerate() {
         let tx_copy = tx.clone();
         tokio::spawn(async move {
-            source.receiver(tx_copy, idx).await;
+            source
+                .receiver(tx_copy, serial as u64, source.name.clone())
+                .await;
         });
     }
 
     let mut first_msg = true;
-    while let Some(tmsg) = rx.recv().await {
-        let frame = hex::decode(&tmsg.frame).unwrap();
+    while let Some(mut msg) = rx.recv().await {
         if first_msg {
             // This workaround results from soapysdr writing directly on stdout.
             // The best thing would be to not write to stdout in the first
@@ -397,63 +416,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             app_dec.lock().await.should_clear = true;
             first_msg = false;
         }
-        if let Ok((_, msg)) = Message::from_bytes((&frame, 0)) {
-            let mut msg = TimedMessage {
-                timestamp: tmsg.timestamp,
-                timesource: tmsg.timesource,
-                rssi: tmsg.rssi,
-                frame: tmsg.frame.to_string(),
-                message: Some(msg),
-                idx: tmsg.idx,
-            };
-            let mut reference =
-                app_dec.lock().await.sources[tmsg.idx].reference;
 
-            if let Some(message) = &mut msg.message {
-                match &mut message.df {
-                    ExtendedSquitterADSB(adsb) => decode_position(
-                        &mut adsb.message,
-                        msg.timestamp,
-                        &adsb.icao24,
-                        &mut aircraft,
-                        &mut reference,
-                    ),
-                    ExtendedSquitterTisB { cf, .. } => decode_position(
-                        &mut cf.me,
-                        msg.timestamp,
-                        &cf.aa,
-                        &mut aircraft,
-                        &mut reference,
-                    ),
-                    _ => {}
+        let mut reference =
+            match msg.metadata.first().map(|metadata| metadata.serial) {
+                None => None,
+                Some(serial) => {
+                    let sources = &app_dec.lock().await.sources;
+                    sources[serial as usize].reference
                 }
             };
 
-            // References may have been modified.
-            // With static receivers, we don't care; for dynamic ones, we may
-            // want to update the reference position.
-            if options.update_position {
-                app_dec.lock().await.sources[tmsg.idx].reference = reference;
+        if let Some(message) = &mut msg.message {
+            match &mut message.df {
+                ExtendedSquitterADSB(adsb) => decode_position(
+                    &mut adsb.message,
+                    msg.timestamp,
+                    &adsb.icao24,
+                    &mut aircraft,
+                    &mut reference,
+                ),
+                ExtendedSquitterTisB { cf, .. } => decode_position(
+                    &mut cf.me,
+                    msg.timestamp,
+                    &cf.aa,
+                    &mut aircraft,
+                    &mut reference,
+                ),
+                _ => {}
             }
+        };
 
-            snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
-
-            if let Ok(json) = serde_json::to_string(&msg) {
-                if options.verbose {
-                    println!("{}", json);
-                }
-                if let Some(file) = &mut file {
-                    file.write_all(json.as_bytes()).await?;
-                    file.write_all("\n".as_bytes()).await?;
-                }
-
-                if let Some(c) = &mut redis_connect {
-                    let _: () = c.publish(redis_topic.clone(), json).await?;
-                }
+        // References may have been modified.
+        // With static receivers, we don't care; for dynamic ones, we may
+        // want to update the reference position.
+        if options.update_position {
+            let sources = &mut app_dec.lock().await.sources;
+            for serial in &msg.metadata {
+                sources[serial.serial as usize].reference = reference;
             }
-
-            snapshot::store_history(&app_dec, msg, &aircraftdb).await;
         }
+
+        snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
+
+        if let Ok(json) = serde_json::to_string(&msg) {
+            if options.verbose {
+                println!("{}", json);
+            }
+            if let Some(file) = &mut file {
+                file.write_all(json.as_bytes()).await?;
+                file.write_all("\n".as_bytes()).await?;
+            }
+
+            if let Some(c) = &mut redis_connect {
+                let _: () = c.publish(redis_topic.clone(), json).await?;
+            }
+        }
+
+        match options.history_expire {
+            Some(0) => (),
+            _ => snapshot::store_history(&app_dec, msg, &aircraftdb).await,
+        }
+
         if app_dec.lock().await.should_quit {
             break;
         }
@@ -532,12 +555,9 @@ impl Jet1090 {
             source.count = 0;
         }
         for vector in self.state_vectors.values_mut() {
-            self.sources[vector.cur.idx]
-                .airport
-                .clone_into(&mut vector.cur.airport);
-            self.sources[vector.cur.idx].count += 1;
-            if self.sources[vector.cur.idx].last < vector.cur.last {
-                self.sources[vector.cur.idx].last = vector.cur.last
+            for sensor in &vector.cur.metadata {
+                self.sources[sensor.serial as usize].count += 1;
+                self.sources[sensor.serial as usize].last = vector.cur.last
             }
         }
     }

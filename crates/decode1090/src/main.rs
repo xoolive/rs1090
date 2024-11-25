@@ -2,6 +2,7 @@
 
 use clap::Parser;
 use rs1090::decode::cpr::{decode_position, AircraftState, Position};
+use rs1090::decode::SensorMetadata;
 use rs1090::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -34,13 +35,17 @@ struct Options {
     msgs: Vec<String>,
 }
 
+// We create this struct because it is too troublesome to have Deserialize for
+// Message at this point.
 #[derive(Serialize, Deserialize)]
 struct JSONEntry {
     timestamp: f64,
-    timesource: rs1090::decode::TimeSource,
-    rssi: Option<f64>,
-    frame: String,
-    idx: Option<usize>,
+    #[serde(
+        serialize_with = "rs1090::decode::as_hex",
+        deserialize_with = "rs1090::decode::from_hex"
+    )]
+    frame: Vec<u8>,
+    metadata: Vec<SensorMetadata>,
 }
 
 #[tokio::main]
@@ -84,20 +89,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Print the JSON objects
         for json in json_objects.into_iter().flatten() {
-            let bytes = hex::decode(&json.frame).unwrap();
-            let message = if let Ok((_, msg)) = Message::from_bytes((&bytes, 0))
-            {
-                Some(msg)
-            } else {
-                None
-            };
+            let message =
+                if let Ok((_, msg)) = Message::from_bytes((&json.frame, 0)) {
+                    Some(msg)
+                } else {
+                    None
+                };
             let mut msg = TimedMessage {
                 timestamp: json.timestamp,
-                timesource: json.timesource,
-                rssi: json.rssi,
-                frame: json.frame.to_string(),
+                frame: json.frame,
                 message,
-                idx: json.idx.map_or(0, |idx| idx),
+                metadata: json.metadata,
+                decode_time: None,
             };
             if let Some(message) = &mut msg.message {
                 match &mut message.df {

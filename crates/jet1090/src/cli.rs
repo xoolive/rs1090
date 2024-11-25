@@ -19,7 +19,7 @@ pub enum Address {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {
     address: Address,
-    pub airport: Option<String>,
+    pub name: Option<String>,
     pub reference: Option<Position>,
     #[serde(skip)]
     pub count: u64,
@@ -69,7 +69,7 @@ impl FromStr for Source {
 
         let mut source = Source {
             address,
-            airport: None,
+            name: None,
             reference: None,
             count: 0,
             last: 0,
@@ -77,7 +77,7 @@ impl FromStr for Source {
 
         if let Some(query) = url.query() {
             if !query.contains(',') {
-                source.airport = Some(query.to_string());
+                source.name = Some(query.to_string());
             }
             source.reference = Position::from_str(query).ok()
         };
@@ -87,7 +87,12 @@ impl FromStr for Source {
 }
 
 impl Source {
-    pub async fn receiver(&self, tx: Sender<TimedMessage>, idx: usize) {
+    pub async fn receiver(
+        &self,
+        tx: Sender<TimedMessage>,
+        serial: u64,
+        name: Option<String>,
+    ) {
         if let Address::Rtlsdr(args) = &self.address {
             #[cfg(not(feature = "rtlsdr"))]
             {
@@ -100,7 +105,8 @@ impl Source {
             }
             #[cfg(feature = "rtlsdr")]
             {
-                rtlsdr::receiver::<&str>(tx, args.as_deref(), idx).await
+                rtlsdr::receiver::<&str>(tx, args.as_deref(), serial, name)
+                    .await
             }
         } else {
             let server_address = match &self.address {
@@ -109,7 +115,9 @@ impl Source {
                 Address::Websocket(s) => BeastSource::Websocket(s.to_owned()),
                 _ => unreachable!(),
             };
-            if let Err(e) = radarcape::receiver(server_address, tx, idx).await {
+            if let Err(e) =
+                radarcape::receiver(server_address, tx, serial, name).await
+            {
                 error!("{}", e.to_string());
             }
         }
@@ -141,13 +149,13 @@ mod test {
         assert!(source.is_ok());
         if let Ok(Source {
             address,
-            airport,
+            name,
             reference: Some(pos),
             ..
         }) = source
         {
             assert_eq!(address, Address::Rtlsdr(None));
-            assert_eq!(airport, Some("LFBO".to_string()));
+            assert_eq!(name, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
@@ -159,13 +167,13 @@ mod test {
         assert!(source.is_ok());
         if let Ok(Source {
             address: Address::Tcp(path),
-            airport,
+            name,
             reference,
             ..
         }) = source
         {
             assert_eq!(path, "0.0.0.0:4003");
-            assert_eq!(airport, None);
+            assert_eq!(name, None);
             assert_eq!(reference, None);
         }
 
@@ -173,13 +181,13 @@ mod test {
         assert!(source.is_ok());
         if let Ok(Source {
             address: Address::Tcp(path),
-            airport,
+            name,
             reference: Some(pos),
             ..
         }) = source
         {
             assert_eq!(path, "0.0.0.0:4003");
-            assert_eq!(airport, Some("LFBO".to_string()));
+            assert_eq!(name, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
@@ -188,7 +196,7 @@ mod test {
         assert!(source.is_ok());
         if let Ok(Source {
             address,
-            airport,
+            name,
             reference: Some(pos),
             ..
         }) = source
@@ -197,7 +205,7 @@ mod test {
                 address,
                 Address::Websocket("ws://1.2.3.4:4003/get".to_string())
             );
-            assert_eq!(airport, Some("LFBO".to_string()));
+            assert_eq!(name, Some("LFBO".to_string()));
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
