@@ -112,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 timestamp: json.timestamp,
                 frame: json.frame,
                 message,
-                metadata: metadata,
+                metadata,
                 decode_time: None,
             };
             if let Some(message) = &mut msg.message {
