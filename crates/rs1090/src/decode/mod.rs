@@ -493,9 +493,7 @@ pub struct SensorMetadata {
 
 static mut SERIALIZE_DECODE_TIME: bool = false;
 fn skip_serialize_decode_time(field: &Option<f64>) -> bool {
-    unsafe {
-        return !SERIALIZE_DECODE_TIME | field.is_none();
-    }
+    unsafe { !SERIALIZE_DECODE_TIME | field.is_none() }
 }
 pub fn serialize_decode_time() {
     unsafe { SERIALIZE_DECODE_TIME = true };
