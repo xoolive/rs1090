@@ -40,11 +40,13 @@ struct Options {
 #[derive(Serialize, Deserialize)]
 struct JSONEntry {
     timestamp: f64,
+    rssi: Option<f64>, // from older format
     #[serde(
         serialize_with = "rs1090::decode::as_hex",
         deserialize_with = "rs1090::decode::from_hex"
     )]
     frame: Vec<u8>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     metadata: Vec<SensorMetadata>,
 }
 
@@ -95,11 +97,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     None
                 };
+            let mut metadata = json.metadata;
+            // If old fashioned file, include the data in a metadata entry
+            if json.rssi.is_some() {
+                metadata.push(SensorMetadata {
+                    system_timestamp: json.timestamp,
+                    gnss_timestamp: None,
+                    rssi: json.rssi,
+                    serial: 0,
+                    name: None,
+                })
+            }
             let mut msg = TimedMessage {
                 timestamp: json.timestamp,
                 frame: json.frame,
                 message,
-                metadata: json.metadata,
+                metadata: metadata,
                 decode_time: None,
             };
             if let Some(message) = &mut msg.message {

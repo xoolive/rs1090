@@ -488,6 +488,7 @@ pub struct SensorMetadata {
     /// The identifier of the receptor
     pub serial: u64,
     /// A possible name for the receptor
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
 
