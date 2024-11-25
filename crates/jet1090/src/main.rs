@@ -14,6 +14,7 @@ use crossterm::event::KeyCode;
 use ratatui::widgets::*;
 use redis::AsyncCommands;
 use rs1090::decode::cpr::{decode_position, AircraftState};
+use rs1090::decode::serialize_decode_time;
 use rs1090::prelude::*;
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -65,6 +66,9 @@ struct Options {
     /// Should we update the reference positions (if the receiver is moving)
     #[arg(short, long, default_value=None)]
     update_position: bool,
+
+    #[arg(long)]
+    stats: Option<bool>,
 
     /// Shell completion generation
     #[arg(long = "completion", value_enum)]
@@ -175,6 +179,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if cli_options.redis_topic.is_some() {
         options.redis_topic = cli_options.redis_topic;
+    }
+    if cli_options.stats.is_some() {
+        options.stats = cli_options.stats;
+    }
+    if options.stats.unwrap_or(false) {
+        serialize_decode_time();
     }
 
     options.sources.append(&mut cli_options.sources);

@@ -491,6 +491,16 @@ pub struct SensorMetadata {
     pub name: Option<String>,
 }
 
+static mut SERIALIZE_DECODE_TIME: bool = false;
+fn skip_serialize_decode_time(field: &Option<f64>) -> bool {
+    unsafe {
+        return !SERIALIZE_DECODE_TIME | field.is_none();
+    }
+}
+pub fn serialize_decode_time() {
+    unsafe { SERIALIZE_DECODE_TIME = true };
+}
+
 #[derive(Serialize)]
 pub struct TimedMessage {
     /// The timestamp (in s) of the first time the message was received
@@ -504,7 +514,7 @@ pub struct TimedMessage {
     /// Information about when and where the message was received
     pub metadata: Vec<SensorMetadata>,
     /// Debugging information about decoding time (not serialized)
-    #[serde(skip)]
+    #[serde(skip_serializing_if = "skip_serialize_decode_time")]
     pub decode_time: Option<f64>,
 }
 
