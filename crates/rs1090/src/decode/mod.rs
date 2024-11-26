@@ -9,7 +9,7 @@ use adsb::{ADSB, ME};
 use commb::{DF20DataSelector, DF21DataSelector};
 use crc::modes_checksum;
 use deku::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use tracing::debug;
 
@@ -475,42 +475,67 @@ impl fmt::Display for Message {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum TimeSource {
-    /// The timestamp is provided by the system when it receives the message
-    System,
-    /// The timestamp is provided by the GPS in the header of the message
-    Radarcape,
-    /// The timestamp is provided by the user asking to decode the message
-    External,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SensorMetadata {
+    /// The timestamp when the message was received by the receptor
+    pub system_timestamp: f64,
+    /// The GNSS timestamp of the message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gnss_timestamp: Option<f64>,
+    /// The signal level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rssi: Option<f64>,
+    /// The identifier of the receptor
+    pub serial: u64,
+    /// A possible name for the receptor
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 }
 
-fn is_zero(value: &usize) -> bool {
-    *value == 0
+static mut SERIALIZE_DECODE_TIME: bool = false;
+fn skip_serialize_decode_time(field: &Option<f64>) -> bool {
+    unsafe { !SERIALIZE_DECODE_TIME | field.is_none() }
+}
+pub fn serialize_decode_time() {
+    unsafe { SERIALIZE_DECODE_TIME = true };
 }
 
 #[derive(Serialize)]
 pub struct TimedMessage {
+    /// The timestamp (in s) of the first time the message was received
     pub timestamp: f64,
-
-    pub timesource: TimeSource,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rssi: Option<f64>,
-
-    pub frame: String,
-
+    /// The message payload
+    #[serde(serialize_with = "as_hex", deserialize_with = "from_hex")]
+    pub frame: Vec<u8>,
+    /// The decoded message
     #[serde(flatten)]
     pub message: Option<Message>,
+    /// Information about when and where the message was received
+    pub metadata: Vec<SensorMetadata>,
+    /// Debugging information about decoding time (not serialized)
+    #[serde(skip_serializing_if = "skip_serialize_decode_time")]
+    pub decode_time: Option<f64>,
+}
 
-    #[serde(skip_serializing_if = "is_zero")]
-    pub idx: usize,
+pub fn as_hex<S>(data: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let hex_string = hex::encode(data);
+    serializer.serialize_str(&hex_string)
+}
+
+pub fn from_hex<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let hex_string = String::deserialize(deserializer)?; // Deserialize as a string
+    hex::decode(&hex_string).map_err(serde::de::Error::custom) // Decode and handle errors
 }
 
 impl fmt::Display for TimedMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{:.5},{}", &self.timestamp, &self.frame)?;
+        writeln!(f, "{:.5},{}", &self.timestamp, hex::encode(&self.frame))?;
         if let Some(msg) = &self.message {
             writeln!(f, "{}", msg)?;
         }
@@ -519,7 +544,7 @@ impl fmt::Display for TimedMessage {
 }
 impl fmt::Debug for TimedMessage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{:.5},{}", &self.timestamp, &self.frame)?;
+        writeln!(f, "{:.5},{}", &self.timestamp, hex::encode(&self.frame))?;
         if let Some(msg) = &self.message {
             writeln!(f, "{:#}", msg)?;
         }

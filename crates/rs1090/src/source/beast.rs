@@ -70,7 +70,8 @@ pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
                         len
                     }
                     _ => {
-                        error!("Error reading from websocket");break;
+                        error!("Error reading from websocket");
+                        break;
                     }
                 }
             }
