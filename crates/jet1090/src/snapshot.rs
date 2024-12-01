@@ -157,7 +157,10 @@ pub async fn update_snapshot(
                         aircraft.cur.altitude = None;
                     }
                     ME::BDS08(bds08) => {
-                        aircraft.cur.callsign = Some(bds08.callsign.to_string())
+                        if !bds08.callsign.contains("#") {
+                            aircraft.cur.callsign =
+                                Some(bds08.callsign.to_string())
+                        }
                     }
                     ME::BDS09(bds09) => {
                         aircraft.cur.vertical_rate = bds09.vertical_rate;
@@ -241,8 +244,10 @@ pub async fn update_snapshot(
                         bds.bds60 = None
                     }
                     if let Some(bds20) = &bds.bds20 {
-                        aircraft.cur.callsign =
-                            Some(bds20.callsign.to_string());
+                        if !bds20.callsign.contains("#") {
+                            aircraft.cur.callsign =
+                                Some(bds20.callsign.to_string());
+                        }
                     }
                     if let Some(bds40) = &bds.bds40 {
                         aircraft.cur.selected_altitude =
@@ -272,8 +277,10 @@ pub async fn update_snapshot(
                         bds.bds60 = None
                     }
                     if let Some(bds20) = &bds.bds20 {
-                        aircraft.cur.callsign =
-                            Some(bds20.callsign.to_string());
+                        if !bds20.callsign.contains("#") {
+                            aircraft.cur.callsign =
+                                Some(bds20.callsign.to_string());
+                        }
                     }
                     if let Some(bds40) = &bds.bds40 {
                         aircraft.cur.selected_altitude =
