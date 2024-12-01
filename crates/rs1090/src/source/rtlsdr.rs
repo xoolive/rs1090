@@ -36,7 +36,11 @@ pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
         None => Device::new("driver=rtlsdr"),
         Some(args) => Device::new(args),
     };
-    let name = name.or(args.unwrap_or("rtlsdr"));
+
+    let name = name.or(args
+        .map(|a| Some(format!("{:?}", a)))
+        .unwrap_or(Some("rtlsdr".to_string())));
+
     let device = match device {
         Ok(device) => {
             info!("{:#}", device.hardware_info().unwrap());
