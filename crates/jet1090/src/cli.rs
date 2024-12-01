@@ -76,9 +76,6 @@ impl FromStr for Source {
         };
 
         if let Some(query) = url.query() {
-            if !query.contains(',') {
-                source.name = Some(query.to_string());
-            }
             source.reference = Position::from_str(query).ok()
         };
 
@@ -155,7 +152,7 @@ mod test {
         }) = source
         {
             assert_eq!(address, Address::Rtlsdr(None));
-            assert_eq!(name, Some("LFBO".to_string()));
+            assert_eq!(name, None);
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
@@ -187,7 +184,7 @@ mod test {
         }) = source
         {
             assert_eq!(path, "0.0.0.0:4003");
-            assert_eq!(name, Some("LFBO".to_string()));
+            assert_eq!(name, None);
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
@@ -205,7 +202,7 @@ mod test {
                 address,
                 Address::Websocket("ws://1.2.3.4:4003/get".to_string())
             );
-            assert_eq!(name, Some("LFBO".to_string()));
+            assert_eq!(name, None);
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
         }
