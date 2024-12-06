@@ -913,7 +913,6 @@ pub enum KE {
 /// The actual meaning is just 4 octal numbers, but we convert it into a hex
 /// number that happens to represent the four octal numbers.
 ///
-
 #[rustfmt::skip]
 pub fn decode_id13(id13_field: u16) -> u16 {
     let mut hex_gillham: u16 = 0;

@@ -269,7 +269,7 @@ fn decode_1090t_vec(
         latitude,
         longitude,
     });
-    decode_positions(&mut res, position);
+    decode_positions(&mut res, position, &None);
 
     let pkl = serde_pickle::to_vec(&res, Default::default()).unwrap();
     Ok(pkl)

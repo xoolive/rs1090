@@ -22,7 +22,6 @@ use std::collections::HashSet;
 ///
 /// Decoding the timestamp:
 /// <https://wiki.modesbeast.com/Radarcape:Firmware_Versions#The_GPS_timestamp>
-
 pub type WsStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 pub enum DataSource {

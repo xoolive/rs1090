@@ -80,7 +80,7 @@ fn main() -> io::Result<()> {
 
     // println!("{} messages processed", res.len());
 
-    decode_positions(&mut res, Some(reference));
+    decode_positions(&mut res, Some(reference), &None);
 
     println!("{}", serde_json::to_string(&res).unwrap());
     Ok(())
