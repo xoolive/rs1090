@@ -30,7 +30,7 @@ impl<'a> ChunkedLines<'a> {
     }
 }
 
-impl<'a> Iterator for ChunkedLines<'a> {
+impl Iterator for ChunkedLines<'_> {
     type Item = Vec<String>;
 
     fn next(&mut self) -> Option<Self::Item> {

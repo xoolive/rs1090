@@ -1,4 +1,3 @@
-use crate::decode::TimeSource;
 use crate::prelude::*;
 use crate::source::beast::DataSource;
 use futures_util::pin_mut;
@@ -18,7 +17,8 @@ pub enum BeastSource {
 pub async fn receiver(
     address: BeastSource,
     tx: mpsc::Sender<TimedMessage>,
-    idx: usize,
+    serial: u64,
+    name: Option<String>,
 ) -> io::Result<()> {
     let msg_stream = match address {
         BeastSource::TCP(address) => match TcpStream::connect(&address).await {
@@ -53,10 +53,24 @@ pub async fn receiver(
     pin_mut!(msg_stream); // needed for iteration
     'receive: loop {
         while let Some(msg) = msg_stream.next().await {
-            let msg = process_radarcape(&msg, idx);
-            info!("Received {}", msg);
-            if tx.send(msg).await.is_err() {
-                break 'receive;
+            let start = SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("SystemTime before unix epoch")
+                .as_secs_f64();
+            let mut tmsg = process_radarcape(&msg, serial, name.clone());
+            info!("Received {}", tmsg);
+            if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0)) {
+                tmsg.decode_time = Some(
+                    SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .expect("SystemTime before unix epoch")
+                        .as_secs_f64()
+                        - start,
+                );
+                tmsg.message = Some(msg);
+                if tx.send(tmsg).await.is_err() {
+                    break 'receive;
+                }
             }
         }
     }
@@ -74,7 +88,11 @@ fn today(now: u128) -> u128 {
     86_400 * (now / 86_400)
 }
 
-fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
+fn process_radarcape(
+    msg: &[u8],
+    serial: u64,
+    name: Option<String>,
+) -> TimedMessage {
     // Copy the bytes from the slice into the array starting from index 2
     let mut array = [0u8; 8];
     array[2..8].copy_from_slice(&msg[2..8]);
@@ -88,33 +106,42 @@ fn process_radarcape(msg: &[u8], idx: usize) -> TimedMessage {
     let rssi = rssi.map(|v| v as f64 / 255.);
     let rssi = rssi.map(|v| 10. * (v * v).log10());
 
-    let frame = msg[9..]
-        .iter()
-        .map(|&b| format!("{:02x}", b))
-        .collect::<Vec<String>>()
-        .join("");
+    /*let frame = msg[9..]
+    .iter()
+    .map(|&b| format!("{:02x}", b))
+    .collect::<Vec<String>>()
+    .join("");*/
 
     let now_u128 = now();
     let now = now_u128 as f64 * 1e-6;
     let timestamp = today(now_u128 / 1_000_000) as f64 + ts;
 
-    let timesource = match (now - timestamp).abs() {
+    /*let timesource = match (now - timestamp).abs() {
         value if value < 5. => TimeSource::Radarcape,
         _ => TimeSource::System,
-    };
+    };*/
     // In some cases, the timestamp is just the one of dump1090, so forget it!
-    let timestamp = match timesource {
+    /* let timestamp = match timesource {
         TimeSource::Radarcape => timestamp,
         TimeSource::System => now,
         TimeSource::External => panic!(), // impossible here
+    };*/
+    let metadata = SensorMetadata {
+        system_timestamp: now,
+        gnss_timestamp: match (now - timestamp).abs() {
+            value if value < 3600. => Some(timestamp),
+            _ => None,
+        },
+        rssi,
+        serial,
+        name,
     };
 
     TimedMessage {
-        timestamp,
-        timesource,
-        rssi,
-        frame,
+        timestamp: metadata.gnss_timestamp.unwrap_or(metadata.system_timestamp),
+        frame: msg[9..].to_vec(),
         message: None,
-        idx,
+        metadata: vec![metadata],
+        decode_time: None,
     }
 }

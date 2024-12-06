@@ -22,7 +22,6 @@ use std::collections::HashSet;
 ///
 /// Decoding the timestamp:
 /// <https://wiki.modesbeast.com/Radarcape:Firmware_Versions#The_GPS_timestamp>
-
 pub type WsStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 pub enum DataSource {
@@ -70,7 +69,8 @@ pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
                         len
                     }
                     _ => {
-                        error!("Error reading from websocket");break;
+                        error!("Error reading from websocket");
+                        break;
                     }
                 }
             }

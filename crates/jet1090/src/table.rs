@@ -377,8 +377,13 @@ impl Render for ColumnRender {
                 s.nacp.map(|v| format!("{}", v)).unwrap_or("".to_string())
             }
             Self::COUNT => s.count.to_string(),
-            Self::REFERENCE => s.airport.clone().unwrap_or("".to_string()),
-            // s.reference.to_string(),
+            Self::REFERENCE => s
+                .metadata
+                .first()
+                .unwrap()
+                .name
+                .clone()
+                .unwrap_or("".to_string()),
             Self::LAST => {
                 if now > s.last + 5 {
                     format!("{}s ago", now - s.last)
@@ -471,7 +476,7 @@ impl Render for ColumnRender {
             ColumnRender::ROLL => Constraint::Length(5),
             ColumnRender::NACP => Constraint::Length(3),
             ColumnRender::COUNT => Constraint::Length(8),
-            ColumnRender::REFERENCE => Constraint::Length(4),
+            ColumnRender::REFERENCE => Constraint::Length(8),
             ColumnRender::LAST => Constraint::Length(7),
             ColumnRender::FIRST => Constraint::Length(5),
         }

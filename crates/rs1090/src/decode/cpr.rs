@@ -212,7 +212,6 @@ fn modulo(a: f64, b: f64) -> f64 {
 /**
  * Decode airborne position from a pair of even and odd position message.
  */
-
 pub fn airborne_position(
     oldest: &AirbornePosition,
     latest: &AirbornePosition,
@@ -303,7 +302,6 @@ pub fn airborne_position(
  * location, etc. The reference position shall be within 180NM of the true
  * position.
  */
-
 pub fn airborne_position_with_reference(
     msg: &AirbornePosition,
     latitude_ref: f64,
@@ -358,7 +356,6 @@ pub fn airborne_position_with_reference(
  * location, etc. The reference position shall be within 45NM of the true
  * position.
  */
-
 pub fn surface_position_with_reference(
     msg: &SurfacePosition,
     latitude_ref: f64,
@@ -407,6 +404,8 @@ pub fn surface_position_with_reference(
     })
 }
 
+pub type UpdateIf = Option<Box<dyn Fn(&AirbornePosition) -> bool>>;
+
 /**
  * Mutates the ME message based on recent past positions (parameter `timestamp`)
  * of the same aircraft (parameter `icao24`). For surface messages, the
@@ -416,13 +415,13 @@ pub fn surface_position_with_reference(
  * - `aircraft` is a hashmap of aircraft containing their most recent state;
  * - `reference` is a (possibly None) set of coordinates.
  */
-
 pub fn decode_position(
     message: &mut ME,
     timestamp: f64,
     icao24: &ICAO,
     aircraft: &mut BTreeMap<ICAO, AircraftState>,
     reference: &mut Option<Position>,
+    update_reference: &UpdateIf,
 ) {
     let latest = aircraft.entry(*icao24).or_insert(AircraftState {
         timestamp,
@@ -487,9 +486,9 @@ pub fn decode_position(
                 // Then update the reference in aircraft
                 latest.pos = Some(pos);
                 latest.timestamp = timestamp;
-                // If necessary update the reference position
-                if let Some(alt) = airborne.alt {
-                    if alt < 1000 {
+                // If necessary (according to the callback) update the reference position
+                if let Some(update_reference) = update_reference {
+                    if update_reference(airborne) {
                         *reference = Some(Position {
                             latitude: pos.latitude,
                             longitude: pos.longitude,
@@ -550,7 +549,11 @@ pub fn decode_position(
 /**
  * This function is only used  for the decoding of offline messages.
  */
-pub fn decode_positions(res: &mut [TimedMessage], reference: Option<Position>) {
+pub fn decode_positions(
+    res: &mut [TimedMessage],
+    reference: Option<Position>,
+    update_reference: &UpdateIf,
+) {
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
     let mut reference = reference;
 
@@ -565,6 +568,7 @@ pub fn decode_positions(res: &mut [TimedMessage], reference: Option<Position>) {
                         &adsb.icao24,
                         &mut aircraft,
                         &mut reference,
+                        update_reference,
                     ),
                     DF::ExtendedSquitterTisB { cf, .. } => decode_position(
                         &mut cf.me,
@@ -572,6 +576,7 @@ pub fn decode_positions(res: &mut [TimedMessage], reference: Option<Position>) {
                         &cf.aa,
                         &mut aircraft,
                         &mut reference,
+                        update_reference,
                     ),
                     _ => {}
                 }
