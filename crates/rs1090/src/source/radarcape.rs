@@ -106,32 +106,18 @@ fn process_radarcape(
     let rssi = rssi.map(|v| v as f64 / 255.);
     let rssi = rssi.map(|v| 10. * (v * v).log10());
 
-    /*let frame = msg[9..]
-    .iter()
-    .map(|&b| format!("{:02x}", b))
-    .collect::<Vec<String>>()
-    .join("");*/
-
     let now_u128 = now();
     let now = now_u128 as f64 * 1e-6;
     let timestamp = today(now_u128 / 1_000_000) as f64 + ts;
 
-    /*let timesource = match (now - timestamp).abs() {
-        value if value < 5. => TimeSource::Radarcape,
-        _ => TimeSource::System,
-    };*/
     // In some cases, the timestamp is just the one of dump1090, so forget it!
-    /* let timestamp = match timesource {
-        TimeSource::Radarcape => timestamp,
-        TimeSource::System => now,
-        TimeSource::External => panic!(), // impossible here
-    };*/
     let metadata = SensorMetadata {
         system_timestamp: now,
         gnss_timestamp: match (now - timestamp).abs() {
             value if value < 3600. => Some(timestamp),
             _ => None,
         },
+        nanoseconds: Some(ts_u64),
         rssi,
         serial,
         name,

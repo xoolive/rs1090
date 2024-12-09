@@ -83,6 +83,7 @@ pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
                     let metadata = SensorMetadata {
                         system_timestamp: timestamp as f64 * 1e-6,
                         gnss_timestamp: None,
+                        nanoseconds: None,
                         rssi: Some(10. * data.signal_level.log10()),
                         serial,
                         name: name.clone(),

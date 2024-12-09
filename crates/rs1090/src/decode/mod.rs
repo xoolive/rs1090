@@ -482,6 +482,8 @@ pub struct SensorMetadata {
     /// The GNSS timestamp of the message
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gnss_timestamp: Option<f64>,
+    /// Number of nanoseconds since beginning of UTC day
+    pub nanoseconds: Option<u64>,
     /// The signal level
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rssi: Option<f64>,

@@ -111,6 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 json.metadata.push(SensorMetadata {
                     system_timestamp: json.timestamp,
                     gnss_timestamp: None,
+                    nanoseconds: None,
                     rssi: json.rssi,
                     serial: 0,
                     name: None,

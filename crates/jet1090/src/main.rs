@@ -2,6 +2,7 @@
 
 mod aircraftdb;
 mod cli;
+mod dedup;
 mod snapshot;
 mod table;
 mod tui;
@@ -403,7 +404,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // I am not sure whether this size calibration is relevant, but let's try...
     // adding one in order to avoid the stupid error when you set a size = 0
     let multiplier = options.sources.len();
-    let (tx, mut rx) = tokio::sync::mpsc::channel(100 * multiplier + 1);
+    let (tx, rx) = tokio::sync::mpsc::channel(100 * multiplier + 1);
+    let (tx_dedup, mut rx_dedup) =
+        tokio::sync::mpsc::channel(100 * multiplier + 1);
 
     let sources = app_dec.lock().await.sources.clone();
     for (serial, source) in sources.into_iter().enumerate() {
@@ -415,6 +418,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    tokio::spawn(async move {
+        dedup::deduplicate_messages(rx, tx_dedup, 400).await;
+    });
+
     // If we choose to update the reference (only useful for surface positions)
     // then we define the callback (for now, if the altitude is below 1000ft)
     let update_reference = match options.update_position {
@@ -425,7 +432,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut first_msg = true;
-    while let Some(mut msg) = rx.recv().await {
+    while let Some(mut msg) = rx_dedup.recv().await {
         if first_msg {
             // This workaround results from soapysdr writing directly on stdout.
             // The best thing would be to not write to stdout in the first
