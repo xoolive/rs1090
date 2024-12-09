@@ -29,10 +29,12 @@ install-updater = true
 [dist.dependencies.apt]
 libsoapysdr-dev = "*"
 soapysdr-module-rtlsdr = "*"
+protobuf-compile = "*"
 
 [dist.dependencies.homebrew]
 soapysdr = { stage = ["build", "run"] }
 soapyrtlsdr = { stage = ["run"] }
+protobuf = { stage = ["build"] }
 
 [dist.github-custom-runners]
 aarch64-apple-darwin = "macos-14"

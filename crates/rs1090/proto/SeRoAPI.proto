@@ -1,0 +1,785 @@
+syntax = "proto3";
+package serosystems.proto.v3.backend.api;
+
+option java_package = "de.serosystems.proto.v3.backend.api";
+option java_outer_classname = "SeRoAPIProto";
+
+// Sensor identifier
+message Sensor {
+
+  // sensor serial number
+  uint64 serial = 1;
+
+  enum Type {
+    // Not specified, do not use.
+    UNSPECIFIED = 0;
+    // SeRo Systems GRX 1090.
+    GRX1090 = 1;
+    // SeRo Systems GRX 1090W.
+    GRX1090W = 2;
+    // SeRo Systems GRX 2120.
+    GRX2120 = 3;
+    // SeRo Systems GRX 1030.
+    GRX1030 = 4;
+    // SeRo Systems GRX 978.
+    GRX978 = 5;
+    // SeRo Systems GRX 3098.
+    GRX3098 = 6;
+  }
+
+  // hardware/sensor type
+  Type type = 2;
+
+}
+
+// An airspace participant. The address type designates what type of address the participant uses. In almost all cases
+// it's a ICAO 24-bit address as this type of identifier is used in Mode S and 1090ES ADS-B tracking. For data from the
+// US you might also find ADS-R or TIS-B targets. For aircraft that do not have Mode S (or ADS-B) or have turned their
+// transponders off (e.g., military), an ATCRBS address might be used as they may still be detected by SecureTrack via
+// Mode 1,2,3/A,C multilateration.
+message Participant {
+
+  // Participant address (e.g. ICAO24).
+  uint32 address = 1;
+
+  // Address type
+  enum AddressType {
+
+    // Not (yet) determined
+    UNKNOWN = 0;
+
+    // ICAO 24-bit address
+    ICAO24 = 1;
+    // NON-ICAO 24-bit address
+    NON_ICAO = 2;
+    // Anonymous address or ground vehicle address or fixed obstacle address of transmitting ADS-B Participant
+    ANONYMOUS = 3; // DF=18 with CF=1 or CF=6 and IMF=1
+    // 12-bit Mode A code and track file number
+    MODEA_TRACK = 4; // DF=18 with CF=2/3 and IMF=1
+    // Reserved (e.g. for military use)
+    RESERVED = 5; // DF=19 with AF>0 or DF=18 with CF=5 and IMF=1 or DF=18 and CF=7
+
+    // Mode S 1090 or UAT TIS-B Track ID.
+    TIS_B_TRACK_ID = 6;
+    // UAT temporary self-assigned.
+    TEMPORARY_SELF_ASSIGNED = 7;
+    // UAT surface vehicle.
+    SURFACE_VEHICLE = 8;
+    // UAT fixed beacon.
+    FIXED_BEACON = 9;
+    // UAT ADS-R target.
+    ADS_R_TARGET = 10;
+
+    // Mode 1,2,3/A,C target without tracker ID
+    ATCRBS_UNTRACKED = 11;
+    // Mode 1,2,3/A, C target track number
+    ATCRBS_TRACK = 12;
+  }
+
+  // Type of this participant
+  AddressType address_type = 2;
+}
+
+// Container for all information that is provided by the aircraft via ADS-B and/or Mode S.
+message ADSBVector {
+
+  // ------------------------------------------------------------------------
+  // The following attributes are derived from different transponder signals.
+  // Check the respective *_last_seen timestamp for age of the values.
+  // ------------------------------------------------------------------------
+
+  // True airspeed [knots] from ADS-B Airspeed message.
+  int32 true_airspeed = 4;
+
+  // Last update of true_airspeed [ms since epoch].
+  uint64 true_airspeed_last_seen = 5;
+
+  // Indicated airspeed [knots] from ADS-B Airspeed Message.
+  int32 indicated_airspeed = 48;
+
+  // Last update of indicated_airspeed [ms since epoch].
+  uint64 indicated_airspeed_last_seen = 49;
+
+  // ADS-B emitter category set encoded as set A = 0, B = 1, C = 2, D = 3 from ADS-B Identification Message.
+  uint32 category_set = 46;
+
+  // ADS-B emitter category within the respective category_set from ADS-B Identification Message. Same encoding as in
+  // Table 2-19 of DO-260B with values 0-7.
+  uint32 category_code = 47;
+
+  // Human readable description of the emitter category / vehicle type that is encoded in the category_set and
+  // category_code fields above.
+  string category_description = 6;
+
+  // Call sign from ADS-B Identification Message.
+  string callsign = 7;
+
+  // Last update of category_description, category_set, category_code and callsign [ms since epoch].
+  uint64 identification_last_seen = 8;
+
+  // ----------------------------------------------------
+  // The following are derived from several message types
+  // ----------------------------------------------------
+
+  // Boolean flag indicating that target is on ground. This flag set based on both Mode S and ADS-B messages.
+  bool ground_flag = 9;
+
+  // Last update of ground flag [ms since epoch].
+  uint64 ground_flag_last_seen = 10;
+
+  // Latitude in WGS-84 decimal degrees from ADS-B Airborne or Surface Position Messages.
+  double latitude = 11;
+
+  // Longitude in WGS-84 decimal degrees from ADS-B Airborne or Surface Position Messages.
+  double longitude = 12;
+
+  // Navigation integrity category (NICp) from ADS-B Airborne or Surface Position Message. A NIC of 0 means "unknown".
+  uint32 nic = 13;
+
+  // Flight information region (FIR) of current position (based on SeRo's FIR database)
+  string flight_information_region = 14;
+
+  // Last update of latitude, longitude, nic and FIR [ms since epoch].
+  uint64 position_last_seen = 15;
+
+  // Heading in decimal degrees clockwise from either magnetic north (common case) from ADS-B Airspeed or
+  // Surface Position Message or geographic north if target is in polar regions.
+  float heading = 16;
+
+  // Last update of heading [ms since epoch].
+  uint64 heading_last_seen = 17;
+
+  // True track angle in decimal degrees clockwise from geographic north from Airborne Velocity Message.
+  float track_angle = 18;
+
+  // Last update of track_angle [ms since epoch].
+  uint64 track_angle_last_seen = 19;
+
+  // Speed over ground from ADS-B Surface Position or Airborne Velocity Message [knots].
+  float speed_over_ground = 20;
+
+  // Last update of speed_over_ground [ms since epoch].
+  uint64 speed_over_ground_last_seen = 21;
+
+  // Barometric altitude of the target [ft] from ADS-B Airborne Position, ACAS or Altitude Reply.
+  int32 altitude_barometric = 22;
+
+  // Last update of altitude_barometric [ms since epoch].
+  uint64 altitude_barometric_last_seen = 23;
+
+  // Geometric height of the target from ADS-B Airborne Position [ft].
+  int32 height_geometric = 24;
+
+  // Last update of height_geometric [ms since epoch].
+  uint64 height_geometric_last_seen = 25;
+
+  // Vertical rate [ft/min] from ADS-B Airborne Velocity or Airspeed Message.
+  int32 vertical_rate = 26;
+
+  // Last update of vertical_rate [ms since epoch].
+  uint64 vertical_rate_last_seen = 27;
+
+  // "4096 identification code" (also called squawk) from Mode S Identify Reply.
+  string mode_a_code = 28;
+
+  // Last update of mode_a_code [ms since epoch].
+  uint64 mode_a_code_last_seen = 29;
+
+  // Alert flag from Mode S Altitude or Identify Reply.
+  bool alert = 30;
+
+  // Special purpose indicator from Mode S Altitude or Identify Reply.
+  bool spi = 31;
+
+  // Last update of alert and spi [ms since epoch].
+  uint64 alert_spi_last_seen = 32;
+
+  // Boolean flat indicating whether target is sending ADS-B. This is set when at least one ADS-B message (DF 17/18 and
+  // valid type code) has been received.
+  bool has_adsb = 33;
+
+  // Difference between barometric and geometric altitude from ADS-B Airspeed or VelocityOverGround messages [ft].
+  int32 geo_minus_baro = 34;
+
+  // Last update of geo_minus_baro [ms since epoch].
+  uint64 geo_minus_baro_last_seen = 35;
+
+  // Boolean flag from ADS-B Operational Status Message indicating whether 1090ES IN is available.
+  bool has_1090es_in = 36;
+
+  // Boolean flag from ADS-B Operational Status Message indicating whether target has a UAT receiver.
+  bool has_uat_in = 37;
+
+  // The ADS-B version number indicated by the target in ADS-B Operational Status Messages.
+  uint32 adsb_version = 38;
+
+  // System design assurance from ADS-B Operational Status Message.
+  uint32 sda = 39;
+
+  // Boolean flat from ADS-B Operational Status Message indicating whether horizontal reference direction (HRD) when
+  // reporting track/heading while on the ground is magentic (true) or true north (false).
+  bool horizontal_reference_direction = 50;
+
+  // Last update of has_1090es_in, has_uat_in, adsb_version, sda and horizontal_reference_direction [ms since epoch].
+  uint64 operational_status_last_seen = 40;
+
+  // Navigation accuracy category (NACp) for positions (4 bit value).
+  uint32 nac_p = 41;
+
+  // Source Integrity Level (SIL) from ADS-B Operational Status Message or Target State and Status.
+  uint32 sil = 42;
+
+  // Last update of nac_p and sil [ms since epoch].
+  uint64 nacp_sil_last_seeen = 43;
+
+  // Boolean flag from airborne ADS-B Operational Status Message indicating whether operational TCAS is available
+  bool has_operational_tcas = 44;
+
+  // Last update of has_1090es_in, has_operational_tcas, has_uat_in, adsb_version, nac_p, sil and sda [ms since epoch].
+  uint64 has_operational_tcas_last_seen = 45;
+
+} // ADSBVector
+
+
+// Container for data that is provided by our MLAT tracker
+message MLATVector {
+
+  // WGS 84 latitude in decimal degrees
+  double latitude = 4;
+
+  // WGS 84 longitude in decimal degrees
+  double longitude = 5;
+
+  // Height above WGS 84 ellipsoid in meters
+  double height_geometric = 6;
+
+  // Estimated horizontal speed in meters per second (inf if unknown).
+  double horizontal_speed = 7;
+
+  // Estimated track angle in clockwise degrees from geographic north.
+  double track_angle = 8;
+
+  // Estimated rate of turn in degrees per second.
+  double rate_of_turn = 9;
+
+  // Estimated vertical speed in meters per second.
+  double vertical_speed = 10;
+
+  ////// Error characterization //////
+
+  // Horizontal 95% containment radius
+  double containment_radius = 11;
+
+  // Horizontal dilution of precision (HDOP)
+  double hdop = 12;
+
+  // Vertical dilution of precision (VDOP)
+  double vdop = 13;
+
+  // Estimated transmission time of this signal in nanoseconds
+  uint64 tx_timestamp = 16;
+
+} // MLATVector
+
+// Report with all information on the target
+message TargetReport {
+
+  // Unique identifier for the target (usually based on ICAO 24-bit transponder address, if available)
+  Participant target = 1;
+
+  // Timestamp of this extended state vector [ms since epoch].
+  uint64 timestamp = 2;
+
+  // Timestamp when the last signal of this transponder was received [ms since epoch].
+  uint64 last_seen = 3;
+
+  // Aggregated ADS-B and Mode S data (can be missing, e.g., for Mode-AC-only tracked aircraft)
+  ADSBVector adsb = 4;
+
+  // Latest MLAT result (might be missing if no MLAT coverage)
+  MLATVector mlat = 5;
+
+  // Container for various statistics on the signals received from this target over the second before timestamp.
+  message Counters {
+
+    // Count of Mode S downlink formats (DF) observed in the last second. This array has always 25 elements,
+    // one for each downlink format. The element at index 0 refers to DF 0, the element at index 24 to
+    // DF 24.
+    repeated uint32 df_count = 1;
+
+    // Count of ADS-B type codes (TC) observed in the last second. This array has always 32 elements,
+    // one for each type code. The element at index 0 refers to TC 0, the element at index 31 to
+    // TC 31.
+    repeated uint32 type_code_count = 2;
+
+    // Count of Interrogator Identifier (II) observed in all call replies during the last second. This array has
+    // always 16 elements, one for each interrogator identifier. The element at index 0 refers to II 0, the element
+    // at index 15 to II 15.
+    repeated uint32 ii_count = 3;
+
+    // Count of Surveillance Identifier (SI) observed in all call replies during the last second. This array has
+    // always 64 elements, one for each surveillance identifier. The element at index 0 refers to SI 0, the element
+    // at index 63 to SI 63.
+    repeated uint32 si_count = 4;
+
+    // The number of MLAT updates that were generated by our system during the last second.
+    uint32 mlat_update_count = 5;
+
+    // The number of ADS-B data validation (verification) results that were generated during the last second.
+    uint32 verification_result_count = 6;
+
+  }
+
+  // Various statistics on the signals received from this target over the second before timestamp. This field is
+  // always set.
+  Counters counters = 6;
+
+  // Number of target reports that were dropped because client is not consuming data fast enough. This is an absolute
+  // counter. Monitor its value for change to detect missed data. Should you have issues, try to reduce the data
+  // volume by applying filters and only receive the data you are really interested in.
+  uint64 dropped_reports = 7;
+
+} // TargetReport
+
+// Container for information coming from a receiver's GNSS module.
+message GNSSInformation {
+
+  // Container for all information relating to the receiver's location.
+  message Position {
+
+    // Type of GNSS fix the receiver had when it determined this position.
+    enum FixType {
+      // No fix established.
+      None = 0;
+      // 2D position fix.
+      Pos2D = 2;
+      // 3D position fix.
+      Pos3D = 3;
+      // Time only fix. Used in "stationary" mode (needs to be configured separately).
+      TimeOnly = 5;
+    }
+
+    // GNSS fix type.
+    FixType fix_type = 1;
+
+    // Number of satellites seen/used by the receiver.
+    uint32 sats_used = 2;
+
+    // WGS84 Latitude of the receiver in decimal degrees.
+    double latitude = 3;
+
+    // WGS84 Longitude of the receiver in decimal degrees.
+    double longitude = 4;
+
+    // Height above WGS84 ellipsoid [m].
+    double height = 5;
+
+    // Estimated horizontal accuracy of the position [m].
+    double horizontal_accuracy = 6;
+
+    // Estimated vertical accuracy of the height [m].
+    double vertical_accuracy = 7;
+  }
+
+  // Container for time synchronization information
+  message Timing {
+
+    // UTC Timing information.
+    message UTC {
+
+      // UTC standard of GNSS receiver.
+      enum Standard {
+        // Unknown.
+        Unknown = 0;
+        // UTC as operated by the U.S. Naval Observatory (USNO).
+        USNO = 3;
+        // UTC as operated by the former Soviet Union.
+        SU = 6;
+        // UTC as operated by the National Time Service Center, China.
+        China = 7;
+      };
+
+      // Whether UTC information is valid (e.g., set once receiver received GPS almanac)
+      bool valid = 1;
+
+      // UTC standard used by the receiver (use only if valid is true).
+      Standard standard = 2;
+
+      // UTC year (use only if valid is true).
+      uint32 year = 3;
+
+      // UTC month (use only if valid is true).
+      uint32 month = 4;
+
+      // UTC day (use only if valid is true).
+      uint32 day = 5;
+
+      // UTC hour (use only if valid is true).
+      uint32 hour = 6;
+
+      // UTC minute (use only if valid is true).
+      uint32 min = 7;
+
+      // UTC second (use only if valid is true). May also be 60, if a leap second is present.
+      uint32 sec = 8;
+
+    } // UTC
+
+    // Disciplining sources used by the receiver.
+    enum DiscipliningSource {
+      // Internal oscillator.
+      Internal = 0;
+      // GNSS.
+      GNSS = 1;
+      // Externel ref in.
+      EXTINT0 = 2;
+      // Externel ref in.
+      EXTINT1 = 3;
+      // Internal oscillator measured by the host.
+      InternalMeasuredByHost = 4;
+      // External oscillator measured by the host.
+      ExternalMeasuredByHost = 5;
+    };
+
+    // UTC timing information.
+    UTC utc = 1;
+
+    // Whether time pulse is within tolerance limits.
+    bool time_pulse_within_tolerance = 2;
+
+    // Whether the internal oscillator is within tolerance limits.
+    bool internal_oscillator_within_tolerance = 3;
+
+    // Disciplining source of the oscillator.
+    DiscipliningSource disciplining_source = 4;
+
+    // Whether the Receiver Autonomous Integrity Monitoring Algorithm (RAIM) is active.
+    bool raim_active = 5;
+
+    // Whether coherent pulse generation is in operation.
+    bool coherent_pulse_generation = 6;
+
+    // Whether the time pulse is locked.
+    bool time_pulse_locked = 7;
+
+    // Offset between preceding pulse and UTC top of second [ns].
+    int32 preceding_pulse_utc_offset = 8;
+
+    // Estimated accuracy of the time provided by the receiver [ns].
+    uint32 time_accuracy = 9;
+
+    // Internal oscillator frequency offset [ppb].
+    float internal_oscillator_frequency_offset = 10;
+
+    // Internal oscillator frequency uncertainty [ppb].
+    float internal_oscillator_frequency_uncertainty = 11;
+
+  } // Timing
+
+  // GNSS hardware monitoring related information.
+  message HardwareMonitoring {
+
+    // Continuous Wave jamming state of GNSS receiver.
+    enum JammingState {
+      // Unknown or feature disabled.
+      UnknownOrDisabled = 0;
+      // OK, no significant jamming.
+      OK = 1;
+      // Warning, interference visible, but fix OK.
+      Warning = 2;
+      // Critical, interference visible and no fix.
+      Critical = 3;
+    }
+
+    // Noise level as measured by the GPS core.
+    uint32 noise_level = 1;
+
+    // AGC monitor (range 0 to 8191).
+    uint32 agc_monitor = 2;
+
+    // Output of the interference monitor.
+    JammingState jamming_state = 3;
+
+    // Continuous wave (CW) jamming indicator: 0 (no CW interference) to 255 (strong CW interference).
+    uint32 jamming_indicator = 4;
+
+    // Magnitude of the I-part of the complex signal (0..255).
+    uint32 signal_magnitude_i = 5;
+
+    // Magnitude of the Q-part of the complex signal (0..255).
+    uint32 signal_magnitude_q = 6;
+
+    // Imbalance of the I-part of the complex signal (-128..127).
+    int32 signal_imbalance_i = 7;
+
+    // Imbalance of the Q-part of the complex signal (-128..127).
+    int32 signal_imbalance_q = 8;
+
+    // Number of 100ms timeslots with parity errors.
+    uint32 timeslots_parity_errors = 9;
+
+    // Number of 100ms timeslots with framing errors.
+    uint32 timeslots_framing_errors = 10;
+
+    // Number of 100ms timeslots with overrun errors.
+    uint32 timeslots_overrun_errors = 11;
+
+    // Number of 100ms timeslots with break conditions.
+    uint32 timeslots_break_conditions = 12;
+
+    // Maximum usage of transmitter buffer during the last sysmon period for all targets [%].
+    uint32 tx_buffers_usage = 13;
+
+    // Maximum usage of transmitter buffer for all targets (overall) [%].
+    uint32 tx_buffers_peak_usage = 14;
+
+  } // HardwareMonitoring
+
+  // Version information.
+  message Versions {
+    // Hardware version of the GNSS module.
+    string module_hw = 1;
+
+    // Software version of the GNSS module.
+    string module_sw = 2;
+  }
+
+  // GNSS Survey-In (timing only mode) related information. This is only valid if timing only mode has been enabled.
+  message SurveyIn {
+
+    // Duration of the survey-in process [s].
+    uint32 duration = 1;
+
+    // Current mean position in ECEF coordinates (X component) [cm].
+    int32 mean_ecef_x = 2;
+
+    // Current mean position in ECEF coordinates (Y component) [cm].
+    int32 mean_ecef_y = 3;
+
+    // Current mean position in ECEF coordinates (Z component) [cm].
+    int32 mean_ecef_z = 4;
+
+    // Mean variance of the position [mm^2].
+    uint32 mean_variance = 5;
+
+    // Number of observations until now.
+    uint32 num_observations = 6;
+
+    // Whether a valid position has been found.
+    bool valid = 7;
+
+    // Whether the survey in progress is still active.
+    bool active = 8;
+
+  } // SurveyIn
+
+  // Position information.
+  Position position = 1;
+
+  // Timing-related information, such as UTC time.
+  Timing timing = 2;
+
+  // GNSS hardware monitoring related information.
+  HardwareMonitoring hardware = 3;
+
+  // Version information.
+  Versions versions = 4;
+
+  // GNSS Survey-In (timing mode) related information.
+  SurveyIn survey_in = 5;
+
+} // GNSSInformation
+
+
+// Container for information about a sensor
+message SensorInformation {
+
+  // Sensor serial number (unique identifier of each device)
+  Sensor sensor = 1;
+
+  // GNSS info about the sensor
+  GNSSInformation gnss = 2;
+
+  // Time when GNSS info was last updated [UTC ms since Epoch].
+  uint64 gnss_information_last_seen = 3;
+
+  // Time when last message was received from this sensor [UTC ms since Epoch].
+  uint64 last_seen = 4;
+
+  // Human readable alias/name of sensor that was set in SecureTrack
+  string alias = 5;
+
+} // SensorInformation
+
+// Reference time that is used for the nanosecond timestamp in receptions
+enum TIMING_BASE {
+  // Not based on any time base
+  NO_BASE = 0;
+  // Clock advances with system clock, and is based on the system's uptime,
+  // i.e. advances monotonic. It only has 51 bit, thus resets each 2^51 ns,
+  // which is about 13 days.
+  SYSTEM_TIME = 1;
+  // Based on GPS Time of Week (ToW)
+  GPS_TOW = 2;
+}
+
+// Source used for timing by the respective receiver.
+enum TIMING_SYNC_SOURCE {
+  // No valid synchronization source or not within allowed bounds.
+  NO_SOURCE = 0;
+  // Synchronized to a Global Navigation Satellite System (GNSS) clock.
+  GNSS = 1;
+  // Synchronized using a (local) atomic clock.
+  ATOMIC_CLOCK = 2;
+}
+
+// Container for all metadata fields for a single Mode S downlink frame reception.
+message ReceptionMetadata {
+
+  // The serial number of the sensor that received this signal
+  Sensor sensor = 1;
+
+  // Timestamp when this frame was ingested by the server [ms since Unix epoch].
+  uint64 server_timestamp = 2;
+
+  // Timestamp when this reception was sent to the server by the sensor [ms since Unix epoch].
+  uint64 sensor_timestamp = 3;
+
+  // Timestamp in nanoseconds for the reception of this frame by the sensor. Usually this is GPT time of week (see
+  // timing_base below). Note that it is not UTC, so no leap seconds correction applied and the time starts over
+  // every week.
+  uint64 gnss_timestamp = 4;
+
+  // Noise level [dBm]
+  float noise_level = 6;
+
+  // Signal level [dBm]
+  float signal_level = 7;
+
+  // Carrier frequency offset from 1090 MHz [Hz]
+  float carrier_frequency_offset = 8;
+
+  // Timing base of the gnss_timestamp field
+  TIMING_BASE timing_base = 10;
+
+  // Timing synchronization source for the gnss_timestamp field
+  TIMING_SYNC_SOURCE timing_sync_source = 11;
+
+  // Number of exact detections in FPGA (quality indicator) or max uint (0xffffffff) if not available.
+  // Note that this field is almost never not set as most receiver use the "light" network protocol to save
+  // bandwidth and this field is not part of that protocol. Let us know if this is required.
+  uint32 num_duplicates = 12;
+
+  // Number of low confidence bits (quality indicator) or max uint (0xffffffff) if not available.
+  // Note that this field is almost never not set as most receiver use the "light" network protocol to save
+  // bandwidth and this field is not part of that protocol. Let us know if this is required.
+  uint32 num_low_confidence = 13;
+
+  // Number of bits corrected by FEC (quality indicator) or max uint (0xffffffff) if not available
+  uint32 num_corrected_bits = 14;
+
+} // ReceptionMetadata
+
+// Mode S reply
+message ModeSDownlinkFrame {
+
+  // Unique identifier for the transmitter of the signal (usually based on ICAO 24-bit transponder address)
+  Participant target = 1;
+
+  // Binary reply, either 7 or 14 bytes (short/long replies)
+  bytes reply = 2;
+
+  // Metadata for each reception of the signal by the different sensors
+  repeated ReceptionMetadata receptions = 3;
+
+  // Number of Mode S receptions that were dropped because client is not consuming data fast enough. This is an absolute
+  // counter. Monitor its value for change to detect missed data. Should you have issues, try to reduce the data
+  // volume by applying filters in the request and only receive the data you are really interested in. If issues
+  // persist, contact your PoC at SeRo.
+  uint64 dropped_frames = 4;
+
+} // ModeSDownlinkFrame
+
+////////////////////// REQUESTS /////////////////////////
+
+// Request for raw Mode S downlink data (signals plus metadata).
+message ModeSDownlinkFramesRequest {
+
+  // Token for user authentication. You need a token to access data. Contact your PoC at SeRo if you do not have a
+  // token yet.
+  string token = 1;
+
+  // Set of downlink formats that you want to retrieve. Please use filtering to decrease the data volume and only
+  // subscribe to the data you need. Leave filter empty to subscribe to all downlink formats.
+  repeated uint32 df_filter = 2;
+
+  // Set of sensors from which data will be provided in the stream. Please use filtering to decrease the data volume
+  // and only subscribe to the data you need. Leave filter empty to subscribe to data from all your sensors.
+  repeated Sensor sensor_filter = 3;
+
+  // Set of 24-bit ICAO transponder IDs for which you want to retrieve data. Please use filtering to decrease the
+  // data volume and only subscribe to the data you need. Leave filter empty to subscribe to all downlink formats.
+  repeated uint32 aircraft_filter = 4;
+
+} // ModeSDownlinkFramesRequest
+
+// Request for decoded information on targets (including MLAT)
+message TargetReportsRequest {
+
+  // Token for user authentication. You need a token to access data. Contact your PoC at SeRo if you do not have a
+  // token yet.
+  string token = 1;
+
+  // Set of sensors from which data will be provided in the stream. Please use filtering to decrease the data volume
+  // and only subscribe to the data you need. Leave filter empty to subscribe to data from all your sensors.
+  repeated Sensor sensor_filter = 2;
+
+  // Set of 24-bit ICAO transponder IDs for which you want to retrieve data. Please use filtering to decrease the
+  // data volume and only subscribe to the data you need. Leave filter empty to subscribe to all downlink formats.
+  repeated uint32 aircraft_filter = 4;
+
+} // TargetReportsRequest
+
+// Request for information about your sensors
+message SensorInfoRequest {
+
+  // Token for user authentication. You need a token to access data. Contact your PoC at SeRo if you do not have a
+  // token yet.
+  string token = 1;
+
+  // Sensors for which to retrieve info (leave empty to retrieve all)
+  repeated Sensor sensors = 2;
+}
+
+// Response object for sensor information
+message SensorInfoResponse {
+
+  // list of sensor info for all sensors
+  repeated SensorInformation sensorInfo = 1;
+
+}
+
+// API specification
+service SeRoAPI {
+
+  // Request a stream of Mode S downlink frames (matching the request) from the server.
+  // For reconfiguration, the call has to be cancelled.
+  // Returns UNAVAILABLE if the service is shutting down.
+  // Returns INVALID_ARGUMENT if request was invalid, see GetModeSDownlinkFramesRequest.
+  // Returns PERMISSION_DENIED if token is invalid or did not match list of sensors.
+  rpc GetModeSDownlinkFrames (ModeSDownlinkFramesRequest) returns (stream ModeSDownlinkFrame);
+
+  // Request a stream of target reports from the server. The reports have a temporal resolution
+  // of 1 second, i.e., they are generated for each target every second.
+  // For reconfiguration, the call has to be cancelled.
+  // Returns UNAVAILABLE if the service is shutting down.
+  // Returns INVALID_ARGUMENT if request was invalid, see GetModeSDownlinkFramesRequest.
+  // Returns PERMISSION_DENIED if token is invalid or did not match list of sensors.
+  rpc GetTargetReports (TargetReportsRequest) returns (stream TargetReport);
+
+  // Get a map with information on all sensors for a given token.
+  // Returns UNAVAILABLE if the DB was unavailable.
+  // Returns PERMISSION_DENIED if token is invalid.
+  rpc GetSensorInfo (SensorInfoRequest) returns (SensorInfoResponse) {}
+
+} // SeRoAPI
