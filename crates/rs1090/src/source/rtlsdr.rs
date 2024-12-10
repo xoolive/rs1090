@@ -88,25 +88,20 @@ pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
                         serial,
                         name: name.clone(),
                     };
-                    let mut tmsg = TimedMessage {
+                    let tmsg = TimedMessage {
                         timestamp: timestamp as f64 * 1e-6,
                         frame: data.msg.to_vec(),
                         message: None,
                         metadata: vec![metadata],
                         decode_time: None,
                     };
-                    if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0))
-                    {
-                        tmsg.message = Some(msg);
-                    }
-
                     if tx.send(tmsg).await.is_err() {
                         break 'receive;
                     }
                 }
             }
             Err(e) => {
-                eprintln!("SoapySDR read error: {}", e);
+                error!("SoapySDR read error: {}", e);
             }
         }
     }

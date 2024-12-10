@@ -53,25 +53,25 @@ pub async fn receiver(
     pin_mut!(msg_stream); // needed for iteration
     'receive: loop {
         while let Some(msg) = msg_stream.next().await {
-            let start = SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("SystemTime before unix epoch")
-                .as_secs_f64();
-            let mut tmsg = process_radarcape(&msg, serial, name.clone());
+            /*let start = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("SystemTime before unix epoch")
+            .as_secs_f64();*/
+            let tmsg = process_radarcape(&msg, serial, name.clone());
             info!("Received {}", tmsg);
-            if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0)) {
-                tmsg.decode_time = Some(
-                    SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .expect("SystemTime before unix epoch")
-                        .as_secs_f64()
-                        - start,
-                );
-                tmsg.message = Some(msg);
-                if tx.send(tmsg).await.is_err() {
-                    break 'receive;
-                }
+            /*if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0)) {
+            tmsg.decode_time = Some(
+                SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("SystemTime before unix epoch")
+                    .as_secs_f64()
+                    - start,
+            );
+            tmsg.message = Some(msg);*/
+            if tx.send(tmsg).await.is_err() {
+                break 'receive;
             }
+            //}
         }
     }
     Ok(())

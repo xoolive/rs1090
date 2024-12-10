@@ -9,6 +9,7 @@ use api::{
 };
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
@@ -39,6 +40,12 @@ async fn download_file(url: &str, destination: &PathBuf) -> Result<()> {
 pub async fn receiver(sero: SeroClient, tx: mpsc::Sender<TimedMessage>) {
     let mut stream = sero.rawstream().await.unwrap();
     let tx_copy = tx.clone();
+    let info = &sero.info().await.unwrap();
+    let sensor_map: HashMap<u64, String> = info
+        .sensor_info
+        .iter()
+        .map(|elt| (elt.sensor.unwrap().serial, elt.alias.to_string()))
+        .collect();
     tokio::spawn(async move {
         while let Some(response) = stream.next().await {
             if let Ok(msg) = response {
@@ -54,20 +61,22 @@ pub async fn receiver(sero: SeroClient, tx: mpsc::Sender<TimedMessage>) {
                         nanoseconds: Some(rm.gnss_timestamp),
                         rssi: Some(rm.signal_level as f64), // TODO makes sense as f32
                         serial: rm.sensor.unwrap().serial,
-                        name: Some("sero".to_string()),
+                        name: sensor_map
+                            .get(&rm.sensor.unwrap().serial)
+                            .cloned(),
                     })
                     .collect();
 
-                let mut tmsg = TimedMessage {
+                let tmsg = TimedMessage {
                     timestamp,
                     frame: bytes.to_vec(),
                     message: None,
                     metadata,
                     decode_time: None,
                 };
-                if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0)) {
-                    tmsg.message = Some(msg);
-                }
+                //if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0)) {
+                //    tmsg.message = Some(msg);
+                //}
                 if let Err(e) = tx_copy.send(tmsg).await {
                     error!("{}", e.to_string());
                 }
@@ -77,7 +86,7 @@ pub async fn receiver(sero: SeroClient, tx: mpsc::Sender<TimedMessage>) {
 }
 
 impl SeroClient {
-    pub async fn client(self) -> Result<SeRoApiClient<Channel>> {
+    pub async fn client(&self) -> Result<SeRoApiClient<Channel>> {
         let mut cache_path = dirs::cache_dir().unwrap_or_default();
         cache_path.push("jet1090");
         if !cache_path.exists() {
@@ -112,7 +121,7 @@ impl SeroClient {
         Ok(SeRoApiClient::new(channel))
     }
 
-    pub async fn info(self) -> Result<SensorInfoResponse> {
+    pub async fn info(&self) -> Result<SensorInfoResponse> {
         let request = tonic::Request::new(SensorInfoRequest {
             token: self.token.clone(),
             sensors: vec![],
@@ -125,7 +134,7 @@ impl SeroClient {
             .into_inner())
     }
 
-    pub async fn rawstream(self) -> Result<Streaming<ModeSDownlinkFrame>> {
+    pub async fn rawstream(&self) -> Result<Streaming<ModeSDownlinkFrame>> {
         let request = tonic::Request::new(ModeSDownlinkFramesRequest {
             token: self.token.clone(),
             df_filter: vec![17, 18, 20, 21],
