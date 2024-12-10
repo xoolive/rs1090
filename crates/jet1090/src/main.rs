@@ -442,13 +442,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             app_dec.lock().await.should_clear = true;
             first_msg = false;
         }
-
         let mut reference =
             match msg.metadata.first().map(|metadata| metadata.serial) {
                 None => None,
                 Some(serial) => {
                     let sources = &app_dec.lock().await.sources;
-                    sources[serial as usize].reference
+                    match sources.get(serial as usize) {
+                        None => None,
+                        Some(src) => src.reference,
+                    }
                 }
             };
 
@@ -584,8 +586,11 @@ impl Jet1090 {
         }
         for vector in self.state_vectors.values_mut() {
             for sensor in &vector.cur.metadata {
-                self.sources[sensor.serial as usize].count += 1;
-                self.sources[sensor.serial as usize].last = vector.cur.last
+                if let Some(src) = self.sources.get_mut(sensor.serial as usize)
+                {
+                    src.count += 1;
+                    src.last = vector.cur.last
+                }
             }
         }
     }

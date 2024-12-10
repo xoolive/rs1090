@@ -10,14 +10,27 @@ use tokio::sync::mpsc::Sender;
 use tracing::error;
 use url::Url;
 
+// An intermediate structure defined so that you can keep your Sero entries in
+// your configuration file even if the sero feature is not activated
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SeroParams {
+    pub token: String,
+}
+
+#[cfg(feature = "sero")]
+impl From<SeroParams> for SeroClient {
+    fn from(value: SeroParams) -> Self {
+        SeroClient { token: value.token }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Address {
     Tcp(String),
     Udp(String),
     Websocket(String),
     Rtlsdr(Option<String>),
-    #[cfg(feature = "sero")]
-    Sero(SeroClient),
+    Sero(SeroParams),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,26 +126,44 @@ impl Source {
             #[cfg(feature = "sero")]
             {
                 if let Address::Sero(sero) = self.address.clone() {
-                    let mut stream = sero.rawstream().await.unwrap();
+                    let mut stream =
+                        SeroClient::from(sero).rawstream().await.unwrap();
                     let tx_copy = tx.clone();
                     tokio::spawn(async move {
                         while let Some(response) = stream.next().await {
                             if let Ok(msg) = response {
                                 let bytes = msg.reply.as_slice();
-                                if let Err(e) = tx_copy
-                                    .send(TimedMessage {
-                                        timestamp: msg.receptions[0]
-                                            .sensor_timestamp
+                                let timestamp =
+                                    msg.receptions[0].sensor_timestamp as f64
+                                        * 1e-3;
+                                let metadata = msg
+                                    .receptions
+                                    .into_iter()
+                                    .map(|rm| SensorMetadata {
+                                        system_timestamp: rm.sensor_timestamp
                                             as f64
                                             * 1e-3,
-                                        timesource: rs1090::decode::TimeSource::Radarcape,
-                                        rssi: None,
-                                        frame: hex::encode(bytes),
-                                        message: None,
-                                        idx: 0,
+                                        gnss_timestamp: None, // TODO gnss_timestamp
+                                        nanoseconds: Some(rm.gnss_timestamp),
+                                        rssi: Some(rm.signal_level as f64), // TODO makes sense as f32
+                                        serial: rm.sensor.unwrap().serial,
+                                        name: Some("sero".to_string()),
                                     })
-                                    .await
+                                    .collect();
+
+                                let mut tmsg = TimedMessage {
+                                    timestamp,
+                                    frame: bytes.to_vec(),
+                                    message: None,
+                                    metadata,
+                                    decode_time: None,
+                                };
+                                if let Ok((_, msg)) =
+                                    Message::from_bytes((&tmsg.frame, 0))
                                 {
+                                    tmsg.message = Some(msg);
+                                }
+                                if let Err(e) = tx_copy.send(tmsg).await {
                                     error!("{}", e.to_string());
                                 }
                             }
