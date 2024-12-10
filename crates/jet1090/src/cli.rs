@@ -1,10 +1,11 @@
 use std::str::FromStr;
 
 use radarcape::BeastSource;
-use rs1090::decode::{cpr::Position, TimedMessage};
 use rs1090::prelude::*;
+#[cfg(feature = "rtlsdr")]
+use rs1090::source::rtlsdr;
 #[cfg(feature = "sero")]
-use rs1090::source::sero::SeroClient;
+use rs1090::source::sero;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tracing::error;
@@ -18,9 +19,11 @@ pub struct SeroParams {
 }
 
 #[cfg(feature = "sero")]
-impl From<SeroParams> for SeroClient {
-    fn from(value: SeroParams) -> Self {
-        SeroClient { token: value.token }
+impl From<&SeroParams> for sero::SeroClient {
+    fn from(value: &SeroParams) -> Self {
+        sero::SeroClient {
+            token: value.token.clone(),
+        }
     }
 }
 
@@ -107,81 +110,43 @@ impl Source {
         serial: u64,
         name: Option<String>,
     ) {
-        if let Address::Rtlsdr(args) = &self.address {
-            #[cfg(not(feature = "rtlsdr"))]
-            {
-                error!(
-                    "rtlsdr://{} ignored",
-                    args.clone().unwrap_or("".to_string())
-                );
-                eprintln!("Compile jet1090 with the rtlsdr feature");
-                std::process::exit(127);
-            }
-            #[cfg(feature = "rtlsdr")]
-            {
-                rtlsdr::receiver::<&str>(tx, args.as_deref(), serial, name)
-                    .await
-            }
-        } else {
-            #[cfg(feature = "sero")]
-            {
-                if let Address::Sero(sero) = self.address.clone() {
-                    let mut stream =
-                        SeroClient::from(sero).rawstream().await.unwrap();
-                    let tx_copy = tx.clone();
-                    tokio::spawn(async move {
-                        while let Some(response) = stream.next().await {
-                            if let Ok(msg) = response {
-                                let bytes = msg.reply.as_slice();
-                                let timestamp =
-                                    msg.receptions[0].sensor_timestamp as f64
-                                        * 1e-3;
-                                let metadata = msg
-                                    .receptions
-                                    .into_iter()
-                                    .map(|rm| SensorMetadata {
-                                        system_timestamp: rm.sensor_timestamp
-                                            as f64
-                                            * 1e-3,
-                                        gnss_timestamp: None, // TODO gnss_timestamp
-                                        nanoseconds: Some(rm.gnss_timestamp),
-                                        rssi: Some(rm.signal_level as f64), // TODO makes sense as f32
-                                        serial: rm.sensor.unwrap().serial,
-                                        name: Some("sero".to_string()),
-                                    })
-                                    .collect();
-
-                                let mut tmsg = TimedMessage {
-                                    timestamp,
-                                    frame: bytes.to_vec(),
-                                    message: None,
-                                    metadata,
-                                    decode_time: None,
-                                };
-                                if let Ok((_, msg)) =
-                                    Message::from_bytes((&tmsg.frame, 0))
-                                {
-                                    tmsg.message = Some(msg);
-                                }
-                                if let Err(e) = tx_copy.send(tmsg).await {
-                                    error!("{}", e.to_string());
-                                }
-                            }
-                        }
-                    });
-                    return;
+        match &self.address {
+            Address::Rtlsdr(args) => {
+                #[cfg(not(feature = "rtlsdr"))]
+                {
+                    error!("Compile jet1090 with the rtlsdr feature, {:?} argument ignored", args);
+                    std::process::exit(127);
+                }
+                #[cfg(feature = "rtlsdr")]
+                {
+                    rtlsdr::receiver::<&str>(tx, args.as_deref(), serial, name)
+                        .await
                 }
             }
-            let server_address = match &self.address {
-                Address::Tcp(s) => BeastSource::TCP(s.to_owned()),
-                Address::Udp(s) => BeastSource::UDP(s.to_owned()),
-                Address::Websocket(s) => BeastSource::Websocket(s.to_owned()),
-                _ => unreachable!(),
-            };
-            if let Err(e) =
-                radarcape::receiver(server_address, tx, serial, name).await
-            {
-                error!("{}", e.to_string());
+            Address::Sero(sero) => {
+                #[cfg(not(feature = "sero"))]
+                {
+                    error!("Compile jet1090 with the sero feature, {:?} argument ignored", sero);
+                }
+                #[cfg(feature = "sero")]
+                {
+                    sero::receiver(sero::SeroClient::from(sero), tx).await
+                }
+            }
+            _ => {
+                let server_address = match &self.address {
+                    Address::Tcp(s) => BeastSource::TCP(s.to_owned()),
+                    Address::Udp(s) => BeastSource::UDP(s.to_owned()),
+                    Address::Websocket(s) => {
+                        BeastSource::Websocket(s.to_owned())
+                    }
+                    _ => unreachable!(),
+                };
+                if let Err(e) =
+                    radarcape::receiver(server_address, tx, serial, name).await
+                {
+                    error!("{}", e.to_string());
+                }
             }
         }
     }

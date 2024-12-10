@@ -3,21 +3,23 @@ mod api {
     tonic::include_proto!("serosystems.proto.v3.backend.api");
 }
 
-use std::path::PathBuf;
-
 use api::{
     se_ro_api_client::SeRoApiClient, ModeSDownlinkFrame,
     ModeSDownlinkFramesRequest, SensorInfoRequest, SensorInfoResponse,
 };
 use serde::Deserialize;
 use serde::Serialize;
+use std::path::PathBuf;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
+use tokio::sync::mpsc;
 use tonic::{
     transport::{Certificate, Channel, ClientTlsConfig},
     Streaming,
 };
-use tracing::info;
+use tracing::{error, info};
+
+use crate::prelude::*;
 
 type Result<T> =
     std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
@@ -32,6 +34,46 @@ async fn download_file(url: &str, destination: &PathBuf) -> Result<()> {
     let mut file = File::create(destination).await?;
     file.write_all(&response).await?;
     Ok(())
+}
+
+pub async fn receiver(sero: SeroClient, tx: mpsc::Sender<TimedMessage>) {
+    let mut stream = sero.rawstream().await.unwrap();
+    let tx_copy = tx.clone();
+    tokio::spawn(async move {
+        while let Some(response) = stream.next().await {
+            if let Ok(msg) = response {
+                let bytes = msg.reply.as_slice();
+                let timestamp =
+                    msg.receptions[0].sensor_timestamp as f64 * 1e-3;
+                let metadata = msg
+                    .receptions
+                    .into_iter()
+                    .map(|rm| SensorMetadata {
+                        system_timestamp: rm.sensor_timestamp as f64 * 1e-3,
+                        gnss_timestamp: None, // TODO gnss_timestamp
+                        nanoseconds: Some(rm.gnss_timestamp),
+                        rssi: Some(rm.signal_level as f64), // TODO makes sense as f32
+                        serial: rm.sensor.unwrap().serial,
+                        name: Some("sero".to_string()),
+                    })
+                    .collect();
+
+                let mut tmsg = TimedMessage {
+                    timestamp,
+                    frame: bytes.to_vec(),
+                    message: None,
+                    metadata,
+                    decode_time: None,
+                };
+                if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0)) {
+                    tmsg.message = Some(msg);
+                }
+                if let Err(e) = tx_copy.send(tmsg).await {
+                    error!("{}", e.to_string());
+                }
+            }
+        }
+    });
 }
 
 impl SeroClient {
