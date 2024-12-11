@@ -8,7 +8,7 @@ use tracing::info;
 pub async fn deduplicate_messages(
     mut rx: mpsc::Receiver<TimedMessage>,
     tx: mpsc::Sender<TimedMessage>,
-    deduplication_threshold: u128,
+    dedup_threshold: u32,
 ) {
     let mut cache: HashMap<Vec<u8>, Vec<TimedMessage>> = HashMap::new();
     let mut expiration_heap: BinaryHeap<Reverse<(u128, Vec<u8>)>> =
@@ -24,7 +24,7 @@ pub async fn deduplicate_messages(
         // Push the expiration timestamp into the heap
         if cache[&frame].len() == 1 {
             expiration_heap.push(Reverse((
-                timestamp_ms + deduplication_threshold,
+                timestamp_ms + dedup_threshold as u128,
                 frame.clone(),
             )));
         }

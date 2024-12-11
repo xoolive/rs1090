@@ -1,11 +1,11 @@
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use num_complex::Complex;
 use soapysdr::{Args, Device, Direction};
 use tokio::sync::mpsc;
 
 use crate::decode::crc::modes_checksum;
+use crate::decode::time::now_in_ns;
 use crate::prelude::*;
 use std::fmt::{self, Display, Formatter};
 use tracing::{error, info};
@@ -75,21 +75,17 @@ pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
                 let outbuf = magnitude(buf);
                 let resulting_data = demodulate2400(&outbuf).unwrap();
                 for data in resulting_data {
-                    let timestamp = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .expect("SystemTime before unix epoch")
-                        .as_micros();
-
+                    let system_timestamp = now_in_ns() as f64 * 1e-9;
                     let metadata = SensorMetadata {
-                        system_timestamp: timestamp as f64 * 1e-6,
+                        system_timestamp,
                         gnss_timestamp: None,
                         nanoseconds: None,
-                        rssi: Some(10. * data.signal_level.log10()),
+                        rssi: Some(10. * data.signal_level.log10() as f32),
                         serial,
                         name: name.clone(),
                     };
                     let tmsg = TimedMessage {
-                        timestamp: timestamp as f64 * 1e-6,
+                        timestamp: system_timestamp,
                         frame: data.msg.to_vec(),
                         message: None,
                         metadata: vec![metadata],

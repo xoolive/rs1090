@@ -68,6 +68,10 @@ struct Options {
     #[arg(short, long, default_value=None)]
     update_position: bool,
 
+    /// When performing deduplication, after how long to dump deduplicated messages (time in ms)
+    #[arg(long, default_value = "400")]
+    deduplication: Option<u32>,
+
     #[arg(long)]
     stats: Option<bool>,
 
@@ -183,6 +187,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if cli_options.stats.is_some() {
         options.stats = cli_options.stats;
+    }
+    if cli_options.deduplication.is_some() {
+        options.deduplication = cli_options.deduplication;
     }
     if options.stats.unwrap_or(false) {
         serialize_decode_time();
@@ -419,7 +426,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     tokio::spawn(async move {
-        dedup::deduplicate_messages(rx, tx_dedup, 400).await;
+        dedup::deduplicate_messages(
+            rx,
+            tx_dedup,
+            options.deduplication.unwrap_or(400),
+        )
+        .await;
     });
 
     // If we choose to update the reference (only useful for surface positions)

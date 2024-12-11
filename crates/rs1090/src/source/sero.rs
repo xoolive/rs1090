@@ -20,6 +20,9 @@ use tonic::{
 };
 use tracing::{error, info};
 
+use crate::decode::time::now_in_ns;
+use crate::decode::time::since_gps_week_to_since_today;
+use crate::decode::time::since_gps_week_to_unix_s;
 use crate::prelude::*;
 
 type Result<T> =
@@ -50,16 +53,19 @@ pub async fn receiver(sero: SeroClient, tx: mpsc::Sender<TimedMessage>) {
         while let Some(response) = stream.next().await {
             if let Ok(msg) = response {
                 let bytes = msg.reply.as_slice();
-                let timestamp =
-                    msg.receptions[0].sensor_timestamp as f64 * 1e-3;
+                let system_timestamp = now_in_ns() as f64 * 1e-9;
                 let metadata = msg
                     .receptions
                     .into_iter()
                     .map(|rm| SensorMetadata {
-                        system_timestamp: rm.sensor_timestamp as f64 * 1e-3,
-                        gnss_timestamp: None, // TODO gnss_timestamp
-                        nanoseconds: Some(rm.gnss_timestamp),
-                        rssi: Some(rm.signal_level as f64), // TODO makes sense as f32
+                        system_timestamp,
+                        gnss_timestamp: Some(since_gps_week_to_unix_s(
+                            rm.gnss_timestamp,
+                        )),
+                        nanoseconds: Some(since_gps_week_to_since_today(
+                            rm.gnss_timestamp,
+                        )),
+                        rssi: Some(rm.signal_level),
                         serial: rm.sensor.unwrap().serial,
                         name: sensor_map
                             .get(&rm.sensor.unwrap().serial)
@@ -68,15 +74,12 @@ pub async fn receiver(sero: SeroClient, tx: mpsc::Sender<TimedMessage>) {
                     .collect();
 
                 let tmsg = TimedMessage {
-                    timestamp,
+                    timestamp: system_timestamp,
                     frame: bytes.to_vec(),
                     message: None,
                     metadata,
                     decode_time: None,
                 };
-                //if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0)) {
-                //    tmsg.message = Some(msg);
-                //}
                 if let Err(e) = tx_copy.send(tmsg).await {
                     error!("{}", e.to_string());
                 }
