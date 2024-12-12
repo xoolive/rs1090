@@ -1,6 +1,6 @@
 [package]
 name = "jet1090"
-description = "Real-time Mode S and ADS-B data with REST and ZMQ endpoints"
+description = "A real-time comprehensive Mode S and ADS-B data decoder"
 repository = "https://github.com/xoolive/rs1090"
 keywords = ["aircraft", "ADS-B", "Mode-S", "decoding"]
 readme = "readme.md"
