@@ -1,22 +1,23 @@
 #![doc = include_str!("../readme.md")]
 
 mod aircraftdb;
-mod cli;
 mod dedup;
+mod sensor;
 mod snapshot;
+mod source;
 mod table;
 mod tui;
 mod web;
 
 use clap::{Command, CommandFactory, Parser, ValueHint};
 use clap_complete::{generate, Generator, Shell};
-use cli::Source;
 use crossterm::event::KeyCode;
 use ratatui::widgets::*;
 use redis::AsyncCommands;
 use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::decode::serialize_decode_time;
 use rs1090::prelude::*;
+use sensor::Sensor;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::io;
@@ -68,6 +69,10 @@ struct Options {
     #[arg(short, long, default_value=None)]
     update_position: bool,
 
+    /// When performing deduplication, after how long to dump deduplicated messages (time in ms)
+    #[arg(long, default_value = "450")]
+    deduplication: Option<u32>,
+
     #[arg(long)]
     stats: Option<bool>,
 
@@ -81,7 +86,7 @@ struct Options {
     // - `host` can be a DNS name, an IP address or `rtlsdr` (for RTL-SDR dongles)
     // - `port` must be a number
     // - `reference` can be LFPG for major airports, `43.3,1.35` otherwise
-    sources: Vec<cli::Source>,
+    sources: Vec<source::Source>,
 
     #[cfg(feature = "rtlsdr")]
     /// List the detected devices, for now, only --discover rtlsdr is fully supported
@@ -184,6 +189,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli_options.stats.is_some() {
         options.stats = cli_options.stats;
     }
+    if cli_options.deduplication.is_some() {
+        options.deduplication = cli_options.deduplication;
+    }
     if options.stats.unwrap_or(false) {
         serialize_decode_time();
     }
@@ -275,8 +283,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut events = tui::EventHandler::new(width);
 
+    let mut references = BTreeMap::<u64, Option<Position>>::new();
+    let mut sensors = BTreeMap::<u64, Sensor>::new();
+    for source in options.sources.iter() {
+        for sensor in sensor::sensors(source).await {
+            references.insert(sensor.serial, sensor.reference);
+            sensors.insert(sensor.serial, sensor);
+        }
+    }
     let app_tui = Arc::new(Mutex::new(Jet1090 {
-        sources: options.sources.clone(),
+        sensors,
         items: Vec::new(),
         state: TableState::default().with_selected(0),
         scroll_state: ScrollbarState::new(0),
@@ -380,11 +396,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                 );
 
-            let app_receivers = app_web.clone();
-            let receivers = warp::path("receivers")
-                .and(warp::any().map(move || app_receivers.clone()))
+            let app_sensors = app_web.clone();
+            let sensors = warp::path("sensors")
+                .and(warp::any().map(move || app_sensors.clone()))
                 .and_then(|app: Arc<Mutex<Jet1090>>| async move {
-                    web::receivers(&app).await
+                    web::sensors(&app).await
                 });
 
             let cors = warp::cors()
@@ -393,7 +409,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .allow_methods(vec!["GET"]);
 
             let routes = warp::get()
-                .and(home.or(all).or(track).or(receivers))
+                .and(home.or(all).or(track).or(sensors))
                 .recover(web::handle_rejection)
                 .with(cors);
 
@@ -403,23 +419,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // I am not sure whether this size calibration is relevant, but let's try...
     // adding one in order to avoid the stupid error when you set a size = 0
-    let multiplier = options.sources.len();
+    let multiplier = references.len();
     let (tx, rx) = tokio::sync::mpsc::channel(100 * multiplier + 1);
     let (tx_dedup, mut rx_dedup) =
         tokio::sync::mpsc::channel(100 * multiplier + 1);
 
-    let sources = app_dec.lock().await.sources.clone();
-    for (serial, source) in sources.into_iter().enumerate() {
+    for source in options.sources.into_iter() {
+        let serial = source.serial();
         let tx_copy = tx.clone();
         tokio::spawn(async move {
-            source
-                .receiver(tx_copy, serial as u64, source.name.clone())
-                .await;
+            source.receiver(tx_copy, serial, source.name.clone()).await;
         });
     }
 
     tokio::spawn(async move {
-        dedup::deduplicate_messages(rx, tx_dedup, 400).await;
+        dedup::deduplicate_messages(
+            rx,
+            tx_dedup,
+            options.deduplication.unwrap_or(450),
+        )
+        .await;
     });
 
     // If we choose to update the reference (only useful for surface positions)
@@ -443,46 +462,62 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             first_msg = false;
         }
 
-        let mut reference =
-            match msg.metadata.first().map(|metadata| metadata.serial) {
-                None => None,
-                Some(serial) => {
-                    let sources = &app_dec.lock().await.sources;
-                    sources[serial as usize].reference
-                }
-            };
-
         if let Some(message) = &mut msg.message {
             match &mut message.df {
-                ExtendedSquitterADSB(adsb) => decode_position(
-                    &mut adsb.message,
-                    msg.timestamp,
-                    &adsb.icao24,
-                    &mut aircraft,
-                    &mut reference,
-                    &update_reference,
-                ),
-                ExtendedSquitterTisB { cf, .. } => decode_position(
-                    &mut cf.me,
-                    msg.timestamp,
-                    &cf.aa,
-                    &mut aircraft,
-                    &mut reference,
-                    &update_reference,
-                ),
+                ExtendedSquitterADSB(adsb) => match adsb.message {
+                    ME::BDS05(_) | ME::BDS06(_) => {
+                        let serial = msg
+                            .metadata
+                            .first()
+                            .map(|meta| meta.serial)
+                            .unwrap();
+                        let mut reference = references[&serial];
+
+                        decode_position(
+                            &mut adsb.message,
+                            msg.timestamp,
+                            &adsb.icao24,
+                            &mut aircraft,
+                            &mut reference,
+                            &update_reference,
+                        );
+
+                        // References may have been modified.
+                        // With static receivers, we don't care; for dynamic ones, we may
+                        // want to update the reference position.
+                        if options.update_position {
+                            for meta in &msg.metadata {
+                                let _ =
+                                    references.insert(meta.serial, reference);
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                ExtendedSquitterTisB { cf, .. } => match cf.me {
+                    ME::BDS05(_) | ME::BDS06(_) => {
+                        let serial = msg
+                            .metadata
+                            .first()
+                            .map(|meta| meta.serial)
+                            .unwrap();
+
+                        let mut reference = references[&serial];
+
+                        decode_position(
+                            &mut cf.me,
+                            msg.timestamp,
+                            &cf.aa,
+                            &mut aircraft,
+                            &mut reference,
+                            &update_reference,
+                        )
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
         };
-
-        // References may have been modified.
-        // With static receivers, we don't care; for dynamic ones, we may
-        // want to update the reference position.
-        if options.update_position {
-            let sources = &mut app_dec.lock().await.sources;
-            for serial in &msg.metadata {
-                sources[serial.serial as usize].reference = reference;
-            }
-        }
 
         snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
 
@@ -514,7 +549,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Debug, Default)]
 pub struct Jet1090 {
-    sources: Vec<Source>,
+    sensors: BTreeMap<u64, Sensor>,
     state: TableState,
     items: Vec<String>,
     scroll_state: ScrollbarState,
@@ -579,13 +614,15 @@ fn update(
 
 impl Jet1090 {
     pub fn receivers(&mut self) {
-        for source in &mut self.sources {
-            source.count = 0;
+        for sensor in self.sensors.values_mut() {
+            sensor.count = 0;
         }
         for vector in self.state_vectors.values_mut() {
             for sensor in &vector.cur.metadata {
-                self.sources[sensor.serial as usize].count += 1;
-                self.sources[sensor.serial as usize].last = vector.cur.last
+                if let Some(src) = self.sensors.get_mut(&sensor.serial) {
+                    src.count += 1;
+                    src.last = vector.cur.last
+                }
             }
         }
     }

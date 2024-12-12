@@ -4,6 +4,7 @@ pub mod commb;
 pub mod cpr;
 pub mod crc;
 pub mod flarm;
+pub mod time;
 
 use adsb::{ADSB, ME};
 use commb::{DF20DataSelector, DF21DataSelector};
@@ -486,7 +487,7 @@ pub struct SensorMetadata {
     pub nanoseconds: Option<u64>,
     /// The signal level
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub rssi: Option<f64>,
+    pub rssi: Option<f32>,
     /// The identifier of the receptor
     pub serial: u64,
     /// A possible name for the receptor

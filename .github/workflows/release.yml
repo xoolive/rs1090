@@ -144,9 +144,15 @@ jobs:
         if: ${{ matrix.runner == 'windows-2019' }}
         shell: bash
         run: |
+          # Pothos SDR (soapy)
           curl -L https://downloads.myriadrf.org/builds/PothosSDR/PothosSDR-2021.07.25-vc16-x64.exe -o pothossdr.exe
           7z x -opothos -y pothossdr.exe
           echo "${{github.workspace}}/pothos/bin" >> $GITHUB_PATH
+          # protobuf compiler
+          curl -L https://github.com/protocolbuffers/protobuf/releases/download/v28.3/protoc-28.3-win64.zip -o protoc.zip
+          mkdir protoc 
+          tar -xf protoc.zip -C protoc
+          echo "${{github.workspace}}/protoc/bin" >> $GITHUB_PATH
           # for pkg-config?
           echo "C:\\msys64\\mingw64\\bin" >> $GITHUB_PATH
       - name: Build artifacts

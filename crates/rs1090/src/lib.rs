@@ -20,7 +20,9 @@ pub mod prelude {
     /// The root structure to decode messages
     pub use crate::decode::Message;
     pub use crate::decode::DF::*;
-    pub use crate::decode::{SensorMetadata, TimedMessage, ICAO};
+    pub use crate::decode::{
+        cpr::Position, SensorMetadata, TimedMessage, ICAO,
+    };
 
     /// This re-export is necessary for the following export
     pub use futures_util::stream::StreamExt;

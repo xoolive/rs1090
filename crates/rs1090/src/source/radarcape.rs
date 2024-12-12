@@ -1,8 +1,8 @@
+use crate::decode::time::{now_in_ns, since_today_to_nanos};
 use crate::prelude::*;
 use crate::source::beast::DataSource;
 use futures_util::pin_mut;
 use std::io;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::net::{TcpStream, UdpSocket};
 use tokio::sync::mpsc;
 use tokio_tungstenite::connect_async;
@@ -53,39 +53,14 @@ pub async fn receiver(
     pin_mut!(msg_stream); // needed for iteration
     'receive: loop {
         while let Some(msg) = msg_stream.next().await {
-            let start = SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("SystemTime before unix epoch")
-                .as_secs_f64();
-            let mut tmsg = process_radarcape(&msg, serial, name.clone());
+            let tmsg = process_radarcape(&msg, serial, name.clone());
             info!("Received {}", tmsg);
-            if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0)) {
-                tmsg.decode_time = Some(
-                    SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .expect("SystemTime before unix epoch")
-                        .as_secs_f64()
-                        - start,
-                );
-                tmsg.message = Some(msg);
-                if tx.send(tmsg).await.is_err() {
-                    break 'receive;
-                }
+            if tx.send(tmsg).await.is_err() {
+                break 'receive;
             }
         }
     }
     Ok(())
-}
-
-fn now() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("SystemTime before unix epoch")
-        .as_micros()
-}
-
-fn today(now: u128) -> u128 {
-    86_400 * (now / 86_400)
 }
 
 fn process_radarcape(
@@ -98,25 +73,27 @@ fn process_radarcape(
     array[2..8].copy_from_slice(&msg[2..8]);
 
     let ts_u64 = u64::from_be_bytes(array);
-    let seconds = ts_u64 >> 30;
+    let seconds = ts_u64 as u128 >> 30;
     let nanos = ts_u64 & 0x00003FFFFFFF;
-    let ts = seconds as f64 + nanos as f64 * 1e-9;
+    let timestamp_in_s =
+        since_today_to_nanos(seconds * 1_000_000_000 + nanos as u128) as f64
+            * 1e-9;
+
+    let system_timestamp = now_in_ns() as f64 * 1e-9;
+
+    let gnss_timestamp = match (system_timestamp - timestamp_in_s).abs() {
+        value if value < 3600. => Some(timestamp_in_s),
+        _ => None,
+    };
 
     let rssi = if msg[8] == 0xff { None } else { Some(msg[8]) };
     let rssi = rssi.map(|v| v as f64 / 255.);
-    let rssi = rssi.map(|v| 10. * (v * v).log10());
-
-    let now_u128 = now();
-    let now = now_u128 as f64 * 1e-6;
-    let timestamp = today(now_u128 / 1_000_000) as f64 + ts;
+    let rssi = rssi.map(|v| 10. * (v * v).log10() as f32);
 
     // In some cases, the timestamp is just the one of dump1090, so forget it!
     let metadata = SensorMetadata {
-        system_timestamp: now,
-        gnss_timestamp: match (now - timestamp).abs() {
-            value if value < 3600. => Some(timestamp),
-            _ => None,
-        },
+        system_timestamp,
+        gnss_timestamp,
         nanoseconds: Some(ts_u64),
         rssi,
         serial,
@@ -124,7 +101,7 @@ fn process_radarcape(
     };
 
     TimedMessage {
-        timestamp: metadata.gnss_timestamp.unwrap_or(metadata.system_timestamp),
+        timestamp: metadata.system_timestamp,
         frame: msg[9..].to_vec(),
         message: None,
         metadata: vec![metadata],

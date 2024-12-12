@@ -1,13 +1,14 @@
-use rs1090::decode::{SensorMetadata, TimedMessage};
+use rs1090::prelude::*;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
+use std::time::SystemTime;
 use tokio::sync::mpsc;
 use tracing::info;
 
 pub async fn deduplicate_messages(
     mut rx: mpsc::Receiver<TimedMessage>,
     tx: mpsc::Sender<TimedMessage>,
-    deduplication_threshold: u128,
+    dedup_threshold: u32,
 ) {
     let mut cache: HashMap<Vec<u8>, Vec<TimedMessage>> = HashMap::new();
     let mut expiration_heap: BinaryHeap<Reverse<(u128, Vec<u8>)>> =
@@ -23,7 +24,7 @@ pub async fn deduplicate_messages(
         // Push the expiration timestamp into the heap
         if cache[&frame].len() == 1 {
             expiration_heap.push(Reverse((
-                timestamp_ms + deduplication_threshold,
+                timestamp_ms + dedup_threshold as u128,
                 frame.clone(),
             )));
         }
@@ -43,11 +44,27 @@ pub async fn deduplicate_messages(
                     .flat_map(|entry| entry.metadata.clone())
                     .collect();
 
-                let mut msg = entries.remove(0);
-                msg.metadata = merged_metadata;
+                let mut tmsg = entries.remove(0);
+                tmsg.metadata = merged_metadata;
 
-                if let Err(e) = tx.send(msg).await {
-                    info!("Failed to send deduplicated entries: {}", e);
+                let start = SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("SystemTime before unix epoch")
+                    .as_secs_f64();
+
+                if let Ok((_, msg)) = Message::from_bytes((&tmsg.frame, 0)) {
+                    tmsg.decode_time = Some(
+                        SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .expect("SystemTime before unix epoch")
+                            .as_secs_f64()
+                            - start,
+                    );
+                    tmsg.message = Some(msg);
+
+                    if let Err(e) = tx.send(tmsg).await {
+                        info!("Failed to send deduplicated entries: {}", e);
+                    }
                 }
             }
         }

@@ -12,6 +12,7 @@ homepage.workspace = true
 
 [features]
 rtlsdr = ['rs1090/rtlsdr']
+sero = ['rs1090/sero']
 
 [dependencies]
 chrono = "0.4.37"

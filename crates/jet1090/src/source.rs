@@ -1,12 +1,36 @@
-use std::str::FromStr;
-
 use radarcape::BeastSource;
-use rs1090::decode::{cpr::Position, TimedMessage};
 use rs1090::prelude::*;
+#[cfg(feature = "rtlsdr")]
+use rs1090::source::rtlsdr;
+#[cfg(feature = "sero")]
+use rs1090::source::sero;
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 use tokio::sync::mpsc::Sender;
 use tracing::error;
 use url::Url;
+
+// An intermediate structure defined so that you can keep your Sero entries in
+// your configuration file even if the sero feature is not activated
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SeroParams {
+    pub token: String,
+    pub df_filter: Option<Vec<u32>>,
+    pub aircraft_filter: Option<Vec<u32>>,
+}
+
+#[cfg(feature = "sero")]
+impl From<&SeroParams> for sero::SeroClient {
+    fn from(value: &SeroParams) -> Self {
+        sero::SeroClient {
+            token: value.token.clone(),
+            df_filter: value.df_filter.clone().unwrap_or_default(),
+            aircraft_filter: value.aircraft_filter.clone().unwrap_or_default(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Address {
@@ -14,17 +38,38 @@ pub enum Address {
     Udp(String),
     Websocket(String),
     Rtlsdr(Option<String>),
+    Sero(SeroParams),
+}
+
+fn build_serial(input: &str) -> u64 {
+    // Create a hasher
+    let mut hasher = DefaultHasher::new();
+    // Hash the string
+    input.hash(&mut hasher);
+    // Get the hash as a u64
+    hasher.finish()
+}
+
+impl Source {
+    pub fn serial(&self) -> u64 {
+        match &self.address {
+            Address::Tcp(name) => build_serial(name),
+            Address::Udp(name) => build_serial(name),
+            Address::Websocket(name) => build_serial(name),
+            Address::Rtlsdr(reference) => {
+                let name = reference.clone().unwrap_or("rtlsdr".to_string());
+                build_serial(&name)
+            }
+            Address::Sero(_) => 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {
-    address: Address,
+    pub address: Address,
     pub name: Option<String>,
     pub reference: Option<Position>,
-    #[serde(skip)]
-    pub count: u64,
-    #[serde(skip)]
-    pub last: u64,
 }
 
 impl FromStr for Source {
@@ -71,8 +116,6 @@ impl FromStr for Source {
             address,
             name: None,
             reference: None,
-            count: 0,
-            last: 0,
         };
 
         if let Some(query) = url.query() {
@@ -90,32 +133,43 @@ impl Source {
         serial: u64,
         name: Option<String>,
     ) {
-        if let Address::Rtlsdr(args) = &self.address {
-            #[cfg(not(feature = "rtlsdr"))]
-            {
-                error!(
-                    "rtlsdr://{} ignored",
-                    args.clone().unwrap_or("".to_string())
-                );
-                eprintln!("Compile jet1090 with the rtlsdr feature");
-                std::process::exit(127);
+        match &self.address {
+            Address::Rtlsdr(args) => {
+                #[cfg(not(feature = "rtlsdr"))]
+                {
+                    error!("Compile jet1090 with the rtlsdr feature, {:?} argument ignored", args);
+                    std::process::exit(127);
+                }
+                #[cfg(feature = "rtlsdr")]
+                {
+                    rtlsdr::receiver::<&str>(tx, args.as_deref(), serial, name)
+                        .await
+                }
             }
-            #[cfg(feature = "rtlsdr")]
-            {
-                rtlsdr::receiver::<&str>(tx, args.as_deref(), serial, name)
-                    .await
+            Address::Sero(sero) => {
+                #[cfg(not(feature = "sero"))]
+                {
+                    error!("Compile jet1090 with the sero feature, {:?} argument ignored", sero);
+                }
+                #[cfg(feature = "sero")]
+                {
+                    sero::receiver(sero::SeroClient::from(sero), tx).await
+                }
             }
-        } else {
-            let server_address = match &self.address {
-                Address::Tcp(s) => BeastSource::TCP(s.to_owned()),
-                Address::Udp(s) => BeastSource::UDP(s.to_owned()),
-                Address::Websocket(s) => BeastSource::Websocket(s.to_owned()),
-                _ => unreachable!(),
-            };
-            if let Err(e) =
-                radarcape::receiver(server_address, tx, serial, name).await
-            {
-                error!("{}", e.to_string());
+            _ => {
+                let server_address = match &self.address {
+                    Address::Tcp(s) => BeastSource::TCP(s.to_owned()),
+                    Address::Udp(s) => BeastSource::UDP(s.to_owned()),
+                    Address::Websocket(s) => {
+                        BeastSource::Websocket(s.to_owned())
+                    }
+                    _ => unreachable!(),
+                };
+                if let Err(e) =
+                    radarcape::receiver(server_address, tx, serial, name).await
+                {
+                    error!("{}", e.to_string());
+                }
             }
         }
     }

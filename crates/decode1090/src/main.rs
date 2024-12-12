@@ -45,7 +45,7 @@ struct Options {
 #[derive(Serialize, Deserialize)]
 struct JSONEntry {
     timestamp: f64,
-    rssi: Option<f64>, // from older format
+    rssi: Option<f32>, // from older format
     #[serde(
         serialize_with = "rs1090::decode::as_hex",
         deserialize_with = "rs1090::decode::from_hex"
