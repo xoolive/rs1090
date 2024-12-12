@@ -7,6 +7,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load TOKEN from environment variables
     let client = SeroClient {
         token: std::env::var("SERO_TOKEN")?,
+        df_filter: vec![],
+        aircraft_filter: vec![],
     };
 
     // Access info about receivers and display it

@@ -17,6 +17,8 @@ use url::Url;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SeroParams {
     pub token: String,
+    pub df_filter: Option<Vec<u32>>,
+    pub aircraft_filter: Option<Vec<u32>>,
 }
 
 #[cfg(feature = "sero")]
@@ -24,6 +26,8 @@ impl From<&SeroParams> for sero::SeroClient {
     fn from(value: &SeroParams) -> Self {
         sero::SeroClient {
             token: value.token.clone(),
+            df_filter: value.df_filter.clone().unwrap_or_default(),
+            aircraft_filter: value.aircraft_filter.clone().unwrap_or_default(),
         }
     }
 }

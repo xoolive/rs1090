@@ -31,6 +31,8 @@ type Result<T> =
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SeroClient {
     pub token: String,
+    pub df_filter: Vec<u32>,
+    pub aircraft_filter: Vec<u32>,
 }
 
 async fn download_file(url: &str, destination: &PathBuf) -> Result<()> {
@@ -140,9 +142,9 @@ impl SeroClient {
     pub async fn rawstream(&self) -> Result<Streaming<ModeSDownlinkFrame>> {
         let request = tonic::Request::new(ModeSDownlinkFramesRequest {
             token: self.token.clone(),
-            df_filter: vec![17, 18, 20, 21],
+            df_filter: self.df_filter.clone(),
             sensor_filter: vec![],
-            aircraft_filter: vec![],
+            aircraft_filter: self.aircraft_filter.clone(),
         });
         Ok(self
             .client()
