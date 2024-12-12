@@ -3,17 +3,16 @@
 rs1090 is a Rust library to decode Mode S, ADS-B and FLARM messages.
 
 It takes its inspiration from the Python [pyModeS](https://github.com/junzis/pyModeS) library, and uses [deku](https://github.com/sharksforarms/deku) in order to decode binary data in a clean declarative way.
-
 The project started as a fork of a very similar project called [adsb-deku](https://crates.io/crates/adsb_deku), but modules have been refactored to match [pyModeS](https://github.com/junzis/pyModeS) design, implementations extensively reviewed, simplified, corrected, and completed.
 
-The directions ambitioned by rs1090 boil down to:
+The directions ambitioned by rs1090 include:
 
 - improving the performance of Mode S decoding in Python;
-- exporting trajectory data to cross-platform formats such as JSON or parquet;
+- exporting trajectory data to cross-platform formats such as JSON, gRPC, arrow;
 - providing efficient multi-receiver Mode S decoding;
 - serving real-time enriched trajectory data to external applications.
 
-If you just want to decode ADS-B messages from your Raspberry and visualize the data on a map, you may want to stick to one of the dump0190 implementations.
+If you just want something stable to decode ADS-B messages from your Raspberry and visualize the data on a map, you may want to stick to one of the dump0190 implementations.
 
 The rs1090 library comes with a companion application [decode1090](https://crates.io/crates/decode1090), a live decoder [jet1090](https://crates.io/crates/jet1090), and a Python binding [rs1090](https://pypi.org/project/rs1090).
 
@@ -31,7 +30,7 @@ The Python script for benchmarking is in [python/examples](python/examples/bench
 The Rust benchmark is executed with `cargo bench`.  
 Both scripts are run on an Intel(R) Core(TM) i7-10850H CPU @ 2.70GHz.
 
-![Benchmark image](./python/examples/benchmark.svg)
+![Benchmark image](https://raw.githubusercontent.com/xoolive/rs1090/refs/heads/master/python/examples/benchmark.svg)
 
 > [!NOTE]  
 > The default out-of-the-box mode of `rs1090` is an execution distributed on all your cores. This benchmark was performed on a regular laptop. It can be much faster on supercomputers, but considering that most laptops now have at least 4 cores, this benchmark yields the speed-up you should get on your own computer.
