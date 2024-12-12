@@ -1,44 +1,78 @@
-use radarcape::BeastSource;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::str::FromStr;
+
 use rs1090::prelude::*;
+
+use radarcape::BeastSource;
 #[cfg(feature = "rtlsdr")]
 use rs1090::source::rtlsdr;
 #[cfg(feature = "sero")]
 use rs1090::source::sero;
+
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::str::FromStr;
 use tokio::sync::mpsc::Sender;
 use tracing::error;
 use url::Url;
 
-// An intermediate structure defined so that you can keep your Sero entries in
-// your configuration file even if the sero feature is not activated
+/**
+* A structure to describe the endpoint to access data.
+*
+* - The most basic one is a TCP Beast format endpoint (port 30005 for dump1090,
+*   port 10003 for Radarcape devices, etc.)
+* - If the sensor is not accessible, it is common practice to redirect the
+*   Beast feed to a UDP endpoint on an other IP address. There is a dedicated
+*   setting on Radarcape devices; otherwise, see socat.
+* - When the Beast format is sent as UDP, it can be dispatched again as a
+*   websocket service: see wsbroad.
+*
+* ## Example code for setting things up
+*
+* - Example of socat command to redirect TCP output to UDP endpoint:  
+*   `socat TCP:localhost:30005 UDP-DATAGRAM:1.2.3.4:5678`
+*
+* - Example of wsbroad command:  
+*   `wsbroad 0.0.0.0:9876`
+*
+* - Then, redirect the data:  
+*   `websocat -b -u udp-l:127.0.0.1:5678 ws://0.0.0.0:9876/5678`
+*
+* - Check data is coming:  
+*   `websocat ws://localhost:9876/5678`
+*
+* For Sero Systems, check documentation at <https://doc.sero-systems.de/api/>
+*/
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SeroParams {
-    pub token: String,
-    pub df_filter: Option<Vec<u32>>,
-    pub aircraft_filter: Option<Vec<u32>>,
-}
-
-#[cfg(feature = "sero")]
-impl From<&SeroParams> for sero::SeroClient {
-    fn from(value: &SeroParams) -> Self {
-        sero::SeroClient {
-            token: value.token.clone(),
-            df_filter: value.df_filter.clone().unwrap_or_default(),
-            aircraft_filter: value.aircraft_filter.clone().unwrap_or_default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Address {
+    /// Address to a TCP feed for Beast format (typically port 10003 or 30005), e.g. `localhost:10003`
     Tcp(String),
+    /// Address to a UDP feed for Beast format (socat or dedicated configuration in jetvision interface), e.g. `:1234`
     Udp(String),
+    /// Address to a websocket feed, e.g. `ws://localhost:9876/1234`
     Websocket(String),
+    /// A RTL-SDR dongle (require feature `rtlsdr`): the parameter can be empty, or use other specifiers, e.g. `rtlsdr://serial=00000001`
     Rtlsdr(Option<String>),
+    /// A token-based access to Sero Systems (require feature `sero`).
     Sero(SeroParams),
+}
+
+/**
+ * Describe sources of raw ADS-B data.
+ *
+ * Several sensors can be behind a single source of data.
+ * Optionally, give it a name (an alias) to spot it easily in decoded data.
+ */
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Source {
+    /// The address to the raw ADS-B data feed
+    #[serde(flatten)]
+    pub address: Address,
+    /// An (optional) alias for the source name (only for single sensors)
+    pub name: Option<String>,
+    /// Localize the source of data (only for single sensors)
+    #[serde(flatten)]
+    pub reference: Option<Position>,
 }
 
 fn build_serial(input: &str) -> u64 {
@@ -48,28 +82,6 @@ fn build_serial(input: &str) -> u64 {
     input.hash(&mut hasher);
     // Get the hash as a u64
     hasher.finish()
-}
-
-impl Source {
-    pub fn serial(&self) -> u64 {
-        match &self.address {
-            Address::Tcp(name) => build_serial(name),
-            Address::Udp(name) => build_serial(name),
-            Address::Websocket(name) => build_serial(name),
-            Address::Rtlsdr(reference) => {
-                let name = reference.clone().unwrap_or("rtlsdr".to_string());
-                build_serial(&name)
-            }
-            Address::Sero(_) => 0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Source {
-    pub address: Address,
-    pub name: Option<String>,
-    pub reference: Option<Position>,
 }
 
 impl FromStr for Source {
@@ -127,6 +139,25 @@ impl FromStr for Source {
 }
 
 impl Source {
+    pub fn serial(&self) -> u64 {
+        match &self.address {
+            Address::Tcp(name) => build_serial(name),
+            Address::Udp(name) => build_serial(name),
+            Address::Websocket(name) => build_serial(name),
+            Address::Rtlsdr(reference) => {
+                let name = reference.clone().unwrap_or("rtlsdr".to_string());
+                build_serial(&name)
+            }
+            Address::Sero(_) => 0,
+        }
+    }
+
+    /**
+     * Start an async task that listens to data and redirects it to a queue.
+     * Messages will have a serial number and a name attached.
+     *
+     * The next step will be deduplication.
+     */
     pub async fn receiver(
         &self,
         tx: Sender<TimedMessage>,
@@ -175,6 +206,30 @@ impl Source {
     }
 }
 
+/// An intermediate structure defined so that you can keep your Sero entries in
+/// your configuration file even if the sero feature is not activated
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SeroParams {
+    /// The access token
+    pub token: String,
+    /// Filter on DF messages to receive (default: all)
+    pub df_filter: Option<Vec<u32>>,
+    /// Filter on messages coming from a set of aircraft (default:all)
+    pub aircraft_filter: Option<Vec<u32>>,
+}
+
+#[cfg(feature = "sero")]
+impl From<&SeroParams> for sero::SeroClient {
+    fn from(value: &SeroParams) -> Self {
+        // TODO fallback to SERO_TOKEN environment variable
+        // std::env::var("SERO_TOKEN")?
+        sero::SeroClient {
+            token: value.token.clone(),
+            df_filter: value.df_filter.clone().unwrap_or_default(),
+            aircraft_filter: value.aircraft_filter.clone().unwrap_or_default(),
+        }
+    }
+}
 #[cfg(test)]
 mod test {
     use super::*;

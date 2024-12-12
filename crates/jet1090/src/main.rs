@@ -345,7 +345,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .state_vectors
                             .iter()
                             .filter(|(_key, value)| {
-                                now > value.cur.last + minutes * 60
+                                now > value.cur.lastseen + minutes * 60
                             })
                             .map(|(key, _)| key.to_string())
                             .collect::<Vec<String>>();
@@ -615,13 +615,13 @@ fn update(
 impl Jet1090 {
     pub fn receivers(&mut self) {
         for sensor in self.sensors.values_mut() {
-            sensor.count = 0;
+            sensor.aircraft_count = 0;
         }
         for vector in self.state_vectors.values_mut() {
             for sensor in &vector.cur.metadata {
                 if let Some(src) = self.sensors.get_mut(&sensor.serial) {
-                    src.count += 1;
-                    src.last = vector.cur.last
+                    src.aircraft_count += 1;
+                    src.last_timestamp = vector.cur.lastseen
                 }
             }
         }

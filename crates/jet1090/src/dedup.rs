@@ -5,6 +5,16 @@ use std::time::SystemTime;
 use tokio::sync::mpsc;
 use tracing::info;
 
+/**
+ * A basic message deduplication algorithm.
+ *
+ * Reads messages from a MPSC and sends deduplicated messages to another one.
+ *
+ * Identical messages are grouped for a duration of `dedup_threshold`.
+ *
+ * Future versions should check for average gap between sensors for a better
+ * synchronisation.
+ */
 pub async fn deduplicate_messages(
     mut rx: mpsc::Receiver<TimedMessage>,
     tx: mpsc::Sender<TimedMessage>,

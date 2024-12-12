@@ -11,9 +11,65 @@ use tokio::sync::Mutex;
 
 use crate::{aircraftdb, Jet1090};
 
+/**
+ * A state vector with the most up-to-date information about an aircraft
+ */
+#[derive(Debug, Serialize)]
+pub struct Snapshot {
+    /// The ICAO 24-bit address of the aircraft transponder
+    pub icao24: String,
+    /// The timestamp of the first seen message
+    pub firstseen: u64,
+    /// The timestamp of the last seen message
+    pub lastseen: u64,
+    /// The callsign of the aircraft, ICAO flight number for commercial aircraft, often matches registration in General Aviation.
+    pub callsign: Option<String>,
+    /// The tail number of the aircraft. If the aircraft is not known in the local database, some heuristics may reconstruct the tail number in some countries.
+    pub registration: Option<String>,
+    /// The ICAO code to the type of aircraft, e.g. A32O or B789
+    pub typecode: Option<String>,
+    /// The squawk code, a 4-digit number set on the transponder, 7700 for general emergencies
+    pub squawk: Option<IdentityCode>,
+    /// WGS84 latitude angle in degrees
+    pub latitude: Option<f64>,
+    /// WGS84 longitude angle in degrees
+    pub longitude: Option<f64>,
+    /// Barometric altitude in feet, expressed in ISA
+    pub altitude: Option<u16>,
+    /// Altitude selected in the FMS
+    pub selected_altitude: Option<u16>,
+    /// Ground speed, in knots
+    pub groundspeed: Option<f64>,
+    /// Vertical rate of the aircraft, in feet/min
+    pub vertical_rate: Option<i16>,
+    /// The true track angle of the aircraft in degrees with respect to the geographic North
+    pub track: Option<f64>,
+    /// Indicated air speed, in knots
+    pub ias: Option<u16>,
+    /// True air speed, in knots
+    pub tas: Option<u16>,
+    /// The Mach number
+    pub mach: Option<f64>,
+    /// The roll angle of the aircraft in degrees (positive angle for banking to the right-hand side)
+    pub roll: Option<f64>,
+    /// The magnetic heading of the aircraft in degrees with respect to the magnetic North
+    pub heading: Option<f64>,
+    /// The NAC position indicator, for uncertainty
+    pub nacp: Option<u8>,
+    /// Number of messages received for the aircraft
+    pub count: usize,
+    /// Metadata information from the sensors seeing the aircraft
+    pub metadata: Vec<SensorMetadata>,
+}
+
+/**
+ * Contains information related to an aircraft: current state and history
+ */
 #[derive(Debug)]
 pub struct StateVectors {
+    /// The latest state of the aircraft
     pub cur: Snapshot,
+    /// The history of received messages
     pub hist: Vec<TimedMessage>,
 }
 
@@ -40,8 +96,8 @@ impl StateVectors {
 
         let cur = Snapshot {
             icao24,
-            first: ts,
-            last: ts,
+            firstseen: ts,
+            lastseen: ts,
             callsign: None,
             registration,
             typecode,
@@ -67,32 +123,6 @@ impl StateVectors {
             hist: Vec::<TimedMessage>::new(),
         }
     }
-}
-
-#[derive(Debug, Serialize)]
-pub struct Snapshot {
-    pub icao24: String,
-    pub first: u64,
-    pub last: u64,
-    pub callsign: Option<String>,
-    pub registration: Option<String>,
-    pub typecode: Option<String>,
-    pub squawk: Option<IdentityCode>,
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
-    pub altitude: Option<u16>,
-    pub selected_altitude: Option<u16>,
-    pub groundspeed: Option<f64>,
-    pub vertical_rate: Option<i16>,
-    pub track: Option<f64>,
-    pub ias: Option<u16>,
-    pub tas: Option<u16>,
-    pub mach: Option<f64>,
-    pub roll: Option<f64>,
-    pub heading: Option<f64>,
-    pub nacp: Option<u8>,
-    pub count: usize,
-    pub metadata: Vec<SensorMetadata>,
 }
 
 fn icao24(msg: &Message) -> Option<String> {
@@ -132,7 +162,7 @@ pub async fn update_snapshot(
                         icao24,
                         aircraftdb,
                     ));
-            aircraft.cur.last = *timestamp as u64;
+            aircraft.cur.lastseen = *timestamp as u64;
             aircraft.cur.metadata = metadata.to_vec();
             aircraft.cur.count += 1;
 

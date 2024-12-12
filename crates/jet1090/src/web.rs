@@ -1,5 +1,6 @@
-use crate::snapshot::Snapshot;
-use crate::Jet1090;
+/**
+ * Information returned on a REST API
+ */
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -8,18 +9,23 @@ use warp::http::StatusCode;
 use warp::reject::Rejection;
 use warp::reply::Reply;
 
+use crate::snapshot::Snapshot;
+use crate::Jet1090;
+
+/// Information required to ask for a trajectory
 #[derive(Serialize, Deserialize)]
 pub struct TrackQuery {
     icao24: String,
 }
 
-/// An API error serializable to JSON.
+/// An API error serializable to JSON
 #[derive(Serialize)]
 struct ErrorMessage {
     code: u16,
     message: String,
 }
 
+/// Returns all the ICAO 24-bit addresses of aircraft seen by jet1090
 pub async fn icao24(
     app: &Arc<Mutex<Jet1090>>,
 ) -> Result<warp::reply::Json, Infallible> {
@@ -27,6 +33,7 @@ pub async fn icao24(
     Ok::<_, Infallible>(warp::reply::json(&app.items))
 }
 
+/// Returns all state vectors without any history information
 pub async fn all(
     app: &Arc<Mutex<Jet1090>>,
 ) -> Result<warp::reply::Json, Infallible> {
@@ -39,6 +46,7 @@ pub async fn all(
     ))
 }
 
+/// Returns the trajectory of a given aircraft matching the REST query
 pub async fn track(
     app: &Arc<Mutex<Jet1090>>,
     q: TrackQuery,
@@ -49,6 +57,7 @@ pub async fn track(
     ))
 }
 
+/// Returns decoding information about all sensors
 pub async fn sensors(
     app: &Arc<Mutex<Jet1090>>,
 ) -> Result<warp::reply::Json, Infallible> {
@@ -56,7 +65,7 @@ pub async fn sensors(
     Ok::<_, Infallible>(warp::reply::json(&app.sensors))
 }
 
-// Define a rejection handler
+/// Returns proper error messages in JSON format
 pub async fn handle_rejection(
     err: Rejection,
 ) -> Result<impl Reply, Infallible> {

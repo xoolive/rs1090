@@ -6,8 +6,11 @@ use zip::read::ZipArchive;
 
 #[derive(Debug)]
 pub struct Aircraft {
+    /// The ICAO 24-bit transponder address
     icao24: String,
+    /// The ICAO typecode of the aircraft, e.g. A320, B789, etc.
     pub typecode: Option<String>,
+    /// The last known tail number of the aircraft
     pub registration: Option<String>,
 }
 

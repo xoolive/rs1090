@@ -9,6 +9,9 @@ use crate::{Jet1090, SortKey};
 
 const INFO_TEXT: &str = "(Esc/Q) quit | (↑/K) up | (↓/J) down | (⤒/G) top";
 
+/**
+ * Rendering of the table in interactive mode
+ */
 pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -23,7 +26,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     app.items = states
         .values()
         .filter(|sv| {
-            (sv.cur.count > 1) && (now as i64 - sv.cur.last as i64) < 30
+            (sv.cur.count > 1) && (now as i64 - sv.cur.lastseen as i64) < 30
         })
         .map(|sv| sv.cur.icao24.to_string())
         .collect();
@@ -38,7 +41,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     let mut sorted_elts = states
         .values()
         .filter(|sv| {
-            (sv.cur.count > 1) && (now as i64 - sv.cur.last as i64) < 30
+            (sv.cur.count > 1) && (now as i64 - sv.cur.lastseen as i64) < 30
         })
         .collect::<Vec<&StateVectors>>();
 
@@ -55,12 +58,12 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
         SortKey::COUNT => {
             |a: &&StateVectors, b: &&StateVectors| a.cur.count.cmp(&b.cur.count)
         }
-        SortKey::FIRST => {
-            |a: &&StateVectors, b: &&StateVectors| a.cur.first.cmp(&b.cur.first)
-        }
-        SortKey::LAST => {
-            |a: &&StateVectors, b: &&StateVectors| a.cur.last.cmp(&b.cur.last)
-        }
+        SortKey::FIRST => |a: &&StateVectors, b: &&StateVectors| {
+            a.cur.firstseen.cmp(&b.cur.firstseen)
+        },
+        SortKey::LAST => |a: &&StateVectors, b: &&StateVectors| {
+            a.cur.lastseen.cmp(&b.cur.lastseen)
+        },
     };
 
     sorted_elts.sort_by(sort_by);
@@ -177,7 +180,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     };
     let rows = sorted_elts
         .iter()
-        .filter(|sv| (now as i64 - sv.cur.last as i64) < 30)
+        .filter(|sv| (now as i64 - sv.cur.lastseen as i64) < 30)
         .enumerate()
         .map(|(i, sv)| {
             let color = match i % 2 {
@@ -257,6 +260,9 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     );
 }
 
+/**
+ * Style-sheet of the table displayed in interactive mode
+ */
 struct TableColors {
     buffer_bg: Color,
     header_bg: Color,
@@ -289,6 +295,9 @@ trait Render {
     fn constraint(&self) -> Constraint;
 }
 
+/**
+ * Describes how to render information in a given column
+ */
 #[allow(clippy::upper_case_acronyms)]
 enum ColumnRender {
     ICAO24,
@@ -385,15 +394,15 @@ impl Render for ColumnRender {
                 .clone()
                 .unwrap_or("".to_string()),
             Self::LAST => {
-                if now > s.last + 5 {
-                    format!("{}s ago", now - s.last)
+                if now > s.lastseen + 5 {
+                    format!("{}s ago", now - s.lastseen)
                 } else {
                     "".to_string()
                 }
             }
             Self::FIRST => {
                 let dt: DateTime<Utc> =
-                    DateTime::from_timestamp(s.first as i64, 0).unwrap();
+                    DateTime::from_timestamp(s.firstseen as i64, 0).unwrap();
                 format!("{}", dt.format("%H:%M"))
             }
         }

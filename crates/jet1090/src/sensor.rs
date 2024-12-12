@@ -1,19 +1,31 @@
-use rs1090::prelude::Position;
+use rs1090::prelude::*;
+
 #[cfg(feature = "sero")]
 use rs1090::source::sero;
 use serde::{Deserialize, Serialize};
 
 use crate::source::{Address, Source};
 
+/**
+ * A structure to describe information to label data produced by a sensor.
+ */
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sensor {
+    /// The serial number is in general a hash of the Address structure
     pub serial: u64,
+    /// An (optional) alias to label the sensor
     pub name: Option<String>,
+    /// An (optional) position to decode ground messages (DF=18 or 17, BDS=0,6)
     pub reference: Option<Position>,
-    pub count: u64, // should be aircraft_count
-    pub last: u64,  // should be last timestamp
+    /// How many aircraft are seen by the sensor
+    pub aircraft_count: u64,
+    /// The timestamp for the last seen message
+    pub last_timestamp: u64,
 }
 
+/**
+ * Create a sensor or a list of sensors based on a source information.
+ */
 pub async fn sensors(value: &Source) -> Vec<Sensor> {
     match &value.address {
         Address::Tcp(_)
@@ -24,8 +36,8 @@ pub async fn sensors(value: &Source) -> Vec<Sensor> {
                 serial: value.serial(),
                 name: value.name.clone(),
                 reference: value.reference,
-                count: 0,
-                last: 0,
+                aircraft_count: 0,
+                last_timestamp: 0,
             }]
         }
         Address::Sero(params) => {
@@ -44,8 +56,8 @@ pub async fn sensors(value: &Source) -> Vec<Sensor> {
                             },
                         ),
                         name: Some(elt.alias.to_string()),
-                        count: 0,
-                        last: 0,
+                        aircraft_count: 0,
+                        last_timestamp: 0,
                     })
                     .collect()
             }
