@@ -59,59 +59,13 @@ impl Source {
             Address::Sero(_) => 0,
         }
     }
-    pub async fn references(&self) -> Vec<(u64, Option<Position>)> {
-        match &self.address {
-            Address::Tcp(name) => {
-                vec![(build_serial(name), self.reference)]
-            }
-            Address::Udp(name) => {
-                vec![(build_serial(name), self.reference)]
-            }
-            Address::Websocket(name) => {
-                vec![(build_serial(name), self.reference)]
-            }
-            Address::Rtlsdr(reference) => {
-                let name = reference.clone().unwrap_or("rtlsdr".to_string());
-                vec![(build_serial(&name), self.reference)]
-            }
-            Address::Sero(params) => {
-                #[cfg(feature = "sero")]
-                {
-                    let sero = sero::SeroClient::from(params);
-                    let info = sero.info().await.unwrap();
-                    info.sensor_info
-                        .iter()
-                        .map(|elt| {
-                            (
-                                elt.sensor.unwrap().serial,
-                                elt.gnss.as_ref().unwrap().position.map(
-                                    |pos| Position {
-                                        latitude: pos.latitude,
-                                        longitude: pos.longitude,
-                                    },
-                                ),
-                            )
-                        })
-                        .collect()
-                }
-                #[cfg(not(feature = "sero"))]
-                {
-                    vec![]
-                }
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {
-    address: Address,
+    pub address: Address,
     pub name: Option<String>,
     pub reference: Option<Position>,
-    #[serde(skip)]
-    pub count: u64,
-    #[serde(skip)]
-    pub last: u64,
 }
 
 impl FromStr for Source {
@@ -158,8 +112,6 @@ impl FromStr for Source {
             address,
             name: None,
             reference: None,
-            count: 0,
-            last: 0,
         };
 
         if let Some(query) = url.query() {

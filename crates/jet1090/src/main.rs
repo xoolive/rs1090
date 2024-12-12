@@ -1,22 +1,23 @@
 #![doc = include_str!("../readme.md")]
 
 mod aircraftdb;
-mod cli;
 mod dedup;
+mod sensor;
 mod snapshot;
+mod source;
 mod table;
 mod tui;
 mod web;
 
 use clap::{Command, CommandFactory, Parser, ValueHint};
 use clap_complete::{generate, Generator, Shell};
-use cli::Source;
 use crossterm::event::KeyCode;
 use ratatui::widgets::*;
 use redis::AsyncCommands;
 use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::decode::serialize_decode_time;
 use rs1090::prelude::*;
+use sensor::Sensor;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::io;
@@ -85,7 +86,7 @@ struct Options {
     // - `host` can be a DNS name, an IP address or `rtlsdr` (for RTL-SDR dongles)
     // - `port` must be a number
     // - `reference` can be LFPG for major airports, `43.3,1.35` otherwise
-    sources: Vec<cli::Source>,
+    sources: Vec<source::Source>,
 
     #[cfg(feature = "rtlsdr")]
     /// List the detected devices, for now, only --discover rtlsdr is fully supported
@@ -282,8 +283,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut events = tui::EventHandler::new(width);
 
+    let mut references = BTreeMap::<u64, Option<Position>>::new();
+    let mut sensors = BTreeMap::<u64, Sensor>::new();
+    for source in options.sources.iter() {
+        for sensor in sensor::sensors(source).await {
+            references.insert(sensor.serial, sensor.reference);
+            sensors.insert(sensor.serial, sensor);
+        }
+    }
     let app_tui = Arc::new(Mutex::new(Jet1090 {
-        sources: options.sources.clone(),
+        sensors,
         items: Vec::new(),
         state: TableState::default().with_selected(0),
         scroll_state: ScrollbarState::new(0),
@@ -387,11 +396,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                 );
 
-            let app_receivers = app_web.clone();
-            let receivers = warp::path("receivers")
-                .and(warp::any().map(move || app_receivers.clone()))
+            let app_sensors = app_web.clone();
+            let sensors = warp::path("sensors")
+                .and(warp::any().map(move || app_sensors.clone()))
                 .and_then(|app: Arc<Mutex<Jet1090>>| async move {
-                    web::receivers(&app).await
+                    web::sensors(&app).await
                 });
 
             let cors = warp::cors()
@@ -400,7 +409,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .allow_methods(vec!["GET"]);
 
             let routes = warp::get()
-                .and(home.or(all).or(track).or(receivers))
+                .and(home.or(all).or(track).or(sensors))
                 .recover(web::handle_rejection)
                 .with(cors);
 
@@ -410,20 +419,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // I am not sure whether this size calibration is relevant, but let's try...
     // adding one in order to avoid the stupid error when you set a size = 0
-    let multiplier = options.sources.len();
+    let multiplier = references.len();
     let (tx, rx) = tokio::sync::mpsc::channel(100 * multiplier + 1);
     let (tx_dedup, mut rx_dedup) =
         tokio::sync::mpsc::channel(100 * multiplier + 1);
 
-    let sources = app_dec.lock().await.sources.clone();
-    let mut references = BTreeMap::<u64, Option<Position>>::new();
-    for source in sources.iter() {
-        for (serial, reference) in source.references().await {
-            references.insert(serial, reference);
-        }
-    }
-
-    for source in sources.into_iter() {
+    for source in options.sources.into_iter() {
         let serial = source.serial();
         let tx_copy = tx.clone();
         tokio::spawn(async move {
@@ -548,7 +549,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Debug, Default)]
 pub struct Jet1090 {
-    sources: Vec<Source>,
+    sensors: BTreeMap<u64, Sensor>,
     state: TableState,
     items: Vec<String>,
     scroll_state: ScrollbarState,
@@ -613,13 +614,12 @@ fn update(
 
 impl Jet1090 {
     pub fn receivers(&mut self) {
-        for source in &mut self.sources {
-            source.count = 0;
+        for sensor in self.sensors.values_mut() {
+            sensor.count = 0;
         }
         for vector in self.state_vectors.values_mut() {
             for sensor in &vector.cur.metadata {
-                if let Some(src) = self.sources.get_mut(sensor.serial as usize)
-                {
+                if let Some(src) = self.sensors.get_mut(&sensor.serial) {
                     src.count += 1;
                     src.last = vector.cur.last
                 }

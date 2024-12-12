@@ -49,11 +49,11 @@ pub async fn track(
     ))
 }
 
-pub async fn receivers(
+pub async fn sensors(
     app: &Arc<Mutex<Jet1090>>,
 ) -> Result<warp::reply::Json, Infallible> {
     let app = app.lock().await;
-    Ok::<_, Infallible>(warp::reply::json(&app.sources))
+    Ok::<_, Infallible>(warp::reply::json(&app.sensors))
 }
 
 // Define a rejection handler
