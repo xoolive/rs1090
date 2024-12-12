@@ -4,7 +4,6 @@ use std::str::FromStr;
 
 use rs1090::prelude::*;
 
-use radarcape::BeastSource;
 #[cfg(feature = "rtlsdr")]
 use rs1090::source::rtlsdr;
 #[cfg(feature = "sero")]
@@ -189,15 +188,15 @@ impl Source {
             }
             _ => {
                 let server_address = match &self.address {
-                    Address::Tcp(s) => BeastSource::TCP(s.to_owned()),
-                    Address::Udp(s) => BeastSource::UDP(s.to_owned()),
+                    Address::Tcp(s) => beast::BeastSource::Tcp(s.to_owned()),
+                    Address::Udp(s) => beast::BeastSource::Udp(s.to_owned()),
                     Address::Websocket(s) => {
-                        BeastSource::Websocket(s.to_owned())
+                        beast::BeastSource::Websocket(s.to_owned())
                     }
                     _ => unreachable!(),
                 };
                 if let Err(e) =
-                    radarcape::receiver(server_address, tx, serial, name).await
+                    beast::receiver(server_address, tx, serial, name).await
                 {
                     error!("{}", e.to_string());
                 }
