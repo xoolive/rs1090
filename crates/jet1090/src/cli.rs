@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use radarcape::BeastSource;
 use rs1090::prelude::*;
 #[cfg(feature = "rtlsdr")]
@@ -7,6 +5,9 @@ use rs1090::source::rtlsdr;
 #[cfg(feature = "sero")]
 use rs1090::source::sero;
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 use tokio::sync::mpsc::Sender;
 use tracing::error;
 use url::Url;
@@ -34,6 +35,72 @@ pub enum Address {
     Websocket(String),
     Rtlsdr(Option<String>),
     Sero(SeroParams),
+}
+
+fn build_serial(input: &str) -> u64 {
+    // Create a hasher
+    let mut hasher = DefaultHasher::new();
+    // Hash the string
+    input.hash(&mut hasher);
+    // Get the hash as a u64
+    hasher.finish()
+}
+
+impl Source {
+    pub fn serial(&self) -> u64 {
+        match &self.address {
+            Address::Tcp(name) => build_serial(name),
+            Address::Udp(name) => build_serial(name),
+            Address::Websocket(name) => build_serial(name),
+            Address::Rtlsdr(reference) => {
+                let name = reference.clone().unwrap_or("rtlsdr".to_string());
+                build_serial(&name)
+            }
+            Address::Sero(_) => 0,
+        }
+    }
+    pub async fn references(&self) -> Vec<(u64, Option<Position>)> {
+        match &self.address {
+            Address::Tcp(name) => {
+                vec![(build_serial(name), self.reference)]
+            }
+            Address::Udp(name) => {
+                vec![(build_serial(name), self.reference)]
+            }
+            Address::Websocket(name) => {
+                vec![(build_serial(name), self.reference)]
+            }
+            Address::Rtlsdr(reference) => {
+                let name = reference.clone().unwrap_or("rtlsdr".to_string());
+                vec![(build_serial(&name), self.reference)]
+            }
+            Address::Sero(params) => {
+                #[cfg(feature = "sero")]
+                {
+                    let sero = sero::SeroClient::from(params);
+                    let info = sero.info().await.unwrap();
+                    info.sensor_info
+                        .iter()
+                        .map(|elt| {
+                            (
+                                elt.sensor.unwrap().serial,
+                                elt.gnss.as_ref().unwrap().position.map(
+                                    |pos| Position {
+                                        latitude: pos.latitude,
+                                        longitude: pos.longitude,
+                                    },
+                                ),
+                            )
+                        })
+                        .collect()
+                }
+                #[cfg(not(feature = "sero"))]
+                {
+                    vec![]
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

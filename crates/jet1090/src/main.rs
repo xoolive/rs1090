@@ -69,7 +69,7 @@ struct Options {
     update_position: bool,
 
     /// When performing deduplication, after how long to dump deduplicated messages (time in ms)
-    #[arg(long, default_value = "400")]
+    #[arg(long, default_value = "450")]
     deduplication: Option<u32>,
 
     #[arg(long)]
@@ -416,12 +416,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::sync::mpsc::channel(100 * multiplier + 1);
 
     let sources = app_dec.lock().await.sources.clone();
-    for (serial, source) in sources.into_iter().enumerate() {
+    let mut references = BTreeMap::<u64, Option<Position>>::new();
+    for source in sources.iter() {
+        for (serial, reference) in source.references().await {
+            references.insert(serial, reference);
+        }
+    }
+
+    for source in sources.into_iter() {
+        let serial = source.serial();
         let tx_copy = tx.clone();
         tokio::spawn(async move {
-            source
-                .receiver(tx_copy, serial as u64, source.name.clone())
-                .await;
+            source.receiver(tx_copy, serial, source.name.clone()).await;
         });
     }
 
@@ -429,7 +435,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dedup::deduplicate_messages(
             rx,
             tx_dedup,
-            options.deduplication.unwrap_or(400),
+            options.deduplication.unwrap_or(450),
         )
         .await;
     });
@@ -454,49 +460,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             app_dec.lock().await.should_clear = true;
             first_msg = false;
         }
-        let mut reference =
-            match msg.metadata.first().map(|metadata| metadata.serial) {
-                None => None,
-                Some(serial) => {
-                    let sources = &app_dec.lock().await.sources;
-                    match sources.get(serial as usize) {
-                        None => None,
-                        Some(src) => src.reference,
-                    }
-                }
-            };
 
         if let Some(message) = &mut msg.message {
             match &mut message.df {
-                ExtendedSquitterADSB(adsb) => decode_position(
-                    &mut adsb.message,
-                    msg.timestamp,
-                    &adsb.icao24,
-                    &mut aircraft,
-                    &mut reference,
-                    &update_reference,
-                ),
-                ExtendedSquitterTisB { cf, .. } => decode_position(
-                    &mut cf.me,
-                    msg.timestamp,
-                    &cf.aa,
-                    &mut aircraft,
-                    &mut reference,
-                    &update_reference,
-                ),
+                ExtendedSquitterADSB(adsb) => match adsb.message {
+                    ME::BDS05(_) | ME::BDS06(_) => {
+                        let serial = msg
+                            .metadata
+                            .first()
+                            .map(|meta| meta.serial)
+                            .unwrap();
+                        let mut reference = references[&serial];
+
+                        decode_position(
+                            &mut adsb.message,
+                            msg.timestamp,
+                            &adsb.icao24,
+                            &mut aircraft,
+                            &mut reference,
+                            &update_reference,
+                        );
+
+                        // References may have been modified.
+                        // With static receivers, we don't care; for dynamic ones, we may
+                        // want to update the reference position.
+                        if options.update_position {
+                            for meta in &msg.metadata {
+                                let _ =
+                                    references.insert(meta.serial, reference);
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                ExtendedSquitterTisB { cf, .. } => match cf.me {
+                    ME::BDS05(_) | ME::BDS06(_) => {
+                        let serial = msg
+                            .metadata
+                            .first()
+                            .map(|meta| meta.serial)
+                            .unwrap();
+
+                        let mut reference = references[&serial];
+
+                        decode_position(
+                            &mut cf.me,
+                            msg.timestamp,
+                            &cf.aa,
+                            &mut aircraft,
+                            &mut reference,
+                            &update_reference,
+                        )
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
         };
-
-        // References may have been modified.
-        // With static receivers, we don't care; for dynamic ones, we may
-        // want to update the reference position.
-        if options.update_position {
-            let sources = &mut app_dec.lock().await.sources;
-            for serial in &msg.metadata {
-                sources[serial.serial as usize].reference = reference;
-            }
-        }
 
         snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
 
