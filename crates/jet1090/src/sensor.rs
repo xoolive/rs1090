@@ -3,6 +3,7 @@ use rs1090::prelude::*;
 #[cfg(feature = "sero")]
 use rs1090::source::sero;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::source::{Address, Source};
 
@@ -44,6 +45,7 @@ pub async fn sensors(value: &Source) -> Vec<Sensor> {
             #[cfg(feature = "sero")]
             {
                 let sero = sero::SeroClient::from(params);
+                debug!("send {:?} to collect info", params);
                 let info = sero.info().await.unwrap();
                 info.sensor_info
                     .iter()
@@ -63,6 +65,7 @@ pub async fn sensors(value: &Source) -> Vec<Sensor> {
             }
             #[cfg(not(feature = "sero"))]
             {
+                debug!("params {:?} unused", params);
                 vec![]
             }
         }
