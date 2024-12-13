@@ -690,12 +690,11 @@ mod tests {
             update_position = false
 
             [[sources]]
-            address = { Udp = "0.0.0.0:1234" }
+            udp = "0.0.0.0:1234"
             airport = 'LFBO'
 
             [[sources]]
-            address = { Udp = "0.0.0.0:3456" }
-            [reference]
+            udp = "0.0.0.0:3456"
             latitude = 48.723
             longitude = 2.379
             "#,
