@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Basic deduplication algorithm
+- Support for SeRo system data source
+- Adjust name aliases and serial numbers
+- Major refactoring
+
 ## 0.3.9
 
 - New data model
