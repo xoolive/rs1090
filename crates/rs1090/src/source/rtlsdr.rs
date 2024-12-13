@@ -20,7 +20,7 @@ const MODES_SHORT_MSG_BYTES: usize = 7;
 const MODES_MAG_BUF_SAMPLES: usize = 131_072;
 const TRAILING_SAMPLES: usize = 326;
 
-pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
+pub async fn receiver<A: Into<Args> + fmt::Display + std::marker::Copy>(
     tx: mpsc::Sender<TimedMessage>,
     args: Option<A>,
     serial: u64,
@@ -28,7 +28,7 @@ pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
 ) {
     match args {
         Some(args) => {
-            info!("Trying to connect rtlsdr with options: {:?}", args)
+            info!("Trying to connect rtlsdr with options: {}", args)
         }
         None => info!("Trying to connect rtlsdr with options: driver=rtlsdr"),
     }
@@ -38,7 +38,7 @@ pub async fn receiver<A: Into<Args> + fmt::Debug + std::marker::Copy>(
     };
 
     let name = name.or(args
-        .map(|a| Some(format!("{:?}", a)))
+        .map(|a| Some(format!("{}", a)))
         .unwrap_or(Some("rtlsdr".to_string())));
 
     let device = match device {
