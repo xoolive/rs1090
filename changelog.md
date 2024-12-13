@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Fix building scripts in GitHub releases
+
 ## 0.4.0
 
 - Basic deduplication algorithm
