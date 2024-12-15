@@ -43,9 +43,9 @@
           markdownFilter = path: _type: builtins.match ".*md$" path != null;
           jsonFilter = path: _type: builtins.match ".*json$" path != null;
           markdownOrJSONOrCargo = path: type:
-          (markdownFilter path type) ||
-          (jsonFilter path type) ||
-          (craneLib.filterCargoSources path type);
+            (markdownFilter path type) ||
+            (jsonFilter path type) ||
+            (craneLib.filterCargoSources path type);
 
           version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
 
@@ -62,11 +62,11 @@
               lib.optionals pkgs.stdenv.isLinux [ clang mold ]
             ;
             buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin
-            [
-              pkgs.libiconv
-              pkgs.darwin.apple_sdk.frameworks.Security
-              pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-            ];
+              [
+                pkgs.libiconv
+                pkgs.darwin.apple_sdk.frameworks.Security
+                pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+              ];
 
           };
 
@@ -76,19 +76,20 @@
           devShells.default = pkgs.mkShell {
             inputsFrom = builtins.attrValues self.checks;
             buildInputs = [ rustToolchain pkgs.pkg-config pkgs.openssl ];
-            shellHook = if pkgs.stdenv.isDarwin then ''
-              export NIX_LDFLAGS="-L${lib.makeLibraryPath [pkgs.libiconv]} $NIX_LDFLAGS"
-              export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.SystemConfiguration}/Library/Frameworks -framework SystemConfiguration $NIX_LDFLAGS"
-              export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.Security}/Library/Frameworks -framework Security $NIX_LDFLAGS"
-            '' else if pkgs.stdenv.isLinux then ''
-              export RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold"
-            ''
-            else "";
+            shellHook =
+              if pkgs.stdenv.isDarwin then ''
+                export NIX_LDFLAGS="-L${lib.makeLibraryPath [pkgs.libiconv]} $NIX_LDFLAGS"
+                export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.SystemConfiguration}/Library/Frameworks -framework SystemConfiguration $NIX_LDFLAGS"
+                export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.Security}/Library/Frameworks -framework Security $NIX_LDFLAGS"
+              '' else if pkgs.stdenv.isLinux then ''
+                export RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold"
+              ''
+              else "";
           };
 
           packages =
             {
-              default =  craneLib.buildPackage (commonArgs // {
+              default = craneLib.buildPackage (commonArgs // {
                 pname = "jet1090";
                 cargoExtraFlags = "--all-features -p jet1090";
                 meta.mainProgram = "jet1090";
