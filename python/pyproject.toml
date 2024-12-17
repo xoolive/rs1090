@@ -1,14 +1,11 @@
 [project]
 name = "rs1090"
-requires-python = ">=3.9"
-dependencies = [
-  "pandas>=2.2.0",
-  "typing_extensions>=4.10.0"
-]
+requires-python = ">=3.10"
+dependencies = ["pandas>=2.2.0", "typing_extensions>=4.10.0"]
 classifiers = [
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version"]
 
@@ -31,10 +28,10 @@ dev-dependencies = [
 
 [tool.ruff]
 line-length = 80
-target-version = "py39"
+target-version = "py310"
 
 [tool.mypy]
-python_version = 3.9
+python_version = "3.10"
 platform = "posix"
 
 color_output = true
