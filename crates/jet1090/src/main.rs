@@ -3,14 +3,16 @@
 mod aircraftdb;
 mod dedup;
 mod sensor;
+mod shell;
 mod snapshot;
 mod source;
 mod table;
 mod tui;
 mod web;
 
+use crate::shell::Shell;
 use clap::{Command, CommandFactory, Parser, ValueHint};
-use clap_complete::{generate, Generator, Shell};
+use clap_complete::{generate, Generator};
 use crossterm::event::KeyCode;
 use ratatui::widgets::*;
 use redis::AsyncCommands;
