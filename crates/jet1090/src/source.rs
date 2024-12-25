@@ -20,7 +20,7 @@ use url::Url;
 * - The most basic one is a TCP Beast format endpoint (port 30005 for dump1090,
 *   port 10003 for Radarcape devices, etc.)
 * - If the sensor is not accessible, it is common practice to redirect the
-*   Beast feed to a UDP endpoint on an other IP address. There is a dedicated
+*   Beast feed to a UDP endpoint on another IP address. There is a dedicated
 *   setting on Radarcape devices; otherwise, see socat.
 * - When the Beast format is sent as UDP, it can be dispatched again as a
 *   websocket service: see wsbroad.
