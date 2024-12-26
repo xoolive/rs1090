@@ -34,5 +34,9 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
 
-      - run: |
+      - name: Deploy to mode-s.org/jet1090
+        run: |
+          git ls-remote "https://x-access-token:${{ secrets.PERSONAL_TOKEN }}@github.com/open-aviation/jet1090"
+          git remote rm origin
+          git remote add origin "https://x-access-token:${{ secrets.PERSONAL_TOKEN }}@github.com/open-aviation/jet1090"
           uvx --with "mkdocs-material[imaging]" mkdocs gh-deploy --force
