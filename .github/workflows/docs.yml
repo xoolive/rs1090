@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+
 jobs:
   deploy:
     # if: startsWith(github.ref, 'refs/tags/') # only deploy pages on release tag
@@ -29,14 +30,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Configure Git Credentials
+      - name: Build the site
         run: |
-          git config user.name github-actions[bot]
-          git config user.email github-actions[bot]@users.noreply.github.com
+          uvx --with "mkdocs-material[imaging]" mkdocs build -d site
 
-      - name: Deploy to mode-s.org/jet1090
-        run: |
-          git ls-remote "https://x-access-token:${{ secrets.PERSONAL_TOKEN }}@github.com/open-aviation/jet1090"
-          git remote rm origin
-          git remote add origin "https://x-access-token:${{ secrets.PERSONAL_TOKEN }}@github.com/open-aviation/jet1090"
-          uvx --with "mkdocs-material[imaging]" mkdocs gh-deploy --force
+      - name: Deploy pages to www.mode-s.org/jet1090
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+          external_repository: open-aviation/jet1090
+          publish_branch: gh-pages
+          publish_dir: site/
