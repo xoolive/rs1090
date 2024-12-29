@@ -14,7 +14,12 @@ The directions ambitioned by rs1090 include:
 
 If you just want something stable to decode ADS-B messages from your Raspberry and visualize the data on a map, you may want to stick to one of the dump0190 implementations.
 
-The rs1090 library comes with a companion application [decode1090](https://crates.io/crates/decode1090), a live decoder [jet1090](https://crates.io/crates/jet1090), and a Python binding [rs1090](https://pypi.org/project/rs1090).
+The rs1090 library comes with:
+
+- a companion application [decode1090](https://crates.io/crates/decode1090),
+- a live decoder [jet1090](https://mode-s.org/jet1090),
+- a Python binding [rs1090](https://pypi.org/project/rs1090).
+- and a WebAssembly binding [rs1090-wasm](https://www.npmjs.com/package/rs1090-wasm).
 
 ## Performance
 
@@ -124,6 +129,10 @@ For FLARM messages (also as batches):
  'gps': 129}
 ```
 
+## WebAssembly bindings
+
+Usage is documented on Observable: [https://observablehq.com/@xoolive/rs1090](https://observablehq.com/@xoolive/rs1090).
+
 ## decode1090
 
 Prebuilt binaries are available on the [Releases page](https://github.com/xoolive/rs1090/releases?q=decode1090).  
@@ -135,12 +144,9 @@ decode1090 --help
 
 ## jet1090
 
-Prebuilt binaries are available on the [Releases page](https://github.com/xoolive/rs1090/releases?q=jet1090).  
-Usage is available with the help command.
+The jet1090 executable is documented on [https://mode-s.org/jet1090](https://mode-s.org/jet1090)
 
-```sh
-jet1090 --help
-```
+![jet1090](https://raw.githubusercontent.com/xoolive/rs1090/refs/heads/master/docs/images/jet1090-table.png)
 
 ## nix
 
