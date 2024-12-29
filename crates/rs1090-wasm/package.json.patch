@@ -1,0 +1,38 @@
+{
+  "files": [
+    "esm/package.json",
+    "esm/rs1090_wasm_bg.wasm",
+    "esm/rs1090_wasm_bg.wasm.d.ts",
+    "esm/rs1090_wasm.js",
+    "esm/rs1090_wasm_bg.js",
+    "esm/rs1090_wasm.d.ts",
+    "nodejs/package.json",
+    "nodejs/rs1090_wasm_bg.wasm",
+    "nodejs/rs1090_wasm_bg.wasm.d.ts",
+    "nodejs/rs1090_wasm.js",
+    "nodejs/rs1090_wasm.d.ts",
+    "web/package.json",
+    "web/rs1090_wasm_bg.wasm",
+    "web/rs1090_wasm_bg.wasm.d.ts",
+    "web/rs1090_wasm.js",
+    "web/rs1090_wasm.d.ts"
+  ],
+  "sideEffects": ["./snippets/*"],
+  "module": "esm/rs1090_wasm.js",
+  "types": "esm/rs1090_wasm.d.ts",
+  "exports": {
+    ".": {
+      "import": "./esm/rs1090_wasm.js",
+      "types": "./esm/rs1090_wasm.d.ts"
+    },
+    "./nodejs": {
+      "require": "./nodejs/rs1090_wasm.js",
+      "import": "./nodejs/rs1090_wasm.js",
+      "types": "./nodejs/rs1090_wasm.d.ts"
+    },
+    "./web": {
+      "import": "./web/rs1090_wasm.js",
+      "types": "./web/rs1090_wasm.d.ts"
+    }
+  }
+}

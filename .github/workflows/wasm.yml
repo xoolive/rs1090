@@ -1,0 +1,36 @@
+name: WebAssembly
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          registry-url: "https://registry.npmjs.org"
+      - name: Install wasm-pack
+        run: |
+          cargo install wasm-pack
+      - uses: extractions/setup-just@v2
+      - name: Build WASM
+        working-directory: crates/rs1090-wasm
+        run: |
+          just pkg
+      - name: Publish to npm (upon release)
+        if: startsWith(github.ref, 'refs/tags/')
+        working-directory: crates/rs1090-wasm/pkg
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish

@@ -331,17 +331,40 @@ impl DekuReader<'_> for DF21DataSelector {
         let tc = u8::from_reader_with_ctx(bds65_reader, deku::ctx::BitSize(5))?;
 
         if tc == 31 {
-            match AircraftOperationStatus::from_reader_with_ctx(
-                bds65_reader,
-                (),
-            ) {
-                Ok(bds65) => result.bds65 = Some(bds65),
-                Err(e) => debug!("Hypothesis BDS65: {}", e.to_string()),
+            let enum_id =
+                u8::from_reader_with_ctx(bds65_reader, deku::ctx::BitSize(3))?;
+            match (enum_id, AircraftOperationStatus::try_from(buf.as_slice())) {
+                (_, Err(e)) => debug!("Hypothesis BDS65: {}", e.to_string()),
+                (id, _) if id >= 2 => {
+                    debug!("Hypothesis BDS65: Reserved field: id={}", id)
+                }
+                (_, Ok(bds65)) => result.bds65 = Some(bds65),
             }
         } else {
             debug!("Hypothesis BDS65: Typecode {} should be 31", tc)
         }
 
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::*;
+    use hexlit::hex;
+
+    #[test]
+    fn test_bds5060_no65() {
+        let bytes = hex!("A8001EBCFFFB23286004A73F6A5B");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        match msg.df {
+            CommBIdentityReply { bds, .. } => {
+                assert!(bds.bds50.is_some());
+                assert!(bds.bds60.is_some());
+                assert!(bds.bds65.is_none());
+            }
+            _ => unreachable!(),
+        }
     }
 }

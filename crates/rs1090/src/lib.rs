@@ -28,6 +28,7 @@ pub mod prelude {
     pub use futures_util::stream::StreamExt;
 
     /// Information on the structure of a Beast message
+    #[cfg(not(target_arch = "wasm32"))]
     pub use crate::source::beast;
 
     #[cfg(feature = "rtlsdr")]
