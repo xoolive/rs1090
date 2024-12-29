@@ -12,7 +12,7 @@ jet1090 aims to be an essential open-source tool in the tangram suite for **trac
 
 ![jet1090 table view](images/jet1090-table.png)
 
-Built on the :material-language-rust: [**rs1090**](https://crates.io/crates/rs1090) library (which also provides :material-language-python: Python and WASM bindings), jet1090 offers:
+Built on the :simple-rust: [**rs1090**](https://crates.io/crates/rs1090) library (which also provides :simple-python: Python and :simple-webassembly: WASM bindings), jet1090 offers:
 
 - A **lightweight, standalone executable**, ideal for low-resource devices;
 - **High-performance and comprehensive ADS-B and Mode S decoding**,  
@@ -35,7 +35,8 @@ Built on the :material-language-rust: [**rs1090**](https://crates.io/crates/rs10
 !!! warning
 
     These pages only document the **jet1090** tool.
-    Follow the links for the documentation of the :material-language-rust: Rust library [**rs1090**](https://docs.rs/rs1090/) with :material-language-python: [Python bindings](https://pypi.org/project/rs1090/).
+
+    Follow the links for the documentation of the :simple-rust: Rust library [**rs1090**](https://docs.rs/rs1090/) with :simple-python: [Python](https://pypi.org/project/rs1090/) and :simple-webassembly: [WebAssembly](https://observablehq.com/@xoolive/rs1090) bindings.
 
 ## Existing tools
 
@@ -54,7 +55,7 @@ The development of the [**rs1090**](https://docs.rs/rs1090/) library and the jet
 
 ## Design choices for jet1090
 
-[**`rs1090`**](https://docs.rs/rs1090/) and [**`jet1090`**](/) are coded in :material-language-rust: Rust, for performance, code safety, and modularity.
+[**`rs1090`**](https://docs.rs/rs1090/) and [**`jet1090`**](/) are coded in :simple-rust: Rust, for performance, code safety, and modularity.
 
 - [**`rs1090`**](https://docs.rs/rs1090/) ports all the decoding knowledge of
   [**`pyModeS`**](https://github.com/junzis/pyModeS) in Rust. It is implemented following a _“decode it all”_ approach.
@@ -62,13 +63,13 @@ The development of the [**rs1090**](https://docs.rs/rs1090/) library and the jet
 
 By design, the language and standard low-level libraries (e.g., `trino` for the asynchronous programming, or `serde` for the serialization) makes it easy to access data in real-time **for those who don't know Rust and don't care about how things work**. All the data is decoded, serialized into a flattened JSON representation, and meta-information about the source of data is attached.
 
-|                          | `dump1090`            | `pyModeS`                  | `jet1090`                                           |
-| ------------------------ | --------------------- | -------------------------- | --------------------------------------------------- |
-| **Programming language** | :material-language-c: | :material-language-python: | :material-language-rust: :material-language-python: |
-| **Extensive decoding**   | :material-close:      | :material-check:           | :material-check:                                    |
-| **Multi-feed**           | :material-check:      | :material-close:           | :material-check:                                    |
-| **SDR**                  | :material-check:      | RTL-SDR only               | RTL-SDR only                                        |
-| **Real-time feed-out**   | Beast format          | :material-close:           | :material-check:                                    |
+|                          | `dump1090`       | `pyModeS`        | `jet1090`                                          |
+| ------------------------ | ---------------- | ---------------- | -------------------------------------------------- |
+| **Programming language** | :simple-c:       | :simple-python:  | :simple-rust: :simple-python: :simple-webassembly: |
+| **Extensive decoding**   | :material-close: | :material-check: | :material-check:                                   |
+| **Multi-feed**           | :material-check: | :material-close: | :material-check:                                   |
+| **SDR**                  | :material-check: | RTL-SDR only     | RTL-SDR only                                       |
+| **Real-time feed-out**   | Beast format     | :material-close: | :material-check:                                   |
 
 !!! example
 
