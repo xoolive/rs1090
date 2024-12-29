@@ -36,23 +36,35 @@ fn decode_1090(msg: String) -> PyResult<Vec<u8>> {
         Ok([128, 4, 78, 46].to_vec()) // None
     }
 }
+struct DecodeError(DekuError);
 
-fn transform_error(e: DekuError) -> PyResult<Vec<u8>> {
-    match e {
-        DekuError::Assertion(msg) => Err(PyAssertionError::new_err(msg)),
-        _ => Err(PyValueError::new_err(e.to_string())),
+impl From<DecodeError> for PyErr {
+    fn from(error: DecodeError) -> Self {
+        match error.0 {
+            DekuError::Assertion(msg) => PyAssertionError::new_err(msg),
+            _ => PyValueError::new_err(error.0.to_string()),
+        }
     }
 }
 
 #[pyfunction]
 fn decode_bds05(msg: String) -> PyResult<Vec<u8>> {
     let bytes = hex::decode(msg).unwrap();
-    match AirbornePosition::from_bytes((&bytes[4..], 0)) {
-        Ok((_, msg)) => {
-            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
-            Ok(pkl)
+    let tc = &bytes[4] >> 3;
+    if (9..22).contains(&tc) && tc != 19 {
+        match AirbornePosition::from_bytes((&bytes[4..], 0)) {
+            Ok((_, msg)) => {
+                let pkl =
+                    serde_pickle::to_vec(&msg, Default::default()).unwrap();
+                Ok(pkl)
+            }
+            Err(e) => Err(DecodeError(e).into()),
         }
-        Err(e) => transform_error(e),
+    } else {
+        Err(PyAssertionError::new_err(format!(
+            "BDS 0,5: invalid typecode {}",
+            tc
+        )))
     }
 }
 
@@ -64,7 +76,7 @@ fn decode_bds10(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -76,7 +88,7 @@ fn decode_bds17(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -88,7 +100,7 @@ fn decode_bds18(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -100,7 +112,7 @@ fn decode_bds19(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -112,7 +124,7 @@ fn decode_bds20(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -124,7 +136,7 @@ fn decode_bds21(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -136,7 +148,7 @@ fn decode_bds30(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -148,7 +160,7 @@ fn decode_bds40(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -160,7 +172,7 @@ fn decode_bds44(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 #[pyfunction]
@@ -171,7 +183,7 @@ fn decode_bds45(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -183,7 +195,7 @@ fn decode_bds50(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
@@ -195,19 +207,30 @@ fn decode_bds60(msg: String) -> PyResult<Vec<u8>> {
             let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
             Ok(pkl)
         }
-        Err(e) => transform_error(e),
+        Err(e) => Err(DecodeError(e).into()),
     }
 }
 
 #[pyfunction]
 fn decode_bds65(msg: String) -> PyResult<Vec<u8>> {
     let bytes = hex::decode(msg).unwrap();
-    match AircraftOperationStatus::from_bytes((&bytes[4..], 0)) {
-        Ok((_, msg)) => {
-            let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
-            Ok(pkl)
+    let tc = &bytes[4] >> 3;
+    let enum_id = &bytes[4] & 0b111;
+    match (tc, enum_id) {
+        (31, id) if id < 2 => {
+            match AircraftOperationStatus::from_bytes((&bytes[4..], 0)) {
+                Ok((_, msg)) => {
+                    let pkl =
+                        serde_pickle::to_vec(&msg, Default::default()).unwrap();
+                    Ok(pkl)
+                }
+                Err(e) => Err(DecodeError(e).into()),
+            }
         }
-        Err(e) => transform_error(e),
+        _ => Err(PyAssertionError::new_err(format!(
+            "BDS 6,5: invalid typecode {} (31) or category {} (0 or 1)",
+            tc, enum_id
+        ))),
     }
 }
 

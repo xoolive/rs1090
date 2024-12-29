@@ -49,12 +49,17 @@ pub fn decode(msg: &str) -> Result<JsValue, JsError> {
 #[wasm_bindgen]
 pub fn decode_bds05(msg: &str) -> Result<JsValue, JsError> {
     let bytes = hex::decode(msg)?;
-    match AirbornePosition::from_bytes((&bytes[4..], 0)) {
-        Ok((_, msg)) => {
-            let map_result = serde_wasm_bindgen::to_value(&msg)?;
-            Ok(map_result)
+    let tc = &bytes[4] >> 3;
+    if (9..22).contains(&tc) && tc != 19 {
+        match AirbornePosition::from_bytes((&bytes[4..], 0)) {
+            Ok((_, msg)) => {
+                let map_result = serde_wasm_bindgen::to_value(&msg)?;
+                Ok(map_result)
+            }
+            Err(e) => Err(DecodeError(e).into()),
         }
-        Err(e) => Err(DecodeError(e).into()),
+    } else {
+        Err(JsError::new(&format!("BDS 0,5: invalid typecode {}", tc)))
     }
 }
 
@@ -205,11 +210,21 @@ pub fn decode_bds60(msg: &str) -> Result<JsValue, JsError> {
 #[wasm_bindgen]
 pub fn decode_bds65(msg: &str) -> Result<JsValue, JsError> {
     let bytes = hex::decode(msg)?;
-    match AircraftOperationStatus::from_bytes((&bytes[4..], 0)) {
-        Ok((_, msg)) => {
-            let map_result = serde_wasm_bindgen::to_value(&msg)?;
-            Ok(map_result)
+    let tc = &bytes[4] >> 3;
+    let enum_id = &bytes[4] & 0b111;
+    match (tc, enum_id) {
+        (31, id) if id < 2 => {
+            match AircraftOperationStatus::from_bytes((&bytes[4..], 0)) {
+                Ok((_, msg)) => {
+                    let map_result = serde_wasm_bindgen::to_value(&msg)?;
+                    Ok(map_result)
+                }
+                Err(e) => Err(DecodeError(e).into()),
+            }
         }
-        Err(e) => Err(DecodeError(e).into()),
+        _ => Err(JsError::new(&format!(
+            "BDS 6,5: invalid typecode {} (31) or category {} (0 or 1)",
+            tc, enum_id
+        ))),
     }
 }
