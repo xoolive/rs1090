@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2
+
+- Fix BDS 6,5 bug for DF 21
+- Implement WebAssembly bindings
+
 ## 0.4.1
 
 - Fix building scripts in GitHub releases
