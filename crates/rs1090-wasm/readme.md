@@ -34,6 +34,13 @@ In the Observable platform, you have to import the web library in a little convo
 rs1090 = {
   let module = await import("https://unpkg.com/rs1090-wasm/web/rs1090_wasm.js");
   await module.default("https://unpkg.com/rs1090-wasm/web/rs1090_wasm_bg.wasm");
+  module.run(); // get better error messages if the Rust code panics
   return module;
 }
+```
+
+You can also just simply:
+
+```js
+import { rs1090 } from "@xoolive/rs1090";
 ```
