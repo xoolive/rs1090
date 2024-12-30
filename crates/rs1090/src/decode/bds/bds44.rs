@@ -59,13 +59,16 @@ fn read_wind_speed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".into()));
+            return Err(DekuError::Assertion(
+                "Invalid wind speed value".into(),
+            ));
         } else {
             return Ok(None);
         }
     }
     if value > 250 {
-        return Err(DekuError::Assertion("BDS 4,4 status".into()));
+        let msg = format!("Invalid wind speed {} kts > 250 kts", value);
+        return Err(DekuError::Assertion(msg.into()));
     }
 
     Ok(Some(value))
@@ -82,7 +85,9 @@ fn read_wind_direction<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if speed.is_none() {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".into()));
+            return Err(DekuError::Assertion(
+                "Invalid wind direction value".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -110,7 +115,8 @@ fn read_temperature<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     };
 
     if !(-80. ..=60.).contains(&temp) {
-        return Err(DekuError::Assertion("BDS 4,4 status".into()));
+        let msg = "Invalid temperature value {}°C outside [-80, 60]";
+        return Err(DekuError::Assertion(msg.into()));
     }
     Ok(temp)
 }
@@ -129,14 +135,16 @@ fn read_pressure<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".into()));
+            return Err(DekuError::Assertion("Invalid pressure value".into()));
         } else {
             return Ok(None);
         }
     }
 
     // Never seen any anyway
-    Err(DekuError::Assertion("BDS 4,4 status".into()))
+    Err(DekuError::Assertion(
+        "Pressure never seen before, message deemed invalid".into(),
+    ))
 
     // return Ok((rest, Some(value)));
 }
@@ -155,7 +163,9 @@ fn read_turbulence<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".into()));
+            return Err(DekuError::Assertion(
+                "Invalid turbulence status".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -186,7 +196,7 @@ fn read_humidity<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,4 status".into()));
+            return Err(DekuError::Assertion("Invalid humidity value".into()));
         } else {
             return Ok(None);
         }

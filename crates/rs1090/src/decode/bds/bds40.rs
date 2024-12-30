@@ -30,7 +30,7 @@ pub struct SelectedVerticalIntention {
     #[serde(skip)]
     #[deku(map = "|v: u8| {
         if v == 0 { Ok(v) } else {
-            Err(DekuError::Assertion(\"Reserved bits to 0\".into()))
+            Err(DekuError::Assertion(\"Reserved bits must be 0\".into()))
         }
     }")]
     #[deku(bits = 8)]
@@ -52,7 +52,7 @@ pub struct SelectedVerticalIntention {
 
     #[deku(map = "|v: u8| {
         if v == 0 { Ok(v) } else {
-            Err(DekuError::Assertion(\"Reserved bits to 0\".into()))
+            Err(DekuError::Assertion(\"Reserved bits must be 0\".into()))
         }
     }")]
     #[deku(bits = 2)]
@@ -103,7 +103,9 @@ fn read_selected<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,0 status".into()));
+            return Err(DekuError::Assertion(
+                "Invalid selected_fms or mcp value".into(),
+            ));
         } else {
             return Ok(None);
         }
@@ -112,7 +114,11 @@ fn read_selected<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     // (encoded as a multiple of 16, but rounded to the closest 100 ft)
     let value = (value + 8) / 100 * 100;
     if value > 45000 {
-        return Err(DekuError::Assertion("BDS 4,0 status".into()));
+        let msg = format!(
+            "Value for selected_fms or selected_mcp: {} ft > 45000 ft",
+            value
+        );
+        return Err(DekuError::Assertion(msg.into()));
     }
 
     Ok(Some(value))
@@ -132,7 +138,7 @@ fn read_qnh<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if !status {
         if value != 0 {
-            return Err(DekuError::Assertion("BDS 4,0 status".into()));
+            return Err(DekuError::Assertion("Invalid QNH value".into()));
         } else {
             return Ok(None);
         }

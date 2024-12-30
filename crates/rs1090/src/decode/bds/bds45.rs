@@ -75,7 +75,7 @@ fn read_level<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         (true, 3) => Ok(Some(Level::Severe)),
         (true, _) => unreachable!(),
         (false, 0) => Ok(None),
-        (false, _) => Err(DekuError::Assertion("invalid data".into())),
+        (false, _) => Err(DekuError::Assertion("Invalid level value".into())),
     }
 }
 
@@ -106,17 +106,18 @@ fn read_temperature<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         temperature
     );
 
+    let msg = "Invalid temperature value {}°C outside [-80, 60]";
     match (status, value, temperature) {
         (true, _, temperature) if (-80. ..=60.).contains(&temperature) => {
             Ok(Some(temperature))
         }
-        (true, _, _) => Err(DekuError::Assertion(
-            "Temperature {} should be between -80 and +60".into(),
-        )),
+        (true, _, _) => Err(DekuError::Assertion(msg.into())),
         //(false, _) => Ok(None),
         // In practice, I see quite some pressure fields with invalid status but non zero values
         (false, 0, _) => Ok(None),
-        (false, _, _) => Err(DekuError::Assertion("invalid data".into())),
+        (false, _, _) => {
+            Err(DekuError::Assertion("Invalid temperature value".into()))
+        }
     }
 }
 
@@ -139,7 +140,9 @@ fn read_pressure<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         //(false, _) => Ok(None),
         // In practice, I see quite some pressure fields with invalid status but non zero values
         (false, 0) => Ok(None),
-        (false, _) => Err(DekuError::Assertion("invalid data".into())),
+        (false, _) => {
+            Err(DekuError::Assertion("Invalid pressure value".into()))
+        }
     }
 }
 
@@ -160,7 +163,7 @@ fn read_height<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     match (status, value) {
         (true, value) => Ok(Some(value * 16)),
         (false, 0) => Ok(None),
-        (false, _) => Err(DekuError::Assertion("invalid data".into())),
+        (false, _) => Err(DekuError::Assertion("Invalid height value".into())),
     }
 }
 
