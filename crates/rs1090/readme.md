@@ -73,6 +73,12 @@ fn main() {
 
 See more examples in the `crates/rs1090/examples` folder.
 
+## jet1090
+
+The jet1090 executable is documented on [https://mode-s.org/jet1090](https://mode-s.org/jet1090)
+
+![jet1090](https://raw.githubusercontent.com/xoolive/rs1090/refs/heads/master/docs/images/jet1090-table.png)
+
 ## Python bindings
 
 You may install the bindings compiled for most Python versions with:
@@ -131,7 +137,7 @@ For FLARM messages (also as batches):
 
 ## WebAssembly bindings
 
-Usage is documented on Observable: [https://observablehq.com/@xoolive/rs1090](https://observablehq.com/@xoolive/rs1090).
+Usage is documented on [https://observablehq.com/@xoolive/rs1090](https://observablehq.com/@xoolive/rs1090).
 
 ## decode1090
 
@@ -142,19 +148,20 @@ Usage is available with the help command.
 decode1090 --help
 ```
 
-## jet1090
-
-The jet1090 executable is documented on [https://mode-s.org/jet1090](https://mode-s.org/jet1090)
-
-![jet1090](https://raw.githubusercontent.com/xoolive/rs1090/refs/heads/master/docs/images/jet1090-table.png)
-
-## nix
+## Nix platform
 
 This repository provides a Nix flake configuration for building and managing this project.
+
+You may run the following to get the `jet1090` and `decode1090` executables in your PATH
+
+```sh
+nix profile install
+```
+
+For reference:
 
 ```sh
 nix develop  # open a shell with the proper environment to compile rs1090
 nix build  # build the jet1090 executable
 nix run  # run the jet1090 executable
-nix profile install  # install jet1090 and decode1090 in your PATH
 ```
