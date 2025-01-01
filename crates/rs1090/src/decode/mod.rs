@@ -10,6 +10,7 @@ use adsb::{ADSB, ME};
 use commb::{DF20DataSelector, DF21DataSelector};
 use crc::modes_checksum;
 use deku::prelude::*;
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use tracing::debug;
@@ -496,12 +497,23 @@ pub struct SensorMetadata {
     pub name: Option<String>,
 }
 
-static mut SERIALIZE_DECODE_TIME: bool = false;
-fn skip_serialize_decode_time(field: &Option<f64>) -> bool {
-    unsafe { !SERIALIZE_DECODE_TIME | field.is_none() }
+#[derive(Debug)]
+struct SerializeConfig {
+    /// Include the decode time in the serialization process (default: false)
+    pub decode_time: bool,
 }
-pub fn serialize_decode_time() {
-    unsafe { SERIALIZE_DECODE_TIME = true };
+
+static CONFIG: OnceCell<SerializeConfig> = OnceCell::new();
+
+fn skip_serialize_decode_time(field: &Option<f64>) -> bool {
+    let decode_time = CONFIG.get().map(|cfg| cfg.decode_time).unwrap_or(false);
+    !decode_time | field.is_none()
+}
+
+pub fn serialize_config(decode_time: bool) {
+    CONFIG
+        .set(SerializeConfig { decode_time })
+        .expect("configuration can only happen once");
 }
 
 #[derive(Serialize)]

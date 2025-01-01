@@ -17,7 +17,7 @@ use crossterm::event::KeyCode;
 use ratatui::widgets::*;
 use redis::AsyncCommands;
 use rs1090::decode::cpr::{decode_position, AircraftState};
-use rs1090::decode::serialize_decode_time;
+use rs1090::decode::serialize_config;
 use rs1090::prelude::*;
 use sensor::Sensor;
 use serde::Deserialize;
@@ -195,7 +195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         options.deduplication = cli_options.deduplication;
     }
     if options.stats.unwrap_or(false) {
-        serialize_decode_time();
+        serialize_config(true);
     }
 
     options.sources.append(&mut cli_options.sources);
