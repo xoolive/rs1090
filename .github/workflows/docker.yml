@@ -1,9 +1,9 @@
 name: docker
 
 on:
-  # push:
-  #   tags:
-  #     - "v*"
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       tag:
@@ -28,8 +28,8 @@ jobs:
       - name: Set version variable
         id: vars
         run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            echo "JET1090_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "JET1090_VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
           else
             echo "JET1090_VERSION=${{ inputs.tag }}" >> $GITHUB_ENV
           fi
