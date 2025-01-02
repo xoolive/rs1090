@@ -1,0 +1,41 @@
+name: docker
+
+on:
+  # push:
+  #   tags:
+  #     - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "jet1090 version"
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Podman
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set version variable
+        id: vars
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "JET1090_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+          else
+            echo "JET1090_VERSION=${{ inputs.tag }}" >> $GITHUB_ENV
+          fi
+
+      - name: Build image
+        run: podman image build -t ghcr.io/${{ github.repository_owner }}/jet1090:${{ env.JET1090_VERSION }} --build-arg VERSION=${{ env.JET1090_VERSION }} -f container/jet1090.Dockerfile .
+
+      - name: Push the image
+        run: podman push ghcr.io/${{ github.repository_owner }}/jet1090:${{ env.JET1090_VERSION }}
