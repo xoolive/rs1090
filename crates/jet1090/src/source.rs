@@ -72,6 +72,8 @@ pub struct Source {
     /// Localize the source of data (only for single sensors)
     #[serde(flatten)]
     pub reference: Option<Position>,
+    /// Localize the source of data, altitude (in m, WGS84 height)
+    pub altitude: Option<f64>,
 }
 
 fn build_serial(input: &str) -> u64 {
@@ -127,6 +129,7 @@ impl FromStr for Source {
             address,
             name: None,
             reference: None,
+            altitude: None,
         };
 
         if let Some(query) = url.query() {

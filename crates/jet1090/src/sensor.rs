@@ -18,6 +18,8 @@ pub struct Sensor {
     pub name: Option<String>,
     /// An (optional) position to decode ground messages (DF=18 or 17, BDS=0,6)
     pub reference: Option<Position>,
+    /// An (optional) position altitude (in m, WGS84 height)
+    pub altitude: Option<f64>,
     /// How many aircraft are seen by the sensor
     pub aircraft_count: u64,
     /// The timestamp for the last seen message
@@ -37,6 +39,7 @@ pub async fn sensors(value: &Source) -> Vec<Sensor> {
                 serial: value.serial(),
                 name: value.name.clone(),
                 reference: value.reference,
+                altitude: value.altitude,
                 aircraft_count: 0,
                 last_timestamp: 0,
             }]
@@ -57,6 +60,12 @@ pub async fn sensors(value: &Source) -> Vec<Sensor> {
                                 longitude: pos.longitude,
                             },
                         ),
+                        altitude: elt
+                            .gnss
+                            .as_ref()
+                            .unwrap()
+                            .position
+                            .map(|pos| pos.height),
                         name: Some(elt.alias.to_string()),
                         aircraft_count: 0,
                         last_timestamp: 0,
