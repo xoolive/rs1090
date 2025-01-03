@@ -2,6 +2,7 @@
 
 mod aircraftdb;
 mod dedup;
+mod filters;
 mod sensor;
 mod shell;
 mod snapshot;
@@ -10,7 +11,8 @@ mod table;
 mod tui;
 mod web;
 
-use crate::shell::Shell;
+use crate::tui::Event;
+use crate::web::TrackQuery;
 use clap::{Command, CommandFactory, Parser, ValueHint};
 use clap_complete::{generate, Generator};
 use crossterm::event::KeyCode;
@@ -31,9 +33,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use tui::Event;
 use warp::Filter;
-use web::TrackQuery;
 
 #[derive(Default, Deserialize, Parser)]
 #[command(
@@ -63,6 +63,14 @@ struct Options {
     #[arg(long, short = 'x')]
     history_expire: Option<u64>,
 
+    /// Downlink formats to select for stdout, file output and history in REST API (keep empty to select all)
+    #[arg(long, value_name = "DF")]
+    df_filter: Option<Vec<u16>>,
+
+    /// Aircraft addresses to select for stdout, file output and history in REST API (keep empty to select all)
+    #[arg(long, value_name = "ICAO24")]
+    aircraft_filter: Option<Vec<ICAO>>,
+
     /// Prevent the computer sleeping when decoding is in progress
     #[arg(long, default_value=None)]
     prevent_sleep: bool,
@@ -81,7 +89,7 @@ struct Options {
     /// Shell completion generation
     #[arg(long = "completion", value_enum)]
     #[serde(skip)]
-    completion: Option<Shell>,
+    completion: Option<shell::Shell>,
 
     /// List the sources of data following the format \[host:\]port\[\@reference\]
     //
@@ -173,6 +181,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli_options.history_expire.is_some() {
         options.history_expire = cli_options.history_expire;
     }
+    if cli_options.df_filter.is_some() {
+        options.df_filter = cli_options.df_filter;
+    }
+    if cli_options.aircraft_filter.is_some() {
+        options.aircraft_filter = cli_options.aircraft_filter;
+    }
     if cli_options.prevent_sleep {
         options.prevent_sleep = cli_options.prevent_sleep;
     }
@@ -240,6 +254,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None => None,
     };
     let redis_topic = options.redis_topic.unwrap_or("jet1090".to_string());
+
+    let filters = filters::Filters {
+        df_filter: options
+            .df_filter
+            .map(|df| df.into_iter().map(|v| format!("{}", v)).collect()),
+        aircraft_filter: options.aircraft_filter,
+    };
 
     let mut file = if let Some(output_path) = options.output {
         let output_path = expanduser(PathBuf::from(output_path));
@@ -523,13 +544,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
 
+        let is_in = filters::Filters::is_in(&filters, &msg);
+
         if let Ok(json) = serde_json::to_string(&msg) {
-            if options.verbose {
+            if options.verbose & is_in {
                 println!("{}", json);
             }
-            if let Some(file) = &mut file {
-                file.write_all(json.as_bytes()).await?;
-                file.write_all("\n".as_bytes()).await?;
+
+            if is_in {
+                if let Some(file) = &mut file {
+                    file.write_all(json.as_bytes()).await?;
+                    file.write_all("\n".as_bytes()).await?;
+                }
             }
 
             if let Some(c) = &mut redis_connect {
@@ -539,7 +565,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         match options.history_expire {
             Some(0) => (),
-            _ => snapshot::store_history(&app_dec, msg, &aircraftdb).await,
+            _ => {
+                if is_in {
+                    snapshot::store_history(&app_dec, msg, &aircraftdb).await
+                }
+            }
         }
 
         if app_dec.lock().await.should_quit {

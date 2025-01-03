@@ -641,6 +641,17 @@ impl Serialize for ICAO {
     }
 }
 
+impl<'de> Deserialize<'de> for ICAO {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        <ICAO as std::str::FromStr>::from_str(&s)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
 impl core::str::FromStr for ICAO {
     type Err = core::num::ParseIntError;
 
@@ -649,6 +660,13 @@ impl core::str::FromStr for ICAO {
         Ok(Self(num))
     }
 }
+
+impl From<IcaoParity> for ICAO {
+    fn from(ap: IcaoParity) -> Self {
+        Self(ap.0)
+    }
+}
+
 /// 13 bit identity code (squawk code), a 4-octal digit identifier
 #[derive(PartialEq, DekuRead, Copy, Clone)]
 pub struct IdentityCode(#[deku(reader = "Self::read(deku::reader)")] pub u16);
