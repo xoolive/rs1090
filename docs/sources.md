@@ -142,7 +142,7 @@ websocat ws://localhost:9876/5678
 
     [Service]
     Type=simple
-    ExecStart=/home/user/.local/bin/websocat -b -u udp-l:127.0.0.1:%i ws://0.0.0.0:9876/%i
+    ExecStart=/home/user/.local/bin/websocat -b -u udp-l:0.0.0.0:%i ws://0.0.0.0:9876/%i
     RestartSec=3
 
     [Install]
