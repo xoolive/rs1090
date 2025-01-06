@@ -58,6 +58,12 @@ The prebuilt binaries are compiled with all features activated. In particular, s
     sudo apt install libsoapysdr-dev soapysdr-module-rtlsdr
     ```
 
+=== "Arch Linux"
+
+    ```sh
+    sudo pacman -S soapyrtlsdr
+    ```
+
 === "Homebrew"
 
     Dependencies are automatically installed if you install `jet1090` through Homebrew. You have to run the command to build the project from source.
