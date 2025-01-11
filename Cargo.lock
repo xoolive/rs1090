@@ -2211,6 +2211,7 @@ dependencies = [
  "keepawake",
  "ratatui",
  "redis",
+ "regex",
  "reqwest",
  "rs1090",
  "rusqlite",

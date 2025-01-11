@@ -325,6 +325,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sort_key: SortKey::default(),
         sort_asc: false,
         width,
+        is_search_mode: false,
+        search_query: "".to_string(),
     }));
     let app_dec = app_tui.clone();
     let app_web = app_tui.clone();
@@ -591,6 +593,8 @@ pub struct Jet1090 {
     sort_key: SortKey,
     sort_asc: bool,
     width: u16,
+    is_search_mode: bool,
+    search_query: String,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -611,30 +615,29 @@ fn update(
     match event {
         Event::Key(key) => {
             use KeyCode::*;
-            match key.code {
-                Char('j') | Down => jet1090.next(),
-                Char('k') | Up => jet1090.previous(),
-                Char('g') | PageUp | Home => jet1090.home(),
-                Char('q') | Esc => jet1090.should_quit = true,
-                Char('a') => {
-                    jet1090.sort_key = SortKey::ALTITUDE;
+
+            match (jet1090.is_search_mode, key.code) {
+                (true, Char(c)) => jet1090.search_query.push(c),
+                (true, Backspace) => {
+                    jet1090.search_query.pop();
                 }
-                Char('c') => {
-                    jet1090.sort_key = SortKey::CALLSIGN;
+                (true, Enter) => jet1090.is_search_mode = false,
+                (true, Esc) => {
+                    jet1090.is_search_mode = false;
+                    jet1090.search_query = "".to_string()
                 }
-                Char('v') => {
-                    jet1090.sort_key = SortKey::VRATE;
-                }
-                Char('.') => {
-                    jet1090.sort_key = SortKey::COUNT;
-                }
-                Char('f') => {
-                    jet1090.sort_key = SortKey::FIRST;
-                }
-                Char('l') => {
-                    jet1090.sort_key = SortKey::LAST;
-                }
-                Char('-') => jet1090.sort_asc = !jet1090.sort_asc,
+                (false, Char('j')) | (_, Down) => jet1090.next(),
+                (false, Char('k')) | (_, Up) => jet1090.previous(),
+                (false, Char('g')) | (_, PageUp) | (_, Home) => jet1090.home(),
+                (false, Char('q')) | (false, Esc) => jet1090.should_quit = true,
+                (false, Char('a')) => jet1090.sort_key = SortKey::ALTITUDE,
+                (false, Char('c')) => jet1090.sort_key = SortKey::CALLSIGN,
+                (false, Char('v')) => jet1090.sort_key = SortKey::VRATE,
+                (false, Char('.')) => jet1090.sort_key = SortKey::COUNT,
+                (false, Char('f')) => jet1090.sort_key = SortKey::FIRST,
+                (false, Char('l')) => jet1090.sort_key = SortKey::LAST,
+                (false, Char('-')) => jet1090.sort_asc = !jet1090.sort_asc,
+                (false, Char('/')) => jet1090.is_search_mode = true,
                 _ => {}
             }
         }

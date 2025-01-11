@@ -1,13 +1,15 @@
 use chrono::prelude::*;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
+use regex::Regex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use style::palette::tailwind;
 
 use crate::snapshot::Snapshot;
 use crate::{Jet1090, SortKey};
 
-const INFO_TEXT: &str = "(Esc/Q) quit | (↑/K) up | (↓/J) down | (⤒/G) top";
+const INFO_TEXT: &str =
+    "(Esc/Q) quit | (↑/K) up | (↓/J) down | (⤒/G) top | (/) search";
 
 /**
  * Rendering of the table in interactive mode
@@ -23,11 +25,37 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
 
     let states = &app.state_vectors;
 
-    app.items = states
-        .values()
-        .filter(|sv| {
-            (sv.cur.count > 1) && (now as i64 - sv.cur.lastseen as i64) < 30
-        })
+    // Filter items based on search query
+    let search_query = app.search_query.to_lowercase().replace("-", "");
+    let search_regex =
+        Regex::new(&search_query).unwrap_or_else(|_| Regex::new("").unwrap());
+    let filtered_states =
+        states
+            .values()
+            .filter(|sv| {
+                (sv.cur.count > 1)
+                    && (now as i64 - sv.cur.lastseen as i64) < 30
+                    && (sv.cur.callsign.as_ref().is_some_and(|s| {
+                        search_regex.is_match(&s.to_lowercase())
+                    }) || search_regex
+                        .is_match(&sv.cur.icao24.to_lowercase())
+                        || sv.cur.typecode.as_ref().is_some_and(|s| {
+                            search_regex.is_match(&s.to_lowercase())
+                        })
+                        || sv.cur.registration.as_ref().is_some_and(|s| {
+                            search_regex
+                                .is_match(&s.replace("-", "").to_lowercase())
+                        })
+                        || sv.cur.metadata.iter().any(|m| {
+                            m.name.as_ref().is_some_and(|n| {
+                                search_regex.is_match(&n.to_lowercase())
+                            })
+                        }))
+            })
+            .collect::<Vec<&StateVectors>>();
+
+    app.items = filtered_states
+        .iter()
         .map(|sv| sv.cur.icao24.to_string())
         .collect();
 
@@ -38,12 +66,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     let colors = TableColors::new(&tailwind::CYAN);
 
     use crate::snapshot::StateVectors;
-    let mut sorted_elts = states
-        .values()
-        .filter(|sv| {
-            (sv.cur.count > 1) && (now as i64 - sv.cur.lastseen as i64) < 30
-        })
-        .collect::<Vec<&StateVectors>>();
+    let mut sorted_elts = filtered_states;
 
     let sort_by = match &app.sort_key {
         SortKey::ALTITUDE => |a: &&StateVectors, b: &&StateVectors| {
@@ -252,12 +275,24 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
     );
 
     let area = rects[1];
-    frame.render_widget(
-        Paragraph::new(Line::from(INFO_TEXT))
+    if app.is_search_mode {
+        frame.render_widget(
+            Paragraph::new(Line::from(format!(
+                "Search (Esc to cancel, Enter to lock): {}",
+                app.search_query
+            )))
             .style(Style::new().fg(colors.row_fg).bg(colors.buffer_bg))
-            .centered(),
-        area,
-    );
+            .left_aligned(),
+            area,
+        );
+    } else {
+        frame.render_widget(
+            Paragraph::new(Line::from(INFO_TEXT))
+                .style(Style::new().fg(colors.row_fg).bg(colors.buffer_bg))
+                .centered(),
+            area,
+        );
+    }
 }
 
 /**

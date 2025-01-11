@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.3
+
+- Add a search bar (regex accepted, based on callsign, icao24, registration, typecode and receptor name)
+- Filter icao24 and DF types in output
+- Sensors/Receptors have an altitude field
+- Catch more error for BDS 0,5 and 6,5
+- Improve error messages on some BDS types
+
 ## 0.4.2
 
 - Fix BDS 6,5 bug for DF 21
