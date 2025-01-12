@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use num_complex::Complex;
-use soapysdr::{Args, Device, Direction};
+use soapysdr::{configure_logging, Args, Device, Direction};
 use tokio::sync::mpsc;
 
 use crate::decode::crc::modes_checksum;
@@ -32,6 +32,7 @@ pub async fn receiver<A: Into<Args> + fmt::Display + std::marker::Copy>(
         }
         None => info!("Trying to connect rtlsdr with options: driver=rtlsdr"),
     }
+    configure_logging();
     let device = match args {
         None => Device::new("driver=rtlsdr"),
         Some(args) => Device::new(args),

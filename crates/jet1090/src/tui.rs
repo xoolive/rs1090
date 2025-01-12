@@ -3,22 +3,22 @@ use crossterm::execute;
 use crossterm::terminal::*;
 use futures::{FutureExt, StreamExt};
 use ratatui::prelude::*;
-use std::io::{self, stderr, Stderr};
+use std::io::{self, stdout, Stdout};
 use tokio::sync::mpsc;
 
 /// A type alias for the terminal type used in this application
-pub type Tui = Terminal<CrosstermBackend<Stderr>>;
+pub type Tui = Terminal<CrosstermBackend<Stdout>>;
 
 /// Initialize the terminal
 pub fn init() -> io::Result<Tui> {
-    execute!(stderr(), EnterAlternateScreen)?;
+    execute!(stdout(), EnterAlternateScreen)?;
     enable_raw_mode()?;
-    Terminal::new(CrosstermBackend::new(stderr()))
+    Terminal::new(CrosstermBackend::new(stdout()))
 }
 
 /// Restore the terminal to its original state
 pub fn restore() -> io::Result<()> {
-    execute!(stderr(), LeaveAlternateScreen)?;
+    execute!(stdout(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
     Ok(())
 }
