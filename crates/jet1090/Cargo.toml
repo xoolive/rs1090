@@ -34,7 +34,7 @@ reqwest = "0.12.9"
 rs1090 = { version = "0.4.4", path = "../rs1090" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.134"
+serde_json = "1.0.135"
 soapysdr = { version = "0.4.1", optional = true }
 tokio = { version = "1.42.0", features = ["full"] }
 toml = "0.8.19"
