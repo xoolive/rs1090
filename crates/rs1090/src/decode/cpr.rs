@@ -316,8 +316,10 @@ pub fn airborne_position_with_reference(
         360. / 59.
     };
 
-    /* let j = libm::floor(latitude_ref / d_lat)
-    + libm::floor(0.5 + modulo(latitude_ref, d_lat) / d_lat - cpr_lat); */
+    /* Older implementation:
+      let j = libm::floor(latitude_ref / d_lat)
+        + libm::floor(0.5 + modulo(latitude_ref, d_lat) / d_lat - cpr_lat);
+    */
 
     // From 1090 MOPS, Vol.1  DO-260C, A.1.7.5
     let j = libm::floor(0.5 + latitude_ref / d_lat - cpr_lat);
@@ -338,8 +340,13 @@ pub fn airborne_position_with_reference(
         nl(lat) - 1
     };
     let d_lon = if ni > 0 { 360. / ni as f64 } else { 360. };
-    /*let m = libm::floor(longitude_ref / d_lon)
-    + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);*/
+
+    /* Older implementation:
+        let m = libm::floor(longitude_ref / d_lon)
+          + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);
+    */
+
+    // From 1090 MOPS, Vol.1  DO-260C, A.1.7.5
     let m = libm::floor(0.5 + longitude_ref / d_lon - cpr_lon);
     let lon = d_lon * (m + cpr_lon);
 
