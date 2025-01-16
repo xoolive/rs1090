@@ -316,8 +316,11 @@ pub fn airborne_position_with_reference(
         360. / 59.
     };
 
-    let j = libm::floor(latitude_ref / d_lat)
-        + libm::floor(0.5 + modulo(latitude_ref, d_lat) / d_lat - cpr_lat);
+    /* let j = libm::floor(latitude_ref / d_lat)
+    + libm::floor(0.5 + modulo(latitude_ref, d_lat) / d_lat - cpr_lat); */
+
+    // From 1090 MOPS, Vol.1  DO-260C, A.1.7.5
+    let j = libm::floor(0.5 + latitude_ref / d_lat - cpr_lat);
 
     let lat = d_lat * (j + cpr_lat);
 
@@ -335,8 +338,9 @@ pub fn airborne_position_with_reference(
         nl(lat) - 1
     };
     let d_lon = if ni > 0 { 360. / ni as f64 } else { 360. };
-    let m = libm::floor(longitude_ref / d_lon)
-        + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);
+    /*let m = libm::floor(longitude_ref / d_lon)
+    + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);*/
+    let m = libm::floor(0.5 + longitude_ref / d_lon - cpr_lon);
     let lon = d_lon * (m + cpr_lon);
 
     // Check that the answer is not more than half a cell away
@@ -681,6 +685,31 @@ mod tests {
 
         assert_relative_eq!(latitude, 49.81755, max_relative = 1e-3);
         assert_relative_eq!(longitude, 6.08442, max_relative = 1e-3);
+    }
+
+    #[test]
+    fn decode_airborne_position_with_reference_numerical_challenge() {
+        let lat_ref = 30.508474576271183; // Close to (360.0/59.0)*5
+        let lon_ref = 7.2 * 5.0 + 3e-15;
+
+        let bytes = hex!("8d06a15358bf17ff7d4a84b47b95");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+
+        let msg = match msg.df {
+            ExtendedSquitterADSB(msg) => match msg.message {
+                ME::BDS05(me) => me,
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        };
+
+        let Position {
+            latitude,
+            longitude,
+        } = airborne_position_with_reference(&msg, lat_ref, lon_ref).unwrap();
+
+        assert_relative_eq!(latitude, 30.50540, max_relative = 1e-3);
+        assert_relative_eq!(longitude, 33.44787, max_relative = 1e-3);
     }
 
     #[test]
