@@ -342,8 +342,8 @@ pub fn airborne_position_with_reference(
     let d_lon = if ni > 0 { 360. / ni as f64 } else { 360. };
 
     /* Older implementation:
-        let m = libm::floor(longitude_ref / d_lon)
-          + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);
+      let m = libm::floor(longitude_ref / d_lon)
+        + libm::floor(0.5 + modulo(longitude_ref, d_lon) / d_lon - cpr_lon);
     */
 
     // From 1090 MOPS, Vol.1  DO-260C, A.1.7.5
