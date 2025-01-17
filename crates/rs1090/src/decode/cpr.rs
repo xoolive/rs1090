@@ -199,14 +199,9 @@ fn nl(lat: f64) -> u64 {
 const D_LAT_EVEN: f64 = 360.0 / (4.0 * NZ);
 const D_LAT_ODD: f64 = 360.0 / (4.0 * NZ - 1.0);
 
-// Main difference for % between Python and Rust is that in Rust, the sign
-// of the result matches the sign of the dividend.
+// Module implementation according to 1090 MOPS, Vol.1 DO-260C, A.1.7.5
 fn modulo(a: f64, b: f64) -> f64 {
-    if a >= 0. {
-        a % b
-    } else {
-        a % b + libm::fabs(b)
-    }
+    a - b * libm::floor(a / b)
 }
 
 /**
