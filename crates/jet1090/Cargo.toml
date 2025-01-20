@@ -32,7 +32,7 @@ redis = { version = "0.28.1", features = ["tokio-comp"] }
 regex = "1.11.1"
 reqwest = "0.12.9"
 rs1090 = { version = "0.4.4", path = "../rs1090" }
-rusqlite = { version = "0.32.1", features = ["bundled"] }
+rusqlite = { version = "0.33.0", features = ["bundled"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.135"
 soapysdr = { version = "0.4.1", optional = true }
