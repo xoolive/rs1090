@@ -11,7 +11,7 @@ edition.workspace = true
 homepage.workspace = true
 
 [dependencies]
-clap = { version = "4.5.26", features = ["color", "derive", "wrap_help"] }
+clap = { version = "4.5.27", features = ["color", "derive", "wrap_help"] }
 deku = "0.18.1"
 futures-util = "0.3.31"
 hex = "0.4.3"
