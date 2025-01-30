@@ -67,3 +67,13 @@ def test_adsb_target_state_status() -> None:
     assert not msg["approach_mode"]
     assert msg["lnav_mode"]
     assert msg["tcas_operational"]
+
+
+def test_adsb_with_position() -> None:
+    msg = rs1090.decode(
+        "90343652300003eeda6de84f1ad2", reference=(40.48, -3.56)
+    )
+    assert rs1090.is_df18(msg)
+    assert rs1090.is_bds06(msg)
+    assert msg["latitude"] == approx(40.4749)
+    assert msg["longitude"] == approx(-3.57068)

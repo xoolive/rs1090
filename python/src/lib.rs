@@ -22,7 +22,10 @@ use rs1090::decode::bds::bds45::MeteorologicalHazardReport;
 use rs1090::decode::bds::bds50::TrackAndTurnReport;
 use rs1090::decode::bds::bds60::HeadingAndSpeedReport;
 use rs1090::decode::bds::bds65::AircraftOperationStatus;
-use rs1090::decode::cpr::{decode_positions, Position};
+use rs1090::decode::cpr::{
+    airborne_position_with_reference, decode_positions,
+    surface_position_with_reference, Position,
+};
 use rs1090::decode::flarm::Flarm;
 use rs1090::prelude::*;
 
@@ -36,6 +39,57 @@ fn decode_1090(msg: String) -> PyResult<Vec<u8>> {
         Ok([128, 4, 78, 46].to_vec()) // None
     }
 }
+
+fn decode_message_with_reference(me: &mut ME, reference: [f64; 2]) {
+    let [latitude_ref, longitude_ref] = reference;
+    match me {
+        ME::BDS05(airborne) => {
+            if let Some(pos) = airborne_position_with_reference(
+                airborne,
+                latitude_ref,
+                longitude_ref,
+            ) {
+                airborne.latitude = Some(pos.latitude);
+                airborne.longitude = Some(pos.longitude);
+            }
+        }
+        ME::BDS06(surface) => {
+            if let Some(pos) = surface_position_with_reference(
+                surface,
+                latitude_ref,
+                longitude_ref,
+            ) {
+                surface.latitude = Some(pos.latitude);
+                surface.longitude = Some(pos.longitude);
+            }
+        }
+        _ => (),
+    }
+}
+
+#[pyfunction]
+fn decode_1090_with_reference(
+    msg: String,
+    reference: [f64; 2],
+) -> PyResult<Vec<u8>> {
+    let bytes = hex::decode(msg).unwrap();
+    if let Ok((_, mut msg)) = Message::from_bytes((&bytes, 0)) {
+        match &mut msg.df {
+            ExtendedSquitterTisB { cf, .. } => {
+                decode_message_with_reference(&mut cf.me, reference)
+            }
+            ExtendedSquitterADSB(adsb) => {
+                decode_message_with_reference(&mut adsb.message, reference)
+            }
+            _ => {}
+        }
+        let pkl = serde_pickle::to_vec(&msg, Default::default()).unwrap();
+        Ok(pkl)
+    } else {
+        Ok([128, 4, 78, 46].to_vec()) // None
+    }
+}
+
 struct DecodeError(DekuError);
 
 impl From<DecodeError> for PyErr {
@@ -432,6 +486,7 @@ fn aircraft_information(
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Decoding functions
     m.add_function(wrap_pyfunction!(decode_1090, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_1090_with_reference, m)?)?;
     m.add_function(wrap_pyfunction!(decode_1090_vec, m)?)?;
     m.add_function(wrap_pyfunction!(decode_1090t_vec, m)?)?;
     m.add_function(wrap_pyfunction!(decode_flarm, m)?)?;

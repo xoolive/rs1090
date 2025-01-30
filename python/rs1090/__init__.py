@@ -9,6 +9,7 @@ from ._rust import (
     aircraft_information,
     decode_1090,
     decode_1090_vec,
+    decode_1090_with_reference,
     decode_1090t_vec,
     decode_bds05,
     decode_bds10,
@@ -169,7 +170,10 @@ def decode(
     batch: int = 1000,
 ) -> Message | list[Message]:
     if isinstance(msg, str):
-        payload = decode_1090(msg)
+        if reference is not None:
+            payload = decode_1090_with_reference(msg, reference)
+        else:
+            payload = decode_1090(msg)
 
     else:
         if timestamp is not None and isinstance(timestamp, (int, float)):
@@ -181,6 +185,10 @@ def decode(
 
         batches = list(batched(msg, batch))
         if timestamp is None:
+            if reference is not None:
+                raise ValueError(
+                    "Provide timestamps in order to fully decode positions"
+                )
             payload = decode_1090_vec(batches)
         else:
             ts = list(batched(timestamp, batch))
