@@ -16,6 +16,9 @@ use rs1090::decode::bds::bds44::MeteorologicalRoutineAirReport;
 use rs1090::decode::bds::bds45::MeteorologicalHazardReport;
 use rs1090::decode::bds::bds50::TrackAndTurnReport;
 use rs1090::decode::bds::bds60::HeadingAndSpeedReport;
+use rs1090::decode::cpr::{
+    airborne_position_with_reference, surface_position_with_reference,
+};
 use rs1090::prelude::*;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
@@ -34,11 +37,55 @@ impl From<DecodeError> for JsError {
     }
 }
 
+fn decode_message_with_reference(me: &mut ME, reference: [f64; 2]) {
+    let [latitude_ref, longitude_ref] = reference;
+    match me {
+        ME::BDS05(airborne) => {
+            if let Some(pos) = airborne_position_with_reference(
+                airborne,
+                latitude_ref,
+                longitude_ref,
+            ) {
+                airborne.latitude = Some(pos.latitude);
+                airborne.longitude = Some(pos.longitude);
+            }
+        }
+        ME::BDS06(surface) => {
+            if let Some(pos) = surface_position_with_reference(
+                surface,
+                latitude_ref,
+                longitude_ref,
+            ) {
+                surface.latitude = Some(pos.latitude);
+                surface.longitude = Some(pos.longitude);
+            }
+        }
+        _ => (),
+    }
+}
+
 #[wasm_bindgen]
-pub fn decode(msg: &str) -> Result<JsValue, JsError> {
+pub fn decode(
+    msg: &str,
+    reference: Option<Vec<f64>>,
+) -> Result<JsValue, JsError> {
     let bytes = hex::decode(msg)?;
     match Message::try_from(bytes.as_slice()) {
-        Ok(msg) => {
+        Ok(mut msg) => {
+            if let Some(reference) = reference.map(|v| [v[0], v[1]]) {
+                match &mut msg.df {
+                    ExtendedSquitterTisB { cf, .. } => {
+                        decode_message_with_reference(&mut cf.me, reference)
+                    }
+                    ExtendedSquitterADSB(adsb) => {
+                        decode_message_with_reference(
+                            &mut adsb.message,
+                            reference,
+                        )
+                    }
+                    _ => {}
+                }
+            }
             let map_result = serde_wasm_bindgen::to_value(&msg)?;
             Ok(Object::from_entries(&map_result).unwrap().into())
         }

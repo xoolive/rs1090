@@ -69,13 +69,14 @@ describe("ADSB Decoding Tests", () => {
     expect(msg.tcas_operational).toBe(true);
   });
 
-  /*test("adsb with position", () => {
-    const msg = decode("90343652300003eeda6de84f1ad2", {
-      reference: [40.48, -3.56],
-    });
-    expect(msg.df).toBe(18);
-    expect(msg.bds).toBe("6)";
+  test("adsb with position", () => {
+    const msg = decode(
+      "90343652300003eeda6de84f1ad2",
+      new Float64Array([40.48, -3.56])
+    );
+    expect(msg.df).toBe("18");
+    expect(msg.bds).toBe("06");
     expect(msg.latitude).toBeCloseTo(40.4749);
     expect(msg.longitude).toBeCloseTo(-3.57068);
-  });*/
+  });
 });
