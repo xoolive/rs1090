@@ -12,7 +12,14 @@ installers = ["shell", "powershell", "homebrew"]
 # A GitHub repo to push Homebrew formulas to
 tap = "xoolive/homebrew-homebrew"
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "aarch64-pc-windows-msvc", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+targets = [
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+]
 # Which actions to run on pull requests
 pr-run-mode = "plan"
 # Publish jobs to run in CI
@@ -25,7 +32,7 @@ install-path = "CARGO_HOME"
 install-updater = true
 # install dependencies for Windows
 # https://opensource.axo.dev/cargo-dist/book/ci/customizing.html#customizing-build-setup
-github-build-setup = "release_setup.yml"
+github-build-setup = "../release_setup.yml"
 
 [dist.dependencies.apt]
 libssl-dev = "*"
