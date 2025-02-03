@@ -17,7 +17,7 @@ sero = ['rs1090/sero']
 [dependencies]
 chrono = "0.4.37"
 clap = { version = "4.5.27", features = ["color", "derive", "wrap_help"] }
-clap_complete = "4.5.42"
+clap_complete = "4.5.44"
 clap_complete_nushell = "4.5.5"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 deku = "0.18.1"
