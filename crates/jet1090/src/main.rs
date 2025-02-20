@@ -467,10 +467,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // If we choose to update the reference (only useful for surface positions)
-    // then we define the callback (for now, if the altitude is below 1000ft)
+    // then we define the callback (for now, if the altitude is below 5000ft)
     let update_reference = match options.update_position {
         true => Some(Box::new(|pos: &AirbornePosition| {
-            pos.alt.is_some_and(|alt| alt < 1000)
+            pos.alt.is_some_and(|alt| alt < 5000)
         }) as Box<dyn Fn(&AirbornePosition) -> bool>),
         false => None,
     };
