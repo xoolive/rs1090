@@ -42,7 +42,7 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 url = "2.5.4"
 warp = "0.3.6"
-zip = "2.2.2"
+zip = "2.2.3"
 
 [[bin]]
 name = "jet1090"
