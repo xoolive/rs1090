@@ -48,8 +48,7 @@ jobs:
             3.13
           allow-prereleases: true
       - name: Build wheels
-        # uses: PyO3/maturin-action@v1
-        uses: PyO3/maturin-action@refs/pull/330/head
+        uses: PyO3/maturin-action@v1
         with:
           working-directory: python
           target: ${{ matrix.platform.target }}
