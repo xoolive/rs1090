@@ -1,3 +1,4 @@
+use rs1090::data::airports::{Airport, AIRPORTS};
 /**
  * Information returned on a REST API
  */
@@ -16,6 +17,12 @@ use crate::Jet1090;
 #[derive(Serialize, Deserialize)]
 pub struct TrackQuery {
     icao24: String,
+}
+
+/// Information required to search for airports
+#[derive(Serialize, Deserialize)]
+pub struct Query {
+    q: String,
 }
 
 /// An API error serializable to JSON
@@ -65,6 +72,21 @@ pub async fn sensors(
     Ok::<_, Infallible>(warp::reply::json(&app.sensors))
 }
 
+/// Returns a list of poential airports matching the query string
+pub async fn airports(query: Query) -> Result<warp::reply::Json, Infallible> {
+    let lowercase = query.q.to_lowercase();
+    let res: Vec<&Airport> = AIRPORTS
+        .iter()
+        .filter(|a| {
+            a.name.to_lowercase().contains(&lowercase)
+                || a.city.to_lowercase().contains(&lowercase)
+                || a.icao.to_lowercase().contains(&lowercase)
+                || a.iata.to_lowercase().contains(&lowercase)
+        })
+        .collect();
+    Ok::<_, Infallible>(warp::reply::json(&res))
+}
+
 /// Returns proper error messages in JSON format
 pub async fn handle_rejection(
     err: Rejection,
@@ -76,8 +98,11 @@ pub async fn handle_rejection(
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
-        message =
-            "Route not found, try one of / /all and /track?icao24={icao24}";
+        message = "Route not found, try one of /,\n\
+            /all,\n\
+            /track?icao24={icao24},\n\
+            /sensors or\n\
+            /airport?q={string}";
     } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
         code = StatusCode::METHOD_NOT_ALLOWED;
         message = "Only GET queries are supported";

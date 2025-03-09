@@ -34,6 +34,7 @@ use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use warp::Filter;
+use web::Query;
 
 #[derive(Default, Deserialize, Parser)]
 #[command(
@@ -428,13 +429,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     web::sensors(&app).await
                 });
 
+            let airports = warp::path("airports")
+                .and(warp::query::<web::Query>())
+                .and_then(
+                    |query: Query| async move { web::airports(query).await },
+                );
+
             let cors = warp::cors()
                 .allow_any_origin()
                 .allow_headers(vec!["*"])
                 .allow_methods(vec!["GET"]);
 
             let routes = warp::get()
-                .and(home.or(all).or(track).or(sensors))
+                .and(home.or(all).or(track).or(sensors).or(airports))
                 .recover(web::handle_rejection)
                 .with(cors);
 

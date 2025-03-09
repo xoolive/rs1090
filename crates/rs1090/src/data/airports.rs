@@ -1,10 +1,10 @@
 use ansi_term::Color;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Result};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Airport {
     pub icao: String,
     pub iata: String,
