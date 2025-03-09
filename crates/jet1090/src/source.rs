@@ -218,6 +218,8 @@ pub struct SeroParams {
     pub df_filter: Option<Vec<u32>>,
     /// Filter on messages coming from a set of aircraft (default:all)
     pub aircraft_filter: Option<Vec<u32>>,
+    /// Filter on sensor aliases (default:all)
+    pub sensor_filter: Option<Vec<String>>,
 }
 
 #[cfg(feature = "sero")]
@@ -229,6 +231,7 @@ impl From<&SeroParams> for sero::SeroClient {
             token: value.token.clone(),
             df_filter: value.df_filter.clone().unwrap_or_default(),
             aircraft_filter: value.aircraft_filter.clone().unwrap_or_default(),
+            sensor_filter: value.sensor_filter.clone().unwrap_or_default(),
         }
     }
 }

@@ -5,7 +5,7 @@ mod api {
 
 use api::{
     se_ro_api_client::SeRoApiClient, ModeSDownlinkFrame,
-    ModeSDownlinkFramesRequest, SensorInfoRequest, SensorInfoResponse,
+    ModeSDownlinkFramesRequest, Sensor, SensorInfoRequest, SensorInfoResponse,
 };
 use serde::Deserialize;
 use serde::Serialize;
@@ -33,6 +33,7 @@ pub struct SeroClient {
     pub token: String,
     pub df_filter: Vec<u32>,
     pub aircraft_filter: Vec<u32>,
+    pub sensor_filter: Vec<String>,
 }
 
 async fn download_file(url: &str, destination: &PathBuf) -> Result<()> {
@@ -140,11 +141,19 @@ impl SeroClient {
     }
 
     pub async fn rawstream(&self) -> Result<Streaming<ModeSDownlinkFrame>> {
+        let sensor_filter: Vec<Sensor> = self
+            .info()
+            .await?
+            .sensor_info
+            .iter()
+            .filter(|s| self.sensor_filter.contains(&s.alias))
+            .map(|s| s.sensor.unwrap())
+            .collect();
         let request = tonic::Request::new(ModeSDownlinkFramesRequest {
             token: self.token.clone(),
             df_filter: self.df_filter.clone(),
-            sensor_filter: vec![],
             aircraft_filter: self.aircraft_filter.clone(),
+            sensor_filter,
         });
         Ok(self
             .client()
