@@ -3,6 +3,7 @@
 mod utils;
 
 use js_sys::Object;
+use rs1090::data::patterns::aircraft_information as patterns;
 use rs1090::decode::bds::bds05::AirbornePosition;
 use rs1090::decode::bds::bds10::DataLinkCapability;
 use rs1090::decode::bds::bds17::CommonUsageGICBCapabilityReport;
@@ -280,5 +281,19 @@ pub fn decode_bds65(msg: &str) -> Result<JsValue, JsError> {
             );
             Err(DecodeError(DekuError::Assertion(msg.into())).into())
         }
+    }
+}
+
+#[wasm_bindgen]
+pub fn aircraft_information(
+    icao24: &str,
+    registration: Option<String>,
+) -> Result<JsValue, JsError> {
+    match patterns(icao24, registration.as_deref()) {
+        Ok(res) => {
+            let js_result = serde_wasm_bindgen::to_value(&res)?;
+            Ok(js_result)
+        }
+        Err(_) => Err(JsError::new("invalid icao24 value")),
     }
 }

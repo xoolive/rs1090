@@ -3334,7 +3334,6 @@ dependencies = [
  "hex",
  "pyo3",
  "rayon",
- "regex",
  "rs1090",
  "serde-pickle",
 ]

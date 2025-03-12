@@ -1,13 +1,12 @@
 #![allow(rustdoc::missing_crate_level_docs)]
 
-use std::collections::HashMap;
-
 use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use rayon::prelude::*;
-use regex::Regex;
-use rs1090::data::patterns::PATTERNS;
-use rs1090::data::tail::tail;
+use rs1090::data::patterns::{
+    aircraft_information as patterns, AircraftInformation,
+};
 use rs1090::decode::bds::bds05::AirbornePosition;
 use rs1090::decode::bds::bds10::DataLinkCapability;
 use rs1090::decode::bds::bds17::CommonUsageGICBCapabilityReport;
@@ -414,71 +413,47 @@ fn decode_flarm_vec(
     Ok(pkl)
 }
 
+struct WrapAircraftInfo(AircraftInformation);
+
+impl<'a> IntoPyObject<'a> for WrapAircraftInfo {
+    type Target = PyDict;
+    type Output = Bound<'a, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(
+        self,
+        py: Python<'a>,
+    ) -> Result<Self::Output, Self::Error> {
+        let dict = PyDict::new(py);
+        dict.set_item("icao24", self.0.icao24)?;
+        if let Some(registration) = self.0.registration {
+            dict.set_item("registration", registration)?;
+        }
+        dict.set_item(
+            "country",
+            self.0.country.or(Some("Unknown".to_string())),
+        )?;
+        dict.set_item("flag", self.0.flag.or(Some("🏳".to_string())))?;
+        if let Some(pattern) = self.0.pattern {
+            dict.set_item("pattern", pattern)?;
+        }
+        if let Some(category) = self.0.category {
+            dict.set_item("category", category)?;
+        }
+        if let Some(comment) = self.0.comment {
+            dict.set_item("comment", comment)?;
+        }
+        Ok(dict)
+    }
+}
+
 #[pyfunction]
 #[pyo3(signature = (icao24, registration=None))]
 fn aircraft_information(
     icao24: &str,
     registration: Option<&str>,
-) -> PyResult<HashMap<String, String>> {
-    let mut reg = HashMap::<String, String>::new();
-    let hexid = u32::from_str_radix(icao24, 16)?;
-
-    reg.insert("icao24".to_string(), icao24.to_lowercase());
-
-    if let Some(tail) = tail(hexid) {
-        reg.insert("registration".to_string(), tail);
-    }
-    if let Some(tail) = registration {
-        reg.insert("registration".to_string(), tail.to_string());
-    }
-
-    if let Some(pattern) = &PATTERNS.registers.iter().find(|elt| {
-        if let Some(start) = &elt.start {
-            if let Some(end) = &elt.end {
-                let start = u32::from_str_radix(&start[2..], 16).unwrap();
-                let end = u32::from_str_radix(&end[2..], 16).unwrap();
-                return (hexid >= start) & (hexid <= end);
-            }
-        }
-        false
-    }) {
-        reg.insert("country".to_string(), pattern.country.to_string());
-        reg.insert("flag".to_string(), pattern.flag.to_string());
-        if let Some(p) = &pattern.pattern {
-            reg.insert("pattern".to_string(), p.to_string());
-        }
-        if let Some(comment) = &pattern.comment {
-            reg.insert("comment".to_string(), comment.to_string());
-        }
-
-        if let Some(tail) = reg.get("registration") {
-            if let Some(categories) = &pattern.categories {
-                if let Some(cat) = categories.iter().find(|elt| {
-                    let re = Regex::new(&elt.pattern).unwrap();
-                    re.is_match(tail)
-                }) {
-                    reg.insert("pattern".to_string(), cat.pattern.to_string());
-                    if let Some(category) = &cat.category {
-                        reg.insert(
-                            "category".to_string(),
-                            category.to_string(),
-                        );
-                    }
-                    if let Some(country) = &cat.country {
-                        reg.insert("country".to_string(), country.to_string());
-                    }
-                    if let Some(flag) = &cat.flag {
-                        reg.insert("flag".to_string(), flag.to_string());
-                    }
-                }
-            }
-        }
-    } else {
-        reg.insert("country".to_string(), "Unknown".to_string());
-        reg.insert("flag".to_string(), "🏳".to_string());
-    }
-
-    Ok(reg)
+) -> PyResult<WrapAircraftInfo> {
+    Ok(WrapAircraftInfo(patterns(icao24, registration)?))
 }
 
 /// A Python module implemented in Rust.
