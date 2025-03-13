@@ -1,5 +1,5 @@
 import { expect, describe, test } from "@jest/globals";
-import { aircraft_information } from "rs1090-wasm";
+import { aircraft_information, airport_information } from "rs1090-wasm";
 
 describe("rs1090 utils", () => {
   test("patterns", () => {
@@ -10,5 +10,11 @@ describe("rs1090 utils", () => {
     const unknown = aircraft_information("000000");
     expect(unknown.country).toBe(undefined);
     expect(unknown.flag).toBe(undefined);
+  });
+
+  test("airports", () => {
+    const a = airport_information("Paris");
+    expect(a.length).toBe(7);
+    expect(a[0].icao).toBe("LFPG");
   });
 });

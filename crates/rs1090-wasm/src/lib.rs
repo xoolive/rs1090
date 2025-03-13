@@ -3,6 +3,7 @@
 mod utils;
 
 use js_sys::Object;
+use rs1090::data::airports::AIRPORTS;
 use rs1090::data::patterns::aircraft_information as patterns;
 use rs1090::decode::bds::bds05::AirbornePosition;
 use rs1090::decode::bds::bds10::DataLinkCapability;
@@ -296,4 +297,19 @@ pub fn aircraft_information(
         }
         Err(_) => Err(JsError::new("invalid icao24 value")),
     }
+}
+
+#[wasm_bindgen]
+pub fn airport_information(query: &str) -> Result<JsValue, JsError> {
+    let lowercase = query.to_lowercase();
+    let res: Vec<_> = AIRPORTS
+        .iter()
+        .filter(|a| {
+            a.name.to_lowercase().contains(&lowercase)
+                || a.city.to_lowercase().contains(&lowercase)
+                || a.icao.to_lowercase().contains(&lowercase)
+                || a.iata.to_lowercase().contains(&lowercase)
+        })
+        .collect();
+    Ok(serde_wasm_bindgen::to_value(&res)?)
 }
