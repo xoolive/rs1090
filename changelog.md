@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.5
+
+- Corner-case numerical problem in CPR decoding fix #153 (#154)
+- Decode position from CPR with reference in Python binding (#163)
+- Test suite for WASM bindings (#164)
+- Update reference below 5000ft instead of 1000ft
+- Filter on SeRo sensors
+- /airport route, /track?icao24=...&since=... API endpoints
+- airports and aircraft information in WASM binding
+
 ## 0.4.3
 
 - Add a search bar (regex accepted, based on callsign, icao24, registration, typecode and receptor name)
