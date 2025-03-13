@@ -1,4 +1,5 @@
 use rs1090::data::airports::{Airport, AIRPORTS};
+
 /**
  * Information returned on a REST API
  */
@@ -17,6 +18,7 @@ use crate::Jet1090;
 #[derive(Serialize, Deserialize)]
 pub struct TrackQuery {
     icao24: String,
+    since: Option<f64>,
 }
 
 /// Information required to search for airports
@@ -59,9 +61,21 @@ pub async fn track(
     q: TrackQuery,
 ) -> Result<warp::reply::Json, Infallible> {
     let app = app.lock().await;
-    Ok::<_, Infallible>(warp::reply::json(
-        &app.state_vectors.get(&q.icao24).map(|sv| &sv.hist),
-    ))
+    let res = app.state_vectors.get(&q.icao24).map(|sv| &sv.hist);
+    let res = match q.since {
+        Some(since) => {
+            let res = res.map(|res| {
+                res.iter()
+                    .filter(|m| m.timestamp > since)
+                    .collect::<Vec<_>>()
+            });
+            // Option<Vec<&TimedMessage>>
+            warp::reply::json(&res)
+        }
+        // Option<&Vec<TimedMessage>>
+        None => warp::reply::json(&res),
+    };
+    Ok::<_, Infallible>(res)
 }
 
 /// Returns decoding information about all sensors
