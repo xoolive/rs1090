@@ -31,7 +31,7 @@ ratatui = "0.29.0"
 redis = { version = "0.29.1", features = ["tokio-comp"] }
 regex = "1.11.1"
 reqwest = "0.12.9"
-rs1090 = { version = "0.4.4", path = "../rs1090" }
+rs1090 = { version = "0.4.5", path = "../rs1090" }
 rusqlite = { version = "0.34.0", features = ["bundled"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
