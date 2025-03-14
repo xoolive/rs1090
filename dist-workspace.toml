@@ -45,6 +45,4 @@ protobuf = { stage = ["build"] }
 
 [dist.github-custom-runners]
 aarch64-apple-darwin = "macos-14"
-
-[dist.github-custom-runners.aarch64-unknown-linux-gnu]
-container = { image = "quay.io/pypa/manylinux_2_28_x86_64", host = "aarch64-apple-darwin" }
+aarch64-unknown-linux-gnu = "ubuntu-22.04-arm"
