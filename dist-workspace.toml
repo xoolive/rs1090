@@ -20,7 +20,7 @@ targets = [
     "x86_64-pc-windows-msvc",
 ]
 # Which actions to run on pull requests
-pr-run-mode = "upload"
+pr-run-mode = "plan"
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]
 # Whether to pass --all-features to cargo build
