@@ -35,7 +35,7 @@ github-build-setup = "../release_setup.yml"
 
 [dist.dependencies.apt]
 libsoapysdr-dev = "*"
-# soapysdr-module-rtlsdr = "*"
+# soapysdr-module-rtlsdr = "*"  # only for running
 protobuf-compiler = "*"
 
 [dist.dependencies.homebrew]
@@ -45,3 +45,7 @@ protobuf = { stage = ["build"] }
 
 [dist.github-custom-runners]
 aarch64-apple-darwin = "macos-14"
+
+[[package.metadata.dist.build]]
+target = "aarch64-unknown-linux-gnu"
+features = ["sero"]
