@@ -556,19 +556,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let is_in = filters::Filters::is_in(&filters, &msg);
 
         if let Ok(json) = serde_json::to_string(&msg) {
-            if options.verbose & is_in {
-                println!("{}", json);
-            }
-
             if is_in {
+                if options.verbose {
+                    println!("{}", json);
+                }
+
                 if let Some(file) = &mut file {
                     file.write_all(json.as_bytes()).await?;
                     file.write_all("\n".as_bytes()).await?;
                 }
-            }
 
-            if let Some(c) = &mut redis_connect {
-                let _: () = c.publish(redis_topic.clone(), json).await?;
+                if let Some(c) = &mut redis_connect {
+                    let _: () = c.publish(redis_topic.clone(), json).await?;
+                }
             }
         }
 
