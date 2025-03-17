@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.7
+
+- Adjust filter behaviour for redis output as well
+- Add some French stride mappings for registrations
+- Remove libssl dependency on Ubuntu, include arm64 target (#188)
+- Publish to ghcr.io including arm64
+
 ## 0.4.5
 
 - Corner-case numerical problem in CPR decoding fix #153 (#154)
