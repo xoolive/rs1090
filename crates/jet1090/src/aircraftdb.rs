@@ -25,6 +25,38 @@ async fn download_file(url: &str, destination: &str) -> Result<()> {
     Ok(())
 }
 
+pub async fn update_db() -> Result<()> {
+    let mut cache_path = dirs::cache_dir().unwrap_or_default();
+    cache_path.push("jet1090");
+    if !cache_path.exists() {
+        let msg =
+            format!("failed to create {:?}", cache_path.to_str().unwrap());
+        fs::create_dir_all(&cache_path).expect(&msg);
+    }
+
+    let zip_url =
+        "https://jetvision.de/resources/sqb_databases/basestation.zip";
+    let zip_file_path = "basestation.zip";
+    cache_path.push(zip_file_path);
+
+    println!("Downloading basestation.zip...");
+    download_file(zip_url, cache_path.to_str().unwrap()).await?;
+
+    // Open the zip file
+    let file = File::open(&cache_path)?;
+    let reader = BufReader::new(file);
+    let mut archive = ZipArchive::new(reader)?;
+    let mut sqlite_in_archive = archive.by_index(0)?;
+
+    // Unzip the sqb file
+    let cache_dir = cache_path.parent().unwrap();
+    let mut sqlite_path = cache_dir.to_path_buf();
+    sqlite_path.push(sqlite_in_archive.mangled_name());
+    let mut sqlite_file = File::create(&sqlite_path)?;
+    copy(&mut sqlite_in_archive, &mut sqlite_file)?;
+    Ok(())
+}
+
 pub async fn aircraft() -> BTreeMap<String, Aircraft> {
     let mut cache_path = dirs::cache_dir().unwrap_or_default();
     cache_path.push("jet1090");

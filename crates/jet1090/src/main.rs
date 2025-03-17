@@ -92,6 +92,11 @@ struct Options {
     #[serde(skip)]
     completion: Option<shell::Shell>,
 
+    /// Download a new version of aircraft database
+    #[arg(long)]
+    #[serde(skip)]
+    update_db: bool,
+
     /// List the sources of data following the format \[host:\]port\[\@reference\]
     //
     // - `host` can be a DNS name, an IP address or `rtlsdr` (for RTL-SDR dongles)
@@ -164,6 +169,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(generator) = cli_options.completion {
         let mut cmd = Options::command();
         print_completions(generator, &mut cmd);
+        return Ok(());
+    }
+
+    if cli_options.update_db {
+        aircraftdb::update_db().await.unwrap();
         return Ok(());
     }
 
