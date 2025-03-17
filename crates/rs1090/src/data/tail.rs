@@ -23,15 +23,16 @@ static NUMERIC_MAPPINGS: Lazy<Vec<NumericMapping>> = Lazy::new(|| {
 
 static STRIDE_MAPPINGS: Lazy<Vec<StrideMapping>> = Lazy::new(|| {
     vec![
-        StrideMapping::new(
-            0x008011,
-            26 * 26,
-            26,
-            String::from("ZS-"),
-            String::from(FULL_ALPHABET),
-            String::from("AAA"),
-            String::from("ZZZ"),
-        ),
+        // South African stride mapping apparently no longer in use
+        // StrideMapping::new(
+        //     0x008011,
+        //     26 * 26,
+        //     26,
+        //     String::from("ZS-"),
+        //     String::from(FULL_ALPHABET),
+        //     String::from("AAA"),
+        //     String::from("ZZZ"),
+        // ),
         StrideMapping::new(
             0x380000,
             1024,
