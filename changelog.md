@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.8
+
+- Add option --update-db to download the latest aircraft database
+- Add ssh tunnelling for TCP sources (#193)
+
 ## 0.4.7
 
 - Adjust filter behaviour for redis output as well
