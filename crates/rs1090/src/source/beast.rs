@@ -36,12 +36,16 @@ pub enum DataSource {
     Tcp(TcpStream),
     Udp(UdpSocket),
     Websocket(WsStream),
+    #[cfg(feature = "ssh")]
+    Tunnelled(makiko::TunnelReceiver),
 }
 
 pub enum BeastSource {
     Tcp(String),
     Udp(String),
     Websocket(String),
+    #[cfg(feature = "ssh")]
+    Tunnelled(super::sshjump::TunnelledTcp),
 }
 
 pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
@@ -84,6 +88,21 @@ pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
                     }
                     _ => {
                         error!("Error reading from websocket");
+                        break;
+                    }
+                }
+            }
+            #[cfg(feature = "ssh")]
+            DataSource::Tunnelled(tunnel_rx) => {
+                match tunnel_rx.recv().await {
+                    Ok(Some(makiko::TunnelEvent::Data(data))) => {
+                        debug!("Received {:?}", data);
+                        let len = data.len().min(buffer.len());
+                        buffer[..len].copy_from_slice(&data[..len]);
+                        len
+                    }
+                    _ => {
+                        error!("Error reading from tunnel");
                         break;
                     }
                 }
@@ -181,6 +200,11 @@ pub async fn receiver(
             info!("Connected to websocket: {}", address);
             let (_, rx) = stream.split();
             DataSource::Websocket(rx)
+        }
+        #[cfg(feature = "ssh")]
+        BeastSource::Tunnelled(tunnel) => {
+            let tunnel_rx = tunnel.connect().await.expect("Failed to connect");
+            DataSource::Tunnelled(tunnel_rx)
         }
     };
 
