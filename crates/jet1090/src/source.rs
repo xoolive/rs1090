@@ -8,6 +8,8 @@ use rs1090::prelude::*;
 use rs1090::source::rtlsdr;
 #[cfg(feature = "sero")]
 use rs1090::source::sero;
+#[cfg(feature = "ssh")]
+use rs1090::source::sshjump::TunnelledTcp;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
@@ -41,11 +43,26 @@ use url::Url;
 *
 * For Sero Systems, check documentation at <https://doc.sero-systems.de/api/>
 */
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AddressStruct {
+    address: String,
+    port: u16,
+    jump: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AddressPath {
+    Short(String),
+    Long(AddressStruct),
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Address {
     /// Address to a TCP feed for Beast format (typically port 10003 or 30005), e.g. `localhost:10003`
-    Tcp(String),
+    Tcp(AddressPath),
     /// Address to a UDP feed for Beast format (socat or dedicated configuration in jetvision interface), e.g. `:1234`
     Udp(String),
     /// Address to a websocket feed, e.g. `ws://localhost:9876/1234`
@@ -95,7 +112,7 @@ impl FromStr for Source {
         let url = default_tcp.join(&s).map_err(|e| e.to_string())?;
 
         let address = match url.scheme() {
-            "tcp" => Address::Tcp(format!(
+            "tcp" => Address::Tcp(AddressPath::Short(format!(
                 "{}:{}",
                 url.host_str().unwrap_or("0.0.0.0"),
                 match url.host() {
@@ -109,7 +126,7 @@ impl FromStr for Source {
                             .expect("A port number was expected")
                     }
                 }
-            )),
+            ))),
             "udp" => Address::Udp(format!(
                 "{}:{}",
                 url.host_str().unwrap_or("0.0.0.0"),
@@ -143,7 +160,17 @@ impl FromStr for Source {
 impl Source {
     pub fn serial(&self) -> u64 {
         match &self.address {
-            Address::Tcp(name) => build_serial(name),
+            Address::Tcp(address) => {
+                let name = match address {
+                    AddressPath::Short(s) => s.clone(),
+                    AddressPath::Long(AddressStruct {
+                        address, port, ..
+                    }) => {
+                        format!("{}:{}", address, port)
+                    }
+                };
+                build_serial(&name)
+            }
             Address::Udp(name) => build_serial(name),
             Address::Websocket(name) => build_serial(name),
             Address::Rtlsdr(reference) => {
@@ -191,7 +218,39 @@ impl Source {
             }
             _ => {
                 let server_address = match &self.address {
-                    Address::Tcp(s) => beast::BeastSource::Tcp(s.to_owned()),
+                    Address::Tcp(address) => match address {
+                        AddressPath::Short(s) => {
+                            beast::BeastSource::Tcp(s.to_owned())
+                        }
+                        #[cfg(not(feature = "ssh"))]
+                        AddressPath::Long(AddressStruct {
+                            address,
+                            port,
+                            ..
+                        }) => beast::BeastSource::Tcp(format!(
+                            "{}:{}",
+                            address, port
+                        )),
+                        #[cfg(feature = "ssh")]
+                        AddressPath::Long(AddressStruct {
+                            address,
+                            port,
+                            jump: None,
+                        }) => beast::BeastSource::Tcp(format!(
+                            "{}:{}",
+                            address, port
+                        )),
+                        #[cfg(feature = "ssh")]
+                        AddressPath::Long(AddressStruct {
+                            address,
+                            port,
+                            jump: Some(jump),
+                        }) => beast::BeastSource::Tunnelled(TunnelledTcp {
+                            address: address.to_owned(),
+                            port: *port,
+                            jump: jump.to_owned(),
+                        }),
+                    },
                     Address::Udp(s) => beast::BeastSource::Udp(s.to_owned()),
                     Address::Websocket(s) => {
                         beast::BeastSource::Websocket(s.to_owned())
@@ -283,7 +342,7 @@ mod test {
             ..
         }) = source
         {
-            assert_eq!(path, "0.0.0.0:4003");
+            assert_eq!(path, AddressPath::Short("0.0.0.0:4003".to_string()));
             assert_eq!(name, None);
             assert_eq!(reference, None);
         }
@@ -297,7 +356,7 @@ mod test {
             ..
         }) = source
         {
-            assert_eq!(path, "0.0.0.0:4003");
+            assert_eq!(path, AddressPath::Short("0.0.0.0:4003".to_string()));
             assert_eq!(name, None);
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);
