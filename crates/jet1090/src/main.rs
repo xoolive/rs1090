@@ -98,10 +98,12 @@ struct Options {
     update_db: bool,
 
     /// List the sources of data following the format \[host:\]port\[\@reference\]
-    //
-    // - `host` can be a DNS name, an IP address or `rtlsdr` (for RTL-SDR dongles)
-    // - `port` must be a number
-    // - `reference` can be LFPG for major airports, `43.3,1.35` otherwise
+    ///
+    /// `host` can be a DNS name, an IP address or `rtlsdr` (for RTL-SDR dongles),
+    /// `port` must be a number,
+    /// `reference` can be LFPG for major airports, `43.3,1.35` otherwise.
+    ///
+    /// More details are available at: https://mode-s.org/jet1090/sources
     sources: Vec<source::Source>,
 
     #[cfg(feature = "rtlsdr")]
