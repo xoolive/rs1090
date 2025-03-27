@@ -16,6 +16,13 @@ pub struct TunnelledTcp {
     pub jump: String,
 }
 
+pub struct TunnelledWebsocket {
+    pub address: String,
+    pub port: u16,
+    pub url: String,
+    pub jump: String,
+}
+
 async fn authenticate_server(
     mut client_rx: ClientReceiver,
     host: String,
@@ -251,5 +258,26 @@ impl TunnelledTcp {
             .expect("Could not open a tunnel");
 
         Ok(tunnel_rx)
+    }
+}
+
+impl TunnelledWebsocket {
+    pub async fn connect(
+        &self,
+    ) -> Result<SshTunnelIo, Box<dyn std::error::Error>> {
+        let params = get_params();
+
+        let target_client = connect_server(&self.jump, &params).await?;
+
+        let channel_config = makiko::ChannelConfig::default();
+        let connect_addr = (self.address.to_owned(), self.port);
+        let origin_addr = ("0.0.0.0".into(), 0);
+
+        let (tunnel, tunnel_rx) = target_client
+            .connect_tunnel(channel_config, connect_addr, origin_addr)
+            .await
+            .expect("Could not open a tunnel");
+
+        Ok(SshTunnelIo::new(tunnel, tunnel_rx))
     }
 }
