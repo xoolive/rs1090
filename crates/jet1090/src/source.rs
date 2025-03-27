@@ -281,9 +281,8 @@ impl Source {
                         }
                         #[cfg(not(feature = "ssh"))]
                         WebsocketPath::Long(WebsocketStruct {
-                            address,
-                            ..
-                        }) => beast::BeastSource::Websocket(address.to_owned()),
+                            url, ..
+                        }) => beast::BeastSource::Websocket(url.to_owned()),
                         #[cfg(feature = "ssh")]
                         WebsocketPath::Long(WebsocketStruct {
                             url,
