@@ -5,12 +5,15 @@ use futures_util::stream::{Stream, StreamExt};
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpStream, UdpSocket};
 use tokio::sync::mpsc;
+#[cfg(feature = "ssh")]
+use tokio_tungstenite::client_async;
 use tokio_tungstenite::connect_async;
+#[cfg(feature = "ssh")]
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::{
     tungstenite::protocol::Message, MaybeTlsStream, WebSocketStream,
 };
-use tracing::info;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use std::collections::HashSet;
 use std::io;
@@ -31,13 +34,18 @@ use crate::prelude::*;
 /// Decoding the timestamp:
 /// <https://wiki.modesbeast.com/Radarcape:Firmware_Versions#The_GPS_timestamp>
 pub type WsStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
+#[cfg(feature = "ssh")]
+pub type TunnelledWsStream =
+    SplitStream<WebSocketStream<super::sshtunnel::SshTunnelIo>>;
 
 pub enum DataSource {
     Tcp(TcpStream),
     Udp(UdpSocket),
     Websocket(WsStream),
     #[cfg(feature = "ssh")]
-    Tunnelled(makiko::TunnelReceiver),
+    TunnelledTcp(makiko::TunnelReceiver),
+    #[cfg(feature = "ssh")]
+    TunnelledWebSocket(TunnelledWsStream),
 }
 
 pub enum BeastSource {
@@ -45,7 +53,9 @@ pub enum BeastSource {
     Udp(String),
     Websocket(String),
     #[cfg(feature = "ssh")]
-    Tunnelled(super::sshjump::TunnelledTcp),
+    TunnelledTcp(super::sshjump::TunnelledTcp),
+    #[cfg(feature = "ssh")]
+    TunnelledWebsocket(super::sshjump::TunnelledWebsocket),
 }
 
 pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
@@ -93,9 +103,24 @@ pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {
                 }
             }
             #[cfg(feature = "ssh")]
-            DataSource::Tunnelled(tunnel_rx) => {
+            DataSource::TunnelledTcp(tunnel_rx) => {
                 match tunnel_rx.recv().await {
                     Ok(Some(makiko::TunnelEvent::Data(data))) => {
+                        debug!("Received {:?}", data);
+                        let len = data.len().min(buffer.len());
+                        buffer[..len].copy_from_slice(&data[..len]);
+                        len
+                    }
+                    _ => {
+                        error!("Error reading from tunnel");
+                        break;
+                    }
+                }
+            }
+            #[cfg(feature = "ssh")]
+            DataSource::TunnelledWebSocket(tunnel_rx) => {
+                match tunnel_rx.next().await {
+                    Some(Ok(Message::Binary(data))) => {
                         debug!("Received {:?}", data);
                         let len = data.len().min(buffer.len());
                         buffer[..len].copy_from_slice(&data[..len]);
@@ -202,9 +227,22 @@ pub async fn receiver(
             DataSource::Websocket(rx)
         }
         #[cfg(feature = "ssh")]
-        BeastSource::Tunnelled(tunnel) => {
+        BeastSource::TunnelledTcp(tunnel) => {
             let tunnel_rx = tunnel.connect().await.expect("Failed to connect");
-            DataSource::Tunnelled(tunnel_rx)
+            DataSource::TunnelledTcp(tunnel_rx)
+        }
+        #[cfg(feature = "ssh")]
+        BeastSource::TunnelledWebsocket(tunnel) => {
+            let stream = tunnel.connect().await.expect("Failed to connect");
+            let url =
+                tunnel.url.into_client_request().expect("Invalid request");
+
+            // Now perform the handshake using client_async, which accepts an already connected stream.
+            let (ws_stream, _) =
+                client_async(url, stream).await.expect("Failed to connect");
+
+            let (_, rx) = ws_stream.split();
+            DataSource::TunnelledWebSocket(rx)
         }
     };
 

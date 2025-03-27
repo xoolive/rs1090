@@ -61,7 +61,7 @@ struct Options {
     serve_port: Option<u16>,
 
     /// How much history to expire (in minutes), 0 for no history
-    #[arg(long, short = 'x')]
+    #[arg(long, env = "EXPIRE_AIRCRAFT", short = 'x')]
     history_expire: Option<u64>,
 
     /// Downlink formats to select for stdout, file output and history in REST API (keep empty to select all)
@@ -119,7 +119,7 @@ struct Options {
     /// Setup Redis stack by:
     ///   `docker run -d --rm --name redis -p 6379:6379 -p 8001:8001 redis/redis-stack:latest`
     /// then check localhost:8001 for the RedisInsight web interface, the this would be `redis://localhost:6379`
-    #[arg(short, long, value_name = "REDIS")]
+    #[arg(short, long, env = "REDIS_URL", value_name = "REDIS")]
     redis_url: Option<String>,
 
     /// Redis topic for the messages, default to "jet1090"

@@ -9,7 +9,7 @@ use rs1090::source::rtlsdr;
 #[cfg(feature = "sero")]
 use rs1090::source::sero;
 #[cfg(feature = "ssh")]
-use rs1090::source::sshjump::TunnelledTcp;
+use rs1090::source::sshjump::{TunnelledTcp, TunnelledWebsocket};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
@@ -59,6 +59,21 @@ pub enum AddressPath {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WebsocketStruct {
+    //address: String,
+    //port: u16,
+    url: String,
+    jump: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WebsocketPath {
+    Short(String),
+    Long(WebsocketStruct),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Address {
     /// Address to a TCP feed for Beast format (typically port 10003 or 30005), e.g. `localhost:10003`
@@ -66,7 +81,7 @@ pub enum Address {
     /// Address to a UDP feed for Beast format (socat or dedicated configuration in jetvision interface), e.g. `:1234`
     Udp(String),
     /// Address to a websocket feed, e.g. `ws://localhost:9876/1234`
-    Websocket(String),
+    Websocket(WebsocketPath),
     /// A RTL-SDR dongle (require feature `rtlsdr`): the parameter can be empty, or use other specifiers, e.g. `rtlsdr://serial=00000001`
     Rtlsdr(Option<String>),
     /// A token-based access to Sero Systems (require feature `sero`).
@@ -133,12 +148,12 @@ impl FromStr for Source {
                 url.port_or_known_default().unwrap()
             )),
             "rtlsdr" => Address::Rtlsdr(url.host_str().map(|s| s.to_string())),
-            "ws" => Address::Websocket(format!(
+            "ws" => Address::Websocket(WebsocketPath::Short(format!(
                 "ws://{}:{}/{}",
                 url.host_str().unwrap_or("0.0.0.0"),
                 url.port_or_known_default().unwrap(),
                 url.path().strip_prefix("/").unwrap()
-            )),
+            ))),
             _ => return Err("unsupported scheme".to_string()),
         };
 
@@ -172,7 +187,15 @@ impl Source {
                 build_serial(&name)
             }
             Address::Udp(name) => build_serial(name),
-            Address::Websocket(name) => build_serial(name),
+            Address::Websocket(address) => {
+                let name = match address {
+                    WebsocketPath::Short(s) => s.clone(),
+                    WebsocketPath::Long(WebsocketStruct { url, .. }) => {
+                        url.clone()
+                    }
+                };
+                build_serial(&name)
+            }
             Address::Rtlsdr(reference) => {
                 let name = reference.clone().unwrap_or("rtlsdr".to_string());
                 build_serial(&name)
@@ -245,16 +268,49 @@ impl Source {
                             address,
                             port,
                             jump: Some(jump),
-                        }) => beast::BeastSource::Tunnelled(TunnelledTcp {
+                        }) => beast::BeastSource::TunnelledTcp(TunnelledTcp {
                             address: address.to_owned(),
                             port: *port,
                             jump: jump.to_owned(),
                         }),
                     },
                     Address::Udp(s) => beast::BeastSource::Udp(s.to_owned()),
-                    Address::Websocket(s) => {
-                        beast::BeastSource::Websocket(s.to_owned())
-                    }
+                    Address::Websocket(address) => match address {
+                        WebsocketPath::Short(s) => {
+                            beast::BeastSource::Websocket(s.to_owned())
+                        }
+                        #[cfg(not(feature = "ssh"))]
+                        WebsocketPath::Long(WebsocketStruct {
+                            address,
+                            ..
+                        }) => beast::BeastSource::Websocket(address.to_owned()),
+                        #[cfg(feature = "ssh")]
+                        WebsocketPath::Long(WebsocketStruct {
+                            url,
+                            jump: None,
+                            ..
+                        }) => beast::BeastSource::Websocket(url.to_owned()),
+                        #[cfg(feature = "ssh")]
+                        WebsocketPath::Long(WebsocketStruct {
+                            url,
+                            jump: Some(jump),
+                        }) => {
+                            let parsed_url = Url::parse(url).unwrap();
+                            beast::BeastSource::TunnelledWebsocket(
+                                TunnelledWebsocket {
+                                    address: parsed_url
+                                        .host_str()
+                                        .unwrap()
+                                        .to_owned(),
+                                    port: parsed_url
+                                        .port_or_known_default()
+                                        .unwrap(),
+                                    url: url.to_owned(),
+                                    jump: jump.to_owned(),
+                                },
+                            )
+                        }
+                    },
                     _ => unreachable!(),
                 };
                 if let Err(e) =
@@ -373,7 +429,9 @@ mod test {
         {
             assert_eq!(
                 address,
-                Address::Websocket("ws://1.2.3.4:4003/get".to_string())
+                Address::Websocket(WebsocketPath::Short(
+                    "ws://1.2.3.4:4003/get".to_string()
+                ))
             );
             assert_eq!(name, None);
             assert_eq!(pos.latitude, 43.628101);
