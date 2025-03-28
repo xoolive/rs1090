@@ -7,6 +7,8 @@ use api::{
     se_ro_api_client::SeRoApiClient, ModeSDownlinkFrame,
     ModeSDownlinkFramesRequest, Sensor, SensorInfoRequest, SensorInfoResponse,
 };
+#[cfg(feature = "ssh")]
+use hyper_util::rt::tokio::TokioIo;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -15,7 +17,7 @@ use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 use tonic::{
-    transport::{Certificate, Channel, ClientTlsConfig},
+    transport::{Certificate, Channel, ClientTlsConfig, Endpoint},
     Streaming,
 };
 use tracing::{error, info};
@@ -24,6 +26,8 @@ use crate::decode::time::now_in_ns;
 use crate::decode::time::since_gps_week_to_since_today;
 use crate::decode::time::since_gps_week_to_unix_s;
 use crate::prelude::*;
+#[cfg(feature = "ssh")]
+use crate::source::sshjump::TunnelledSero;
 
 type Result<T> =
     std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
@@ -34,6 +38,7 @@ pub struct SeroClient {
     pub df_filter: Vec<u32>,
     pub aircraft_filter: Vec<u32>,
     pub sensor_filter: Vec<String>,
+    pub jump: Option<String>,
 }
 
 async fn download_file(url: &str, destination: &PathBuf) -> Result<()> {
@@ -119,10 +124,31 @@ impl SeroClient {
         let tls_config = ClientTlsConfig::new().ca_certificate(ca_cert);
 
         // Build the channel with TLS configuration
-        let channel = Channel::from_static("https://api.secureadsb.com:4201")
-            .tls_config(tls_config)?
-            .connect()
-            .await?;
+        let endpoint = Endpoint::from_static("https://api.secureadsb.com:4201")
+            .tls_config(tls_config)?;
+
+        #[cfg(not(feature = "ssh"))]
+        let channel = endpoint.connect().await?;
+        #[cfg(feature = "ssh")]
+        let channel = match self.jump {
+            None => endpoint.connect().await?,
+            Some(ref jump) => {
+                let jump = jump.clone();
+                let connector = tower::service_fn(move |_uri: http::Uri| {
+                    let jump = jump.clone();
+                    async move {
+                        let tunnel = TunnelledSero { jump };
+                        let stream =
+                            tunnel.connect().await.expect("Failed to connect");
+                        let wrapped_stream = TokioIo::new(stream);
+                        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(
+                            wrapped_stream,
+                        )
+                    }
+                });
+                endpoint.connect_with_connector(connector).await?
+            }
+        };
 
         Ok(SeRoApiClient::new(channel))
     }

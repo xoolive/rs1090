@@ -10,6 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         df_filter: vec![],
         aircraft_filter: vec![],
         sensor_filter: vec![],
+        jump: None,
     };
 
     // Access info about receivers and display it
