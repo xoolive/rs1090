@@ -2654,9 +2654,9 @@ dependencies = [
 
 [[package]]
 name = "makiko"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bce09e9319c05a058a24aa52a6a0ccfece0424b8d7caf03710bdad6a553be8d"
+checksum = "b2cbaa9728c106462e4f7a534dea8ad8d0ab50bcc370959365463b69513581af"
 dependencies = [
  "aes",
  "aes-gcm",
