@@ -116,10 +116,7 @@ struct Options {
     log_file: Option<String>,
 
     /// Publish messages to a Redis pubsub
-    /// Setup Redis stack by:
-    ///   `docker run -d --rm --name redis -p 6379:6379 -p 8001:8001 redis/redis-stack:latest`
-    /// then check localhost:8001 for the RedisInsight web interface, the this would be `redis://localhost:6379`
-    #[arg(short, long, env = "REDIS_URL", value_name = "REDIS")]
+    #[arg(short, long, value_name = "REDIS URL")]
     redis_url: Option<String>,
 
     /// Redis topic for the messages, default to "jet1090"
