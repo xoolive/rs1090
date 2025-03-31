@@ -9,5 +9,3 @@ pub mod sero;
 
 #[cfg(feature = "ssh")]
 pub mod sshjump;
-#[cfg(feature = "ssh")]
-pub mod sshtunnel;

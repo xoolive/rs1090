@@ -35,8 +35,7 @@ use crate::prelude::*;
 /// <https://wiki.modesbeast.com/Radarcape:Firmware_Versions#The_GPS_timestamp>
 pub type WsStream = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 #[cfg(feature = "ssh")]
-pub type TunnelledWsStream =
-    SplitStream<WebSocketStream<super::sshtunnel::SshTunnelIo>>;
+pub type TunnelledWsStream = SplitStream<WebSocketStream<makiko::TunnelStream>>;
 
 pub enum DataSource {
     Tcp(TcpStream),

@@ -1,14 +1,12 @@
 use log::{info, warn};
 use makiko::{
     ChannelConfig, Client, ClientConfig, ClientReceiver, Privkey,
-    TunnelReceiver,
+    TunnelReceiver, TunnelStream,
 };
 use ssh2_config::{ParseRule, SshConfig};
 use std::fs::File;
 use std::io::BufReader;
 use tokio::net::TcpStream;
-
-use crate::source::sshtunnel::SshTunnelIo;
 
 pub struct TunnelledTcp {
     pub address: String,
@@ -171,7 +169,7 @@ fn get_default_username() -> String {
 
 enum Io {
     Tcp(TcpStream),
-    Tunnel(SshTunnelIo),
+    Tunnel(TunnelStream),
 }
 
 #[async_recursion::async_recursion]
@@ -199,7 +197,7 @@ async fn connect_server(
                 )
                 .await
                 .expect("Could not open a tunnel");
-            Io::Tunnel(SshTunnelIo::new(tunnel, tunnel_rx))
+            Io::Tunnel(TunnelStream::new(tunnel, tunnel_rx))
         }
     };
 
@@ -224,23 +222,48 @@ async fn connect_server(
 
     tokio::task::spawn(authenticate_server(client_rx, hostname, port));
 
-    // TODO try several keys
-    let identity_files = server_params.identity_file.unwrap();
-    let privkey = tokio::fs::read(identity_files.first().unwrap()).await?;
-    let privkey = match std::env::var("SSH_PASSPHRASE").ok() {
-        None => makiko::keys::decode_pem_privkey_nopass(&privkey)
-            .expect("could not decode a private key from pem")
-            .privkey()
-            .cloned()
-            .expect("Private key is encrypted"),
-        Some(passphrase) => {
-            makiko::keys::decode_pem_privkey(&privkey, passphrase.as_bytes())
-                .expect("could not decode a private key with passphrase")
+    let mut decoded_privkey = None;
+    for file in server_params.identity_file.unwrap().iter() {
+        let filename = file.as_os_str();
+        if let Ok(privkey) = tokio::fs::read(file).await {
+            if let Ok(passphrase) = std::env::var("SSH_PASSPHRASE") {
+                if let Ok(res) = makiko::keys::decode_pem_privkey(
+                    &privkey,
+                    passphrase.as_bytes(),
+                ) {
+                    decoded_privkey = Some(res);
+                    break;
+                } else {
+                    info!(
+                        "Could not decode a private key from pem {:?}",
+                        &filename
+                    );
+                    continue;
+                }
+            } else if let Ok(privkey) = std::fs::read(file) {
+                if let Ok(data) =
+                    makiko::keys::decode_pem_privkey_nopass(&privkey)
+                {
+                    if let Some(key) = data.privkey().cloned() {
+                        decoded_privkey = Some(key);
+                        break;
+                    }
+                } else {
+                    info!(
+                        "Could not decode a private key from pem {:?}",
+                        &filename
+                    );
+                    continue;
+                }
+            } else {
+                info!("Identity file not found {:?}", &filename);
+                continue;
+            };
         }
-    };
-
+    }
+    let privkey =
+        decoded_privkey.expect("None of the identity files could be decoded");
     authenticate_by_private_key(&client, &user, &privkey).await;
-
     Ok(client)
 }
 
@@ -268,7 +291,7 @@ impl TunnelledTcp {
 impl TunnelledWebsocket {
     pub async fn connect(
         &self,
-    ) -> Result<SshTunnelIo, Box<dyn std::error::Error>> {
+    ) -> Result<TunnelStream, Box<dyn std::error::Error>> {
         let params = get_params();
 
         let target_client = connect_server(&self.jump, &params).await?;
@@ -282,14 +305,14 @@ impl TunnelledWebsocket {
             .await
             .expect("Could not open a tunnel");
 
-        Ok(SshTunnelIo::new(tunnel, tunnel_rx))
+        Ok(TunnelStream::new(tunnel, tunnel_rx))
     }
 }
 
 impl TunnelledSero {
     pub async fn connect(
         &self,
-    ) -> Result<SshTunnelIo, Box<dyn std::error::Error>> {
+    ) -> Result<TunnelStream, Box<dyn std::error::Error>> {
         let params = get_params();
 
         let target_client = connect_server(&self.jump, &params).await?;
@@ -302,6 +325,6 @@ impl TunnelledSero {
             .await
             .expect("Could not open a tunnel");
 
-        Ok(SshTunnelIo::new(tunnel, tunnel_rx))
+        Ok(TunnelStream::new(tunnel, tunnel_rx))
     }
 }
