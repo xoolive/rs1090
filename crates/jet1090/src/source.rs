@@ -9,7 +9,7 @@ use rs1090::source::rtlsdr;
 #[cfg(feature = "sero")]
 use rs1090::source::sero;
 #[cfg(feature = "ssh")]
-use rs1090::source::sshjump::{TunnelledTcp, TunnelledWebsocket};
+use rs1090::source::ssh::{TunnelledTcp, TunnelledWebsocket};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;

@@ -8,4 +8,4 @@ pub mod rtlsdr;
 pub mod sero;
 
 #[cfg(feature = "ssh")]
-pub mod sshjump;
+pub mod ssh;

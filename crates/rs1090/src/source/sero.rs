@@ -27,7 +27,7 @@ use crate::decode::time::since_gps_week_to_since_today;
 use crate::decode::time::since_gps_week_to_unix_s;
 use crate::prelude::*;
 #[cfg(feature = "ssh")]
-use crate::source::sshjump::TunnelledSero;
+use crate::source::ssh::TunnelledSero;
 
 type Result<T> =
     std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;

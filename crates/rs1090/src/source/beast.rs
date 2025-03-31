@@ -52,9 +52,9 @@ pub enum BeastSource {
     Udp(String),
     Websocket(String),
     #[cfg(feature = "ssh")]
-    TunnelledTcp(super::sshjump::TunnelledTcp),
+    TunnelledTcp(super::ssh::TunnelledTcp),
     #[cfg(feature = "ssh")]
-    TunnelledWebsocket(super::sshjump::TunnelledWebsocket),
+    TunnelledWebsocket(super::ssh::TunnelledWebsocket),
 }
 
 pub async fn next_msg(mut stream: DataSource) -> impl Stream<Item = Vec<u8>> {

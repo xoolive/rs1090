@@ -7,6 +7,10 @@ use ssh2_config::{ParseRule, SshConfig};
 use std::fs::File;
 use std::io::BufReader;
 use tokio::net::TcpStream;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    process::{ChildStdin, ChildStdout, Command},
+};
 
 pub struct TunnelledTcp {
     pub address: String,
@@ -170,8 +174,14 @@ fn get_default_username() -> String {
 enum Io {
     Tcp(TcpStream),
     Tunnel(TunnelStream),
+    Proxy(ProxyCommand),
 }
 
+/**
+ * This function connects to a server using SSH. It handles proxy commands
+ * and proxy jumps. It also handles authentication using private keys.
+ * It returns a Client object that can be used to interact with the server.
+ */
 #[async_recursion::async_recursion]
 async fn connect_server(
     server: &str,
@@ -183,7 +193,30 @@ async fn connect_server(
     let user = server_params.user.unwrap_or(get_default_username());
 
     let io = match server_params.unsupported_fields.get("proxyjump") {
-        None => Io::Tcp(TcpStream::connect((hostname.to_owned(), port)).await?),
+        None => match server_params.unsupported_fields.get("proxycommand") {
+            None => {
+                Io::Tcp(TcpStream::connect((hostname.to_owned(), port)).await?)
+            }
+            Some(args) => {
+                let mut command = Command::new(args[0].clone());
+                for arg in args[1..].iter() {
+                    let arg = arg
+                        // Replace %% with %
+                        .replace("%%", "%")
+                        // Replace the following placeholders with actual values
+                        .replace("%h", &hostname)
+                        .replace("%p", &port.to_string());
+                    command.arg(arg);
+                }
+                println!("Executing proxy command: {:?}", command);
+                Io::Proxy(ProxyCommand::new(
+                    command
+                        .stdin(std::process::Stdio::piped())
+                        .stdout(std::process::Stdio::piped())
+                        .stderr(std::process::Stdio::piped()),
+                ))
+            }
+        },
         Some(jump) => {
             let jump_server = jump.first().expect("No jump host specified");
             let jump_client = connect_server(jump_server, params).await?;
@@ -212,7 +245,13 @@ async fn connect_server(
         }
         Io::Tunnel(io) => {
             let (client, client_rx, client_fut) = Client::open(io, config)?;
-
+            tokio::spawn(async move {
+                client_fut.await.expect("Error in client future");
+            });
+            (client, client_rx)
+        }
+        Io::Proxy(io) => {
+            let (client, client_rx, client_fut) = Client::open(io, config)?;
             tokio::spawn(async move {
                 client_fut.await.expect("Error in client future");
             });
@@ -326,5 +365,58 @@ impl TunnelledSero {
             .expect("Could not open a tunnel");
 
         Ok(TunnelStream::new(tunnel, tunnel_rx))
+    }
+}
+
+#[derive(Debug)]
+pub struct ProxyCommand {
+    stdin: ChildStdin,
+    stdout: ChildStdout,
+}
+
+impl ProxyCommand {
+    pub fn new(command: &mut Command) -> Self {
+        let mut command = command.spawn().expect("failed to spawn");
+        let stdin = command.stdin.take().expect("failed to open stdin");
+        let stdout = command.stdout.take().expect("failed to open stdout");
+        ProxyCommand { stdin, stdout }
+    }
+}
+
+impl AsyncRead for ProxyCommand {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        std::pin::Pin::new(&mut this.stdout).poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for ProxyCommand {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        let this = self.get_mut();
+        std::pin::Pin::new(&mut this.stdin).poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        std::pin::Pin::new(&mut this.stdin).poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        std::pin::Pin::new(&mut this.stdin).poll_shutdown(cx)
     }
 }
