@@ -3,14 +3,21 @@ use makiko::{
     ChannelConfig, Client, ClientConfig, ClientReceiver, Privkey,
     TunnelReceiver, TunnelStream,
 };
+use once_cell::sync::Lazy;
 use ssh2_config::{ParseRule, SshConfig};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
+use std::sync::Arc;
 use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     process::{ChildStdin, ChildStdout, Command},
 };
+
+pub static CONNECTION_MAP: Lazy<Arc<Mutex<HashMap<String, Client>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 pub struct TunnelledTcp {
     pub address: String,
@@ -186,7 +193,16 @@ enum Io {
 async fn connect_server(
     server: &str,
     params: &SshConfig,
+    connection_map: Arc<Mutex<HashMap<String, Client>>>,
 ) -> Result<Client, Box<dyn std::error::Error>> {
+    // Check if the server is already connected
+    // If so, return the existing connection
+    if connection_map.lock().await.contains_key(server) {
+        info!("Reusing existing connection to {}", server);
+        return Ok(connection_map.lock().await.get(server).unwrap().clone());
+    }
+
+    // Otherwise create a new connection
     let server_params = params.query(server);
     let hostname = server_params.host_name.unwrap();
     let port = server_params.port.unwrap_or(22);
@@ -208,7 +224,7 @@ async fn connect_server(
                         .replace("%p", &port.to_string());
                     command.arg(arg);
                 }
-                println!("Executing proxy command: {:?}", command);
+                info!("Executing proxy command: {:?}", command);
                 Io::Proxy(ProxyCommand::new(
                     command
                         .stdin(std::process::Stdio::piped())
@@ -219,7 +235,9 @@ async fn connect_server(
         },
         Some(jump) => {
             let jump_server = jump.first().expect("No jump host specified");
-            let jump_client = connect_server(jump_server, params).await?;
+            let jump_client =
+                connect_server(jump_server, params, connection_map.clone())
+                    .await?;
             let channel_config = ChannelConfig::default();
             let origin_addr = ("127.0.0.1".into(), 0);
             let (tunnel, tunnel_rx) = jump_client
@@ -261,11 +279,16 @@ async fn connect_server(
 
     tokio::task::spawn(authenticate_server(client_rx, hostname, port));
 
+    let ssh_folder = dirs::home_dir().unwrap().join(".ssh");
     let mut decoded_privkey = None;
-    for file in server_params.identity_file.unwrap().iter() {
+    let identity_files = server_params.identity_file.unwrap_or_else(|| {
+        vec![ssh_folder.join("id_rsa"), ssh_folder.join("id_ed25519")]
+    });
+    for file in identity_files.iter() {
         let filename = file.as_os_str();
         if let Ok(privkey) = tokio::fs::read(file).await {
             if let Ok(passphrase) = std::env::var("SSH_PASSPHRASE") {
+                info!("Decoding private key {:?} with passphrase", &filename);
                 if let Ok(res) = makiko::keys::decode_pem_privkey(
                     &privkey,
                     passphrase.as_bytes(),
@@ -284,6 +307,10 @@ async fn connect_server(
                     makiko::keys::decode_pem_privkey_nopass(&privkey)
                 {
                     if let Some(key) = data.privkey().cloned() {
+                        info!(
+                            "Successfully decoded a private key {:?} without passphrase",
+                            &filename
+                        );
                         decoded_privkey = Some(key);
                         break;
                     }
@@ -303,6 +330,12 @@ async fn connect_server(
     let privkey =
         decoded_privkey.expect("None of the identity files could be decoded");
     authenticate_by_private_key(&client, &user, &privkey).await;
+
+    connection_map
+        .lock()
+        .await
+        .insert(server.to_string(), client.clone());
+
     Ok(client)
 }
 
@@ -312,16 +345,18 @@ impl TunnelledTcp {
     ) -> Result<TunnelReceiver, Box<dyn std::error::Error>> {
         let params = get_params();
 
-        let target_client = connect_server(&self.jump, &params).await?;
+        let target_client =
+            connect_server(&self.jump, &params, CONNECTION_MAP.clone()).await?;
 
         let channel_config = makiko::ChannelConfig::default();
         let connect_addr = (self.address.to_owned(), self.port);
         let origin_addr = ("0.0.0.0".into(), 0);
 
+        let err_msg = format!("Could not open a tunnel to {:?}", connect_addr);
         let (_tunnel, tunnel_rx) = target_client
             .connect_tunnel(channel_config, connect_addr, origin_addr)
             .await
-            .expect("Could not open a tunnel");
+            .expect(&err_msg);
 
         Ok(tunnel_rx)
     }
@@ -333,16 +368,18 @@ impl TunnelledWebsocket {
     ) -> Result<TunnelStream, Box<dyn std::error::Error>> {
         let params = get_params();
 
-        let target_client = connect_server(&self.jump, &params).await?;
+        let target_client =
+            connect_server(&self.jump, &params, CONNECTION_MAP.clone()).await?;
 
         let channel_config = makiko::ChannelConfig::default();
         let connect_addr = (self.address.to_owned(), self.port);
         let origin_addr = ("0.0.0.0".into(), 0);
 
+        let err_msg = format!("Could not open a tunnel to {:?}", connect_addr);
         let (tunnel, tunnel_rx) = target_client
             .connect_tunnel(channel_config, connect_addr, origin_addr)
             .await
-            .expect("Could not open a tunnel");
+            .expect(&err_msg);
 
         Ok(TunnelStream::new(tunnel, tunnel_rx))
     }
@@ -354,7 +391,8 @@ impl TunnelledSero {
     ) -> Result<TunnelStream, Box<dyn std::error::Error>> {
         let params = get_params();
 
-        let target_client = connect_server(&self.jump, &params).await?;
+        let target_client =
+            connect_server(&self.jump, &params, CONNECTION_MAP.clone()).await?;
         let channel_config = makiko::ChannelConfig::default();
         let connect_addr = ("api.secureadsb.com".to_string(), 4201);
         let origin_addr = ("0.0.0.0".into(), 0);
@@ -362,7 +400,7 @@ impl TunnelledSero {
         let (tunnel, tunnel_rx) = target_client
             .connect_tunnel(channel_config, connect_addr, origin_addr)
             .await
-            .expect("Could not open a tunnel");
+            .expect("Could not open a tunnel to api.secureadsb.com");
 
         Ok(TunnelStream::new(tunnel, tunnel_rx))
     }
