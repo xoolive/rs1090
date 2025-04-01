@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.9
+
+- Add ssh tunnelling for Websocket and SeRo sources (#199 #200)
+- Add support for ProxyCommand
+- Reuse existing ssh connections
+
 ## 0.4.8
 
 - Add option --update-db to download the latest aircraft database
