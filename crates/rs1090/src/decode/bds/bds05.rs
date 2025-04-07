@@ -1,7 +1,7 @@
 use crate::decode::cpr::CPRFormat;
 use crate::decode::{decode_id13, gray2alt};
 use deku::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /**
@@ -14,7 +14,7 @@ use std::fmt;
  * | 5  | 2  |  1  | 12  | 1 | 1 |   17    |   17    |
  */
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct AirbornePosition {
     #[deku(bits = 5)]
     tc: u8,
@@ -137,16 +137,26 @@ impl fmt::Display for AirbornePosition {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 #[deku(id_type = "u8", bits = "2")]
 pub enum SurveillanceStatus {
+    #[serde(rename = "no_condition")]
     NoCondition = 0,
+    #[serde(rename = "permanent_alert")]
     PermanentAlert = 1,
+    #[serde(rename = "temporary_alert")]
     TemporaryAlert = 2,
+    #[serde(rename = "spi_condition")]
     SPICondition = 3,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Copy, Clone)]
+impl Default for SurveillanceStatus {
+    fn default() -> Self {
+        Self::NoCondition
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone)]
 pub enum Source {
     #[serde(rename = "barometric")]
     Barometric = 0,
@@ -164,5 +174,89 @@ impl fmt::Display for Source {
                 Self::Gnss => "GNSS",
             }
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::*;
+    use hexlit::hex;
+    use serde_json;
+    use rmp_serde::{Deserializer, Serializer};
+    use serde::{Deserialize, Serialize};
+    use std::io::Cursor;
+
+    #[test]
+    fn test_airborne_position_serde_json() {
+        let bytes = hex!("8D40058B58C901375147EFD09357");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS05(ap) = adsb_msg.message {
+                // Create a copy with simplified fields for serialization testing
+                let test_ap = AirbornePosition {
+                    tc: ap.tc,
+                    nuc_p: ap.nuc_p,
+                    ss: ap.ss,
+                    saf_or_nicb: ap.saf_or_nicb,
+                    alt: ap.alt,
+                    source: ap.source,
+                    t: ap.t,
+                    parity: ap.parity,
+                    lat_cpr: ap.lat_cpr,
+                    lon_cpr: ap.lon_cpr,
+                    latitude: None,
+                    longitude: None,
+                };
+
+                // Serialize to JSON
+                let json = serde_json::to_string(&test_ap).unwrap();
+
+                // Deserialize back
+                let deserialized: AirbornePosition = serde_json::from_str(&json).unwrap();
+
+                // Check equality
+                assert_eq!(test_ap.lat_cpr, deserialized.lat_cpr);
+                assert_eq!(test_ap.lon_cpr, deserialized.lon_cpr);
+                assert_eq!(test_ap.alt, deserialized.alt);
+                assert_eq!(test_ap.parity, deserialized.parity);
+                return;
+            }
+        }
+        panic!("Expected AirbornePosition message");
+    }
+
+    #[test]
+    fn test_airborne_position_serde_msgpack() {
+        // Create a minimal AirbornePosition object with only the required fields
+        let test_position = AirbornePosition {
+            tc: 11,
+            nuc_p: 7,
+            ss: SurveillanceStatus::NoCondition,
+            saf_or_nicb: Some(0),
+            alt: Some(10000),
+            source: Source::Barometric,
+            t: false,
+            parity: CPRFormat::Even,
+            lat_cpr: 92345,
+            lon_cpr: 47890,
+            latitude: None,
+            longitude: None,
+        };
+
+        // Use direct serialization methods - no intermediate data structures
+        let encoded = rmp_serde::to_vec_named(&test_position).unwrap();
+
+        // Deserialize directly into a new struct
+        let deserialized: AirbornePosition = rmp_serde::from_slice(&encoded).unwrap();
+
+        // Check equality of important fields
+        assert_eq!(test_position.tc, deserialized.tc);
+        assert_eq!(test_position.nuc_p, deserialized.nuc_p);
+        assert_eq!(test_position.alt, deserialized.alt);
+        assert_eq!(test_position.lat_cpr, deserialized.lat_cpr);
+        assert_eq!(test_position.lon_cpr, deserialized.lon_cpr);
+        assert_eq!(test_position.parity, deserialized.parity);
     }
 }

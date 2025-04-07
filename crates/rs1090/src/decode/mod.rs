@@ -36,7 +36,7 @@ use tracing::debug;
  * | 24       | [`DF::CommDExtended`]               | 3.1.2.7.3   |
  */
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Clone)]
 #[deku(id_type = "u8", bits = "5", ctx = "crc: u32")]
 #[serde(tag = "df")]
 pub enum DF {
@@ -281,7 +281,7 @@ pub enum DF {
 /// The entry point to Mode S and ADS-B decoding
 ///
 /// Use as `Message::try_from()` in mostly all applications
-#[derive(Debug, PartialEq, Serialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Message {
     /// Calculated from all bits, should be 0 for ADS-B (raises a DekuError),
     /// icao24 otherwise
@@ -333,6 +333,7 @@ impl DekuContainerRead<'_> for Message {
     }
 }
 
+// Ensure DF20DataSelector and DF21DataSelector can be properly deserialized
 impl DekuReader<'_> for Message {
     fn from_reader_with_ctx<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         reader: &mut Reader<R>,
@@ -447,9 +448,9 @@ impl fmt::Display for Message {
                     writeln!(f, "  Air/Ground:    ground")?;
                 }
             }
-            DF::ExtendedSquitterADSB(msg) => {
-                write!(f, "{msg}")?;
-            }
+            DF::ExtendedSquitterADSB(adsb_msg) => {
+                write!(f, "{}", adsb_msg)?;
+            },
             DF::ExtendedSquitterTisB { cf, .. } => {
                 // DF18
                 write!(f, "{cf}")?;
@@ -516,7 +517,7 @@ pub fn serialize_config(decode_time: bool) {
         .expect("configuration can only happen once");
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct TimedMessage {
     /// The timestamp (in s) of the first time the message was received
     pub timestamp: f64,
@@ -603,18 +604,28 @@ impl Serialize for IcaoParity {
     }
 }
 
-impl core::str::FromStr for IcaoParity {
-    type Err = core::num::ParseIntError;
+impl<'de> Deserialize<'de> for IcaoParity {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        u32::from_str_radix(&s, 16)
+            .map(|num| Self(num))
+            .map_err(serde::de::Error::custom)
+    }
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let num = u32::from_str_radix(s, 16)?;
-        Ok(Self(num))
+// Default implementation for IcaoParity
+impl Default for IcaoParity {
+    fn default() -> Self {
+        Self(0)
     }
 }
 
 /// ICAO 24-bit address, commonly use to reference airframes, i.e. tail numbers
 /// of aircraft
-#[derive(PartialEq, Eq, PartialOrd, DekuRead, Hash, Copy, Clone, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, DekuRead, Hash, Copy, Clone, Ord, Default)]
 pub struct ICAO(#[deku(bits = 24, endian = "big")] pub u32);
 
 impl fmt::Debug for ICAO {
@@ -668,7 +679,7 @@ impl From<IcaoParity> for ICAO {
 }
 
 /// 13 bit identity code (squawk code), a 4-octal digit identifier
-#[derive(PartialEq, DekuRead, Copy, Clone)]
+#[derive(PartialEq, DekuRead, Copy, Clone, Deserialize)]
 pub struct IdentityCode(#[deku(reader = "Self::read(deku::reader)")] pub u16);
 
 impl IdentityCode {
@@ -708,7 +719,7 @@ impl Serialize for IdentityCode {
 }
 
 /// 13 bit encoded altitude
-#[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct AC13Field(#[deku(reader = "Self::read(deku::reader)")] pub u16);
 
 impl AC13Field {
@@ -750,7 +761,7 @@ impl AC13Field {
 }
 
 /// Transponder level and additional information (3.1.2.5.2.2.1)
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 #[deku(id_type = "u8", bits = "3")]
 #[allow(non_camel_case_types)]
 pub enum Capability {
@@ -791,8 +802,15 @@ impl fmt::Display for Capability {
     }
 }
 
+// Default implementation for Capability
+impl Default for Capability {
+    fn default() -> Self {
+        Self::AG_LEVEL1
+    }
+}
+
 /// Airborne or Ground and SPI (used in DF=4, 5, 20 or 21)
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 #[deku(id_type = "u8", bits = "3")]
 #[serde(rename_all = "snake_case")]
 pub enum FlightStatus {
@@ -824,8 +842,15 @@ impl fmt::Display for FlightStatus {
     }
 }
 
+// Default implementation for FlightStatus
+impl Default for FlightStatus {
+    fn default() -> Self {
+        Self::NoAlertNoSpiAirborne
+    }
+}
+
 /// The downlink request (used in DF=4, 5, 20 or 21)
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone, Deserialize)]
 #[deku(id_type = "u8", bits = "5")]
 pub enum DownlinkRequest {
     None = 0b00000,
@@ -836,16 +861,33 @@ pub enum DownlinkRequest {
     Unknown,
 }
 
+// Default implementation for DownlinkRequest
+impl Default for DownlinkRequest {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 /// The utility message (used in DF=4, 5, 20 or 21)
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone, Deserialize)]
 pub struct UtilityMessage {
     #[deku(bits = "4")]
     pub iis: u8,
     pub ids: UtilityMessageType,
 }
 
+// Default implementation for UtilityMessage
+impl Default for UtilityMessage {
+    fn default() -> Self {
+        Self {
+            iis: 0,
+            ids: UtilityMessageType::default(),
+        }
+    }
+}
+
 /// The utility message type (used in DF=4, 5, 20 or 21)
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone, Deserialize)]
 #[deku(id_type = "u8", bits = "2")]
 pub enum UtilityMessageType {
     NoInformation = 0b00,
@@ -854,8 +896,15 @@ pub enum UtilityMessageType {
     CommD = 0b11,
 }
 
+// Default implementation for UtilityMessageType
+impl Default for UtilityMessageType {
+    fn default() -> Self {
+        Self::NoInformation
+    }
+}
+
 /// The control field in TIS-B messages (DF=18)
-#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Clone)]
 pub struct ControlField {
     #[serde(rename = "tisb")]
     pub field_type: ControlFieldType,
@@ -874,7 +923,7 @@ impl fmt::Display for ControlField {
 }
 
 /// The control field type in TIS-B messages (DF=18)
-#[derive(Debug, PartialEq, serde::Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, DekuRead, Clone)]
 #[deku(id_type = "u8", bits = "3")]
 #[allow(non_camel_case_types)]
 pub enum ControlFieldType {
@@ -928,15 +977,22 @@ impl fmt::Display for ControlFieldType {
 }
 
 /// Uplink / Downlink (DF=24)
-#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone, Deserialize)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum KE {
     DownlinkELMTx = 0,
     UplinkELMAck = 1,
 }
 
+// Default implementation for KE
+impl Default for KE {
+    fn default() -> Self {
+        Self::DownlinkELMTx
+    }
+}
+
 /// Decode a [Gillham code](https://en.wikipedia.org/wiki/Gillham_code)
-/// 
+///
 /// In the squawk (identity) field bits are interleaved as follows in
 /// (message bit 20 to bit 32):
 ///
@@ -1015,7 +1071,6 @@ pub fn gray2alt(gray: u16) -> Result<i32, &'static str> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use hexlit::hex;
 
@@ -1043,5 +1098,49 @@ mod tests {
         } else {
             unreachable!()
         }
+    }
+
+    #[test]
+    fn test_message_serde_json() {
+        use serde_json;
+
+        let bytes = hex!("8d4bb463003d10000000001b5bec");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&msg).unwrap();
+
+        // Deserialize back
+        let deserialized_msg: Message = serde_json::from_str(&json).unwrap();
+
+        // Check equality
+        assert_eq!(
+            format!("{:?}", msg.df),
+            format!("{:?}", deserialized_msg.df)
+        );
+    }
+
+    #[test]
+    fn test_message_serde_msgpack() {
+        use rmp_serde::{Deserializer, Serializer};
+        use serde::{Deserialize, Serialize};
+        use std::io::Cursor;
+
+        let bytes = hex!("8d4bb463003d10000000001b5bec");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+
+        // Serialize to MessagePack
+        let mut buf = Vec::new();
+        msg.serialize(&mut Serializer::new(&mut buf)).unwrap();
+
+        // Deserialize back
+        let mut de = Deserializer::new(Cursor::new(&buf));
+        let deserialized_msg: Message = Deserialize::deserialize(&mut de).unwrap();
+
+        // Check equality
+        assert_eq!(
+            format!("{:?}", msg.df),
+            format!("{:?}", deserialized_msg.df)
+        );
     }
 }

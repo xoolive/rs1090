@@ -14,7 +14,7 @@ use super::bds::bds60::HeadingAndSpeedReport;
 use super::bds::bds65::AircraftOperationStatus;
 use super::AC13Field;
 use deku::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use tracing::debug;
 
@@ -75,6 +75,17 @@ pub struct DF20DataSelector {
     pub bds65: Option<AircraftOperationStatus>,
 }
 
+// Custom Deserialize implementation that handles all fields as None
+impl<'de> Deserialize<'de> for DF20DataSelector {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // Create a default instance with all fields set to None
+        Ok(Self::default())
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Clone, Default)]
 pub struct DF21DataSelector {
     #[serde(skip)]
@@ -122,6 +133,16 @@ pub struct DF21DataSelector {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds65: Option<AircraftOperationStatus>,
+}
+
+impl<'de> Deserialize<'de> for DF21DataSelector {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // Create a default instance with all fields set to None
+        Ok(Self::default())
+    }
 }
 
 impl fmt::Display for DF21DataSelector {

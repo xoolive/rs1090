@@ -1,7 +1,7 @@
 #![allow(clippy::suspicious_else_formatting)]
 
 use deku::prelude::*;
-use serde::ser::SerializeStruct;
+use serde::{Deserialize, ser::SerializeStruct};
 use serde::Serialize;
 use std::fmt;
 
@@ -25,7 +25,7 @@ use std::fmt;
  * subtypes 2 and 4 at this moment.
  *
  */
-#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Clone)]
 pub struct AirborneVelocity {
     #[deku(bits = "3")]
     #[serde(skip)]
@@ -106,7 +106,7 @@ fn read_geobaro<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     Ok(value)
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Clone)]
 #[deku(ctx = "subtype: u8", id = "subtype")]
 #[serde(untagged)]
 pub enum AirborneVelocitySubType {
@@ -125,11 +125,19 @@ pub enum AirborneVelocitySubType {
     Reserved1(#[deku(bits = "22")] u32),
 }
 
-#[derive(Debug, PartialEq, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum Sign {
+    #[serde(rename = "positive")]
     Positive = 0,
+    #[serde(rename = "negative")]
     Negative = 1,
+}
+
+impl Default for Sign {
+    fn default() -> Self {
+        Self::Positive
+    }
 }
 
 impl Sign {
@@ -195,6 +203,33 @@ pub struct GroundSpeedDecoding {
     pub track: f64,
 }
 
+// Implement Deserialize for GroundSpeedDecoding
+impl<'de> Deserialize<'de> for GroundSpeedDecoding {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // Create a simple struct that deserializes the fields we need
+        #[derive(Deserialize)]
+        struct GroundSpeedHelper {
+            groundspeed: f64,
+            track: f64,
+        }
+
+        let helper = GroundSpeedHelper::deserialize(deserializer)?;
+
+        // Create a default instance but with the values from the deserialization
+        Ok(GroundSpeedDecoding {
+            ew_sign: Sign::Positive,
+            ew_vel: 0.0,
+            ns_sign: Sign::Positive,
+            ns_vel: 0.0,
+            groundspeed: helper.groundspeed,
+            track: helper.track,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, DekuRead, Clone)]
 pub struct AirspeedSubsonicDecoding {
     #[deku(bits = "1")]
@@ -242,6 +277,42 @@ impl Serialize for AirspeedSubsonicDecoding {
             }
         }
         state.end()
+    }
+}
+
+// Add Deserialize implementation for AirspeedSubsonicDecoding
+impl<'de> Deserialize<'de> for AirspeedSubsonicDecoding {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // Create a helper struct that can be properly deserialized
+        #[derive(Deserialize)]
+        struct Helper {
+            heading: Option<f64>,
+            #[serde(rename = "IAS")]
+            ias: Option<u16>,
+            #[serde(rename = "TAS")]
+            tas: Option<u16>,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+
+        // Determine airspeed type and value based on which field is present
+        let airspeed_type = if helper.tas.is_some() {
+            AirspeedType::TAS
+        } else {
+            AirspeedType::IAS
+        };
+
+        let airspeed = helper.tas.or(helper.ias);
+
+        Ok(Self {
+            status_heading: helper.heading.is_some(),
+            heading: helper.heading,
+            airspeed_type,
+            airspeed,
+        })
     }
 }
 
@@ -295,7 +366,43 @@ impl Serialize for AirspeedSupersonicDecoding {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
+// Add Deserialize implementation for AirspeedSupersonicDecoding
+impl<'de> Deserialize<'de> for AirspeedSupersonicDecoding {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // Create a helper struct that can be properly deserialized
+        #[derive(Deserialize)]
+        struct Helper {
+            heading: Option<f32>,
+            #[serde(rename = "IAS")]
+            ias: Option<u16>,
+            #[serde(rename = "TAS")]
+            tas: Option<u16>,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+
+        // Determine airspeed type and value based on which field is present
+        let airspeed_type = if helper.tas.is_some() {
+            AirspeedType::TAS
+        } else {
+            AirspeedType::IAS
+        };
+
+        let airspeed = helper.tas.or(helper.ias);
+
+        Ok(Self {
+            status_heading: helper.heading.is_some(),
+            heading: helper.heading,
+            airspeed_type,
+            airspeed,
+        })
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, DekuRead, Deserialize)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum AirspeedType {
     IAS = 0,
@@ -329,7 +436,7 @@ pub enum DirectionNS {
     NorthToSouth = 1,
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum VerticalRateSource {
     #[serde(rename = "barometric")]
@@ -337,6 +444,12 @@ pub enum VerticalRateSource {
 
     #[serde(rename = "GNSS")]
     GeometricAltitude = 1,
+}
+
+impl Default for VerticalRateSource {
+    fn default() -> Self {
+        Self::BarometricPressureAltitude
+    }
 }
 
 impl fmt::Display for VerticalRateSource {
@@ -501,5 +614,75 @@ mod tests {
   NACv:          0
 "#
         )
+    }
+
+    #[test]
+    fn test_airborne_velocity_serde_json() {
+        use serde_json;
+
+        let bytes = hex!("8D485020994409940838175B284F");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS09(velocity) = adsb_msg.message {
+                // Serialize to JSON
+                let json = serde_json::to_string(&velocity).unwrap();
+
+                // Deserialize back
+                let deserialized: AirborneVelocity = serde_json::from_str(&json).unwrap();
+
+                // Check basic equality
+                assert_eq!(velocity.nac_v, deserialized.nac_v);
+                assert_eq!(velocity.vertical_rate, deserialized.vertical_rate);
+
+                // Check specific velocity subtype fields
+                match (&velocity.velocity, &deserialized.velocity) {
+                    (AirborneVelocitySubType::GroundSpeedDecoding(v1),
+                     AirborneVelocitySubType::GroundSpeedDecoding(v2)) => {
+                        assert_relative_eq!(v1.groundspeed, v2.groundspeed, max_relative = 1e-3);
+                        assert_relative_eq!(v1.track, v2.track, max_relative = 1e-3);
+                    },
+                    _ => panic!("Expected GroundSpeedDecoding"),
+                }
+                return;
+            }
+        }
+        panic!("Expected AirborneVelocity message");
+    }
+
+    #[test]
+    fn test_airborne_velocity_serde_msgpack() {
+        use rmp_serde::{Deserializer, Serializer};
+        use serde::{Deserialize, Serialize};
+        use std::io::Cursor;
+
+        let bytes = hex!("8D485020994409940838175B284F");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS09(velocity) = adsb_msg.message {
+                // Serialize to MessagePack
+                let mut buf = Vec::new();
+                velocity.serialize(&mut Serializer::new(&mut buf)).unwrap();
+
+                // Deserialize back
+                let mut de = Deserializer::new(Cursor::new(&buf));
+                let deserialized: AirborneVelocity = Deserialize::deserialize(&mut de).unwrap();
+
+                // Check basic equality
+                assert_eq!(velocity.nac_v, deserialized.nac_v);
+                assert_eq!(velocity.vertical_rate, deserialized.vertical_rate);
+
+                // Check specific velocity subtype fields
+                match (&velocity.velocity, &deserialized.velocity) {
+                    (AirborneVelocitySubType::GroundSpeedDecoding(v1),
+                     AirborneVelocitySubType::GroundSpeedDecoding(v2)) => {
+                        assert_relative_eq!(v1.groundspeed, v2.groundspeed, max_relative = 1e-3);
+                        assert_relative_eq!(v1.track, v2.track, max_relative = 1e-3);
+                    },
+                    _ => panic!("Expected GroundSpeedDecoding"),
+                }
+                return;
+            }
+        }
+        panic!("Expected AirborneVelocity message");
     }
 }

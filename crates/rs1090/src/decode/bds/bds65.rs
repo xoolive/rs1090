@@ -1,5 +1,5 @@
 use deku::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /**
@@ -13,7 +13,7 @@ use std::fmt;
  *
  */
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 #[deku(id_type = "u8", bits = "3")]
 #[serde(untagged)]
 pub enum AircraftOperationStatus {
@@ -38,7 +38,7 @@ impl fmt::Display for AircraftOperationStatus {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct OperationStatusAirborne {
     /// The capacity class
     #[serde(skip)]
@@ -62,7 +62,7 @@ impl fmt::Display for OperationStatusAirborne {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct CapabilityClassAirborne {
     #[deku(bits = "2", assert_eq = "0")]
     #[serde(skip)]
@@ -103,6 +103,20 @@ pub struct CapabilityClassAirborne {
     pub tc: u8,
 }
 
+impl Default for CapabilityClassAirborne {
+    fn default() -> Self {
+        Self {
+            reserved0: 0,
+            acas: false,
+            cdti: false,
+            reserved1: 0,
+            arv: false,
+            ts: false,
+            tc: 0,
+        }
+    }
+}
+
 impl fmt::Display for CapabilityClassAirborne {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.acas {
@@ -125,7 +139,7 @@ impl fmt::Display for CapabilityClassAirborne {
 }
 
 /// Version 2 support only
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct OperationStatusSurface {
     /// The capacity class
     #[serde(skip)]
@@ -158,7 +172,7 @@ impl fmt::Display for OperationStatusSurface {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct CapabilityClassSurface {
     #[deku(bits = "2", assert_eq = "0")]
     #[serde(skip)]
@@ -195,6 +209,20 @@ pub struct CapabilityClassSurface {
     pub nic_c: u8,
 }
 
+impl Default for CapabilityClassSurface {
+    fn default() -> Self {
+        Self {
+            reserved0: 0,
+            poe: false,
+            es1090: false,
+            b2_low: false,
+            uat_in: false,
+            nac_v: 0,
+            nic_c: 0,
+        }
+    }
+}
+
 impl fmt::Display for CapabilityClassSurface {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "   NICc:               {}", self.nic_c)?;
@@ -203,7 +231,7 @@ impl fmt::Display for CapabilityClassSurface {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct OperationalMode {
     #[deku(bits = "2", assert_eq = "0")]
     #[serde(skip)]
@@ -224,6 +252,19 @@ pub struct OperationalMode {
 
     #[deku(bits = "2")]
     system_design_assurance: u8,
+}
+
+impl Default for OperationalMode {
+    fn default() -> Self {
+        Self {
+            reserved: 0,
+            tcas_ra_active: false,
+            ident_switch_active: false,
+            reserved_recv_atc_service: false,
+            single_antenna_flag: false,
+            system_design_assurance: 0,
+        }
+    }
 }
 
 impl fmt::Display for OperationalMode {
@@ -275,7 +316,38 @@ pub enum ADSBVersionAirborne {
     Reserved { id: u8 },
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+impl<'de> Deserialize<'de> for ADSBVersionAirborne {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // Create a simple helper enum that follows the structure
+        #[derive(Deserialize)]
+        #[serde(tag = "version")]
+        enum VersionHelper {
+            #[serde(rename = "0")]
+            V0,
+            #[serde(rename = "1")]
+            V1(AirborneV1),
+            #[serde(rename = "2")]
+            V2(AirborneV2),
+            #[serde(rename = "3to7")]
+            Other { id: u8 },
+        }
+
+        let helper = VersionHelper::deserialize(deserializer)?;
+
+        // Convert to our actual enum
+        match helper {
+            VersionHelper::V0 => Ok(ADSBVersionAirborne::DOC9871AppendixA(Empty {})),
+            VersionHelper::V1(v1) => Ok(ADSBVersionAirborne::DOC9871AppendixB(v1)),
+            VersionHelper::V2(v2) => Ok(ADSBVersionAirborne::DOC9871AppendixC(v2)),
+            VersionHelper::Other { id } => Ok(ADSBVersionAirborne::Reserved { id }),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct AirborneV1 {
     #[deku(bits = "1")]
     #[serde(rename = "NICs")]
@@ -309,7 +381,7 @@ pub struct AirborneV1 {
     pub horizontal_reference_direction: u8,
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct AirborneV2 {
     #[deku(bits = "1")]
     #[serde(rename = "NICa")]
@@ -378,7 +450,38 @@ pub enum ADSBVersionSurface {
     Reserved { id: u8 },
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+impl<'de> Deserialize<'de> for ADSBVersionSurface {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // Create a simple helper enum that follows the structure
+        #[derive(Deserialize)]
+        #[serde(tag = "version")]
+        enum VersionHelper {
+            #[serde(rename = "0")]
+            V0,
+            #[serde(rename = "1")]
+            V1(SurfaceV1),
+            #[serde(rename = "2")]
+            V2(SurfaceV2),
+            #[serde(rename = "3to7")]
+            Other { id: u8 },
+        }
+
+        let helper = VersionHelper::deserialize(deserializer)?;
+
+        // Convert to our actual enum
+        match helper {
+            VersionHelper::V0 => Ok(ADSBVersionSurface::DOC9871AppendixA(Empty {})),
+            VersionHelper::V1(v1) => Ok(ADSBVersionSurface::DOC9871AppendixB(v1)),
+            VersionHelper::V2(v2) => Ok(ADSBVersionSurface::DOC9871AppendixC(v2)),
+            VersionHelper::Other { id } => Ok(ADSBVersionSurface::Reserved { id }),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct SurfaceV1 {
     #[deku(bits = "1")]
     #[serde(rename = "NICs")]
@@ -407,7 +510,7 @@ pub struct SurfaceV1 {
     pub horizontal_reference_direction: u8,
 }
 
-#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct SurfaceV2 {
     #[deku(bits = "1")]
     #[serde(rename = "NICa")]
@@ -450,4 +553,99 @@ pub struct Empty {}
 pub struct EmptyU8 {
     pub id: u8,
     pub unused: u8,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::*;
+    use hexlit::hex;
+    use serde_json;
+    use rmp_serde;
+
+    // New helper function to create a valid test message
+    fn create_test_message() -> AircraftOperationStatus {
+        // Create a simplified version of AircraftOperationStatus for serialization testing
+        AircraftOperationStatus::Airborne(OperationStatusAirborne {
+            capability_class: CapabilityClassAirborne {
+                reserved0: 0,
+                acas: true,
+                cdti: false,
+                reserved1: 0,
+                arv: true,
+                ts: false,
+                tc: 1,
+            },
+            operational_mode: OperationalMode {
+                reserved: 0,
+                tcas_ra_active: false,
+                ident_switch_active: true,
+                reserved_recv_atc_service: false,
+                single_antenna_flag: true,
+                system_design_assurance: 2,
+            },
+            version: ADSBVersionAirborne::DOC9871AppendixB(AirborneV1 {
+                nic_s: 1,
+                nac_p: 8,
+                barometric_altitude_quality: 2,
+                sil: 2,
+                barometric_altitude_integrity: 1,
+                horizontal_reference_direction: 0,
+            }),
+        })
+    }
+
+    #[test]
+    fn test_operation_status_serde_json() {
+        // Create test message
+        let status = create_test_message();
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&status).unwrap();
+
+        // Deserialize back
+        let deserialized: AircraftOperationStatus = serde_json::from_str(&json).unwrap();
+
+        // Check the version is preserved
+        match (status, deserialized) {
+            (AircraftOperationStatus::Airborne(orig),
+             AircraftOperationStatus::Airborne(deser)) => {
+                match (&orig.version, &deser.version) {
+                    (ADSBVersionAirborne::DOC9871AppendixB(_),
+                     ADSBVersionAirborne::DOC9871AppendixB(_)) => {
+                        // Test passes if we reach here
+                    },
+                    _ => panic!("Version mismatch after deserialization"),
+                }
+            },
+            _ => panic!("Expected Airborne status"),
+        }
+    }
+
+    #[test]
+    fn test_operation_status_serde_msgpack() {
+        // Create test message
+        let status = create_test_message();
+
+        // Serialize to MessagePack using direct method
+        let encoded = rmp_serde::to_vec(&status).unwrap();
+
+        // Deserialize back
+        let deserialized: AircraftOperationStatus = rmp_serde::from_slice(&encoded).unwrap();
+
+        // Check the version is preserved
+        match (status, deserialized) {
+            (AircraftOperationStatus::Airborne(orig),
+             AircraftOperationStatus::Airborne(deser)) => {
+                match (&orig.version, &deser.version) {
+                    (ADSBVersionAirborne::DOC9871AppendixB(_),
+                     ADSBVersionAirborne::DOC9871AppendixB(_)) => {
+                        // Test passes if we reach here
+                    },
+                    _ => panic!("Version mismatch after deserialization"),
+                }
+            },
+            _ => panic!("Expected Airborne status"),
+        }
+    }
 }
