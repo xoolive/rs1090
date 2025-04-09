@@ -61,10 +61,14 @@ pub struct AirbornePosition {
     pub source: Source,
 
     #[deku(bits = "1")]
-    #[serde(skip)]
-    // UTC sync or not
-    pub t: bool,
+    /// Time synchronisation, set to true when time of applicability is
+    /// synchronised with the UTC time.
+    pub time_sync: bool,
 
+    /// If the time synchronisation bit is true, the parity bit will alternate
+    /// between even and odd for successive 0.2 second time ticks, beginning
+    /// with even parity when the Time of Applicability is an exact
+    /// even-numbered UTC second.
     pub parity: CPRFormat,
 
     #[deku(bits = "17", endian = "big")]
