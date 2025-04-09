@@ -26,9 +26,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
 
-fn haversine(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+fn haversine(lat1: f64, lon1: f64, lat2: f64, _lon2: f64) -> f64 {
     let d_lat = (lat2 - lat1).to_radians();
-    let d_lon = (lon2 - lon1).to_radians();
+    let d_lon = (lat2 - lon1).to_radians();
     let a = (d_lat / 2.0).sin() * (d_lat / 2.0).sin()
         + lat1.to_radians().cos()
             * lat2.to_radians().cos()
@@ -44,7 +44,7 @@ fn dist_haversine(pos1: &Position, pos2: &Position) -> f64 {
 }
 
 /// A flag to qualify a CPR position as odd or even
-#[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 #[deku(id_type = "u8", bits = "1")]
 #[serde(rename_all = "snake_case")]
 pub enum CPRFormat {
