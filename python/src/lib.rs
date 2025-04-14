@@ -396,13 +396,7 @@ fn decode_flarm_vec(
                 .zip(reference)
                 .filter_map(|((msg, timestamp), reference)| {
                     let bytes = hex::decode(msg).unwrap();
-                    if let Ok(flarm) =
-                        Flarm::from_record(timestamp, &reference, &bytes)
-                    {
-                        Some(flarm)
-                    } else {
-                        None
-                    }
+                    Flarm::from_record(timestamp, &reference, &bytes).ok()
                 })
                 .collect()
         })
