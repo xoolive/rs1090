@@ -1,5 +1,5 @@
 use deku::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use tracing::{debug, trace};
 
@@ -16,7 +16,7 @@ use tracing::{debug, trace};
  * TC: Type code CA: Aircraft category C*: A character
  */
 
-#[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Clone)]
 //#[deku(ctx = "id: u8")]
 pub struct AircraftIdentification {
     #[deku(bits = 5)]
@@ -100,8 +100,9 @@ impl TryFrom<u8> for Typecode {
 * - ICAO WTC M (Medium) is equivalent to ADS-B (TC=4, CA=2 or CA=3).
 * - ICAO WTC H (Heavy) or J (Super) is equivalent to ADS-B (TC=4, CA=5).
 */
-#[derive(Debug, PartialEq, Serialize, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum WakeVortex {
+    #[serde(rename = "reserved")]
     Reserved,
 
     // Category C
@@ -111,16 +112,21 @@ pub enum WakeVortex {
     EmergencyVehicle,
     #[serde(rename = "Surface service vehicle")]
     ServiceVehicle,
+    #[serde(rename = "obstruction")]
     Obstruction,
 
     // Category B
+    #[serde(rename = "glider")]
     Glider,
     #[serde(rename = "Lighter than air")]
     Lighter,
+    #[serde(rename = "parachutist")]
     Parachutist,
+    #[serde(rename = "ultralight")]
     Ultralight,
     #[serde(rename = "UAM")]
     Unmanned,
+    #[serde(rename = "space")]
     Space,
 
     // Category A
@@ -132,10 +138,18 @@ pub enum WakeVortex {
     Medium2,
     #[serde(rename = "High vortex")]
     HighVortex,
+    #[serde(rename = "heavy")]
     Heavy,
     #[serde(rename = "High performance")]
     HighPerformance,
+    #[serde(rename = "rotorcraft")]
     Rotorcraft,
+}
+
+impl Default for WakeVortex {
+    fn default() -> Self {
+        Self::NoInformation
+    }
 }
 
 impl fmt::Display for WakeVortex {
