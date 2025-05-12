@@ -2,7 +2,7 @@
 
 use super::super::cpr::CPRFormat;
 use deku::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use tracing::debug;
 
@@ -22,7 +22,7 @@ use tracing::debug;
  *
  */
 
-#[derive(Debug, PartialEq, DekuRead, Serialize, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, DekuRead, Copy, Clone)]
 pub struct SurfacePosition {
     #[deku(bits = 5)]
     pub tc: u8,
