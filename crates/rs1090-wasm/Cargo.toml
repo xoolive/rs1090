@@ -34,3 +34,9 @@ getrandom = { version = "0.2.15", features = ["js"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
+
+[package.metadata.wasm-pack.profile.release]
+# TODO check if this is still needed
+# This had to be disabled for now, as it was causing issues with the
+# wasm-bindgen version used in the project.
+wasm-opt = false
