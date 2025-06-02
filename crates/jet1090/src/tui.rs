@@ -94,8 +94,9 @@ impl EventHandler {
     }
 
     pub async fn next(&mut self) -> Result<Event, io::Error> {
-        self.rx.recv().await.ok_or_else(|| {
-            io::Error::new(io::ErrorKind::Other, "Unable to get event")
-        })
+        self.rx
+            .recv()
+            .await
+            .ok_or_else(|| io::Error::other("Unable to get event"))
     }
 }

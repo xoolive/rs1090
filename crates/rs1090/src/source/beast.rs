@@ -218,9 +218,8 @@ pub async fn receiver(
         }
         BeastSource::Websocket(address) => {
             info!("Connecting to websocket: {}", address);
-            let (stream, _) = connect_async(&address)
-                .await
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let (stream, _) =
+                connect_async(&address).await.map_err(io::Error::other)?;
             info!("Connected to websocket: {}", address);
             let (_, rx) = stream.split();
             DataSource::Websocket(rx)
