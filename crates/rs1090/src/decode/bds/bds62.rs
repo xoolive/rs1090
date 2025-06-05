@@ -1,13 +1,13 @@
 #![allow(clippy::suspicious_else_formatting)]
 
 use deku::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /**
  * ## Target State and Status Information (BDS 6,2)
  */
-#[derive(Copy, Clone, Debug, Serialize, PartialEq, DekuRead)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, DekuRead)]
 pub struct TargetStateAndStatusInformation {
     #[deku(bits = "2")] // bits 5..=6
     #[serde(skip)]
@@ -57,7 +57,7 @@ pub struct TargetStateAndStatusInformation {
         bits = "9",// bit 30..39
         endian = "big",
         map = "|heading: u16| -> Result<_, DekuError> {
-            if *heading_status {Ok(Some(heading as f32 * 180.0 / 256.0))} 
+            if *heading_status {Ok(Some(heading as f32 * 180.0 / 256.0))}
             else {Ok(None)}
         }"
     )]
@@ -206,7 +206,7 @@ impl fmt::Display for TargetStateAndStatusInformation {
     }
 }
 
-#[derive(Copy, Clone, Debug, Serialize, PartialEq, DekuRead)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, DekuRead)]
 #[deku(id_type = "u8", bits = "1")]
 /// Encode the source of information for selected altitude
 pub enum AltSource {
@@ -219,6 +219,13 @@ pub enum AltSource {
     /// Flight Management System
     FMS,
 }
+
+impl Default for AltSource {
+    fn default() -> Self {
+        Self::MCP
+    }
+}
+
 impl fmt::Display for AltSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
