@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use rs1090::data::aircraft::Aircraft;
 use rs1090::decode::bds::bds09::AirborneVelocitySubType::{
     AirspeedSubsonic, GroundSpeedDecoding,
 };
@@ -9,7 +10,7 @@ use rs1090::prelude::*;
 use serde::Serialize;
 use tokio::sync::Mutex;
 
-use crate::{aircraftdb, Jet1090};
+use crate::Jet1090;
 
 /**
  * A state vector with the most up-to-date information about an aircraft
@@ -77,7 +78,7 @@ impl StateVectors {
     fn new(
         ts: u64,
         icao24: String,
-        aircraftdb: &BTreeMap<String, aircraftdb::Aircraft>,
+        aircraftdb: &BTreeMap<String, Aircraft>,
     ) -> StateVectors {
         let hexid = u32::from_str_radix(&icao24, 16).unwrap_or(0);
         let ac = aircraftdb.get(&icao24);
@@ -143,7 +144,7 @@ fn icao24(msg: &Message) -> Option<String> {
 pub async fn update_snapshot(
     states: &Mutex<Jet1090>,
     msg: &mut TimedMessage,
-    aircraftdb: &BTreeMap<String, aircraftdb::Aircraft>,
+    aircraftdb: &BTreeMap<String, Aircraft>,
 ) {
     if let TimedMessage {
         timestamp,
@@ -342,7 +343,7 @@ pub async fn update_snapshot(
 pub async fn store_history(
     states: &Mutex<Jet1090>,
     msg: TimedMessage,
-    aircraftdb: &BTreeMap<String, aircraftdb::Aircraft>,
+    aircraftdb: &BTreeMap<String, Aircraft>,
 ) {
     if let TimedMessage {
         timestamp,

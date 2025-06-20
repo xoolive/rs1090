@@ -44,6 +44,7 @@ prost = { version = "0.13.5", optional = true }
 rayon = "1.9.0"
 regex = "1.11.1"
 reqwest = { version = "0.12.12", optional = true, default-features = false, features = [ "rustls-tls" ] }
+rusqlite = { version = "0.36.0", features = ["bundled"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 soapysdr = { version = "0.4.1", optional = true }
@@ -52,6 +53,7 @@ tonic = { version = "0.13.1", features = ["_tls-any"], optional = true }
 tower = { version = "0.5.2", optional = true }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+zip = "4.1.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.45.1", features = ["full"] }

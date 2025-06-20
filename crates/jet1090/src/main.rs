@@ -1,6 +1,5 @@
 #![doc = include_str!("../readme.md")]
 
-mod aircraftdb;
 mod dedup;
 mod filters;
 mod sensor;
@@ -18,6 +17,7 @@ use clap_complete::{generate, Generator};
 use crossterm::event::KeyCode;
 use ratatui::widgets::*;
 use redis::AsyncCommands;
+use rs1090::data::aircraft;
 use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::decode::serialize_config;
 use rs1090::prelude::*;
@@ -172,7 +172,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if cli_options.update_db {
-        aircraftdb::update_db().await.unwrap();
+        aircraft::update_db().await.unwrap();
         return Ok(());
     }
 
@@ -285,7 +285,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    let aircraftdb = aircraftdb::aircraft().await;
+    let aircraftdb = aircraft::aircraft().await;
 
     let _awake = match options.prevent_sleep {
         true => Some(
