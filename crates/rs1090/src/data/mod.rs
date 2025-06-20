@@ -1,4 +1,4 @@
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "aircraft")]
 pub mod aircraft;
 pub mod airports;
 pub mod patterns;

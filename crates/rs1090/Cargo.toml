@@ -10,6 +10,7 @@ license.workspace = true
 edition.workspace = true
 
 [features]
+aircraft = ['dirs', 'reqwest', 'zip']
 rtlsdr = ['soapysdr']
 sero = ['prost', 'tonic', 'dirs', 'reqwest']
 ssh = [
@@ -53,7 +54,7 @@ tonic = { version = "0.13.1", features = ["_tls-any"], optional = true }
 tower = { version = "0.5.2", optional = true }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
-zip = "4.1.0"
+zip = { version = "4.1.0", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
