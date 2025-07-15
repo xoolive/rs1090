@@ -124,7 +124,7 @@ pub async fn handle_rejection(
         code = StatusCode::BAD_REQUEST;
         message = "Invalid query";
     } else {
-        eprintln!("unhandled rejection: {:?}", err);
+        eprintln!("unhandled rejection: {err:?}");
         code = StatusCode::INTERNAL_SERVER_ERROR;
         message = "Unknown error";
     }

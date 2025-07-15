@@ -108,10 +108,8 @@ pub fn decode_bds05(msg: &str) -> Result<JsValue, JsError> {
             Err(e) => Err(DecodeError(e).into()),
         }
     } else {
-        let msg = format!(
-            "Invalid typecode {} for BDS 0,5 (9 to 18 or 20 to 22)",
-            tc
-        );
+        let msg =
+            format!("Invalid typecode {tc} for BDS 0,5 (9 to 18 or 20 to 22)");
         Err(DecodeError(DekuError::Assertion(msg.into())).into())
     }
 }
@@ -277,8 +275,7 @@ pub fn decode_bds65(msg: &str) -> Result<JsValue, JsError> {
         }
         _ => {
             let msg = format!(
-                "Invalid typecode {} (31) or category {} (0 or 1) for BDS 6,5",
-                tc, enum_id
+                "Invalid typecode {tc} (31) or category {enum_id} (0 or 1) for BDS 6,5"
             );
             Err(DecodeError(DekuError::Assertion(msg.into())).into())
         }

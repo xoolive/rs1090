@@ -61,7 +61,7 @@ pub fn aircraft_registration_read<
             Ok(Some(encoded))
         } else {
             Err(DekuError::Assertion(
-                format!("Invalid aircraft registration {}", encoded).into(),
+                format!("Invalid aircraft registration {encoded}").into(),
             ))
         }
     } else if all_zeros {
@@ -69,8 +69,7 @@ pub fn aircraft_registration_read<
     } else {
         Err(DekuError::Assertion(
             format!(
-                "Non-null value after invalid aircraft registration status: {}",
-                encoded
+                "Non-null value after invalid aircraft registration status: {encoded}"
             )
             .into(),
         ))
@@ -101,8 +100,7 @@ pub fn airline_registration_read<
         // Ok((inside_rest, Some(encoded)))
         Err(DekuError::Assertion(
             format!(
-                "Most transponders don't implement this field. (value = {})",
-                encoded
+                "Most transponders don't implement this field. (value = {encoded})"
             )
             .into(),
         ))
@@ -111,8 +109,7 @@ pub fn airline_registration_read<
     } else {
         Err(DekuError::Assertion(
             format!(
-                "Non-null value after invalid airline registration status: {}",
-                encoded
+                "Non-null value after invalid airline registration status: {encoded}"
             )
             .into(),
         ))

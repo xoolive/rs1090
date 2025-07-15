@@ -13,7 +13,7 @@ fn main() {
         Ok((_, msg)) => {
             // JSON output
             let json = serde_json::to_string(&msg).unwrap();
-            println!("{}", json);
+            println!("{json}");
         }
         Err(e) => error!("{}", e.to_string()),
     }
@@ -22,6 +22,6 @@ fn main() {
     if let Ok(msg) = Message::try_from(bytes.as_slice()) {
         // JSON output
         let json = serde_json::to_string(&msg).unwrap();
-        println!("{}", json);
+        println!("{json}");
     }
 }

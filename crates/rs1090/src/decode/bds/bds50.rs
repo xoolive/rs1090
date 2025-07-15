@@ -62,7 +62,7 @@ fn read_roll<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     };
     if roll.abs() > 50. {
         return Err(DekuError::Assertion(
-            format!("Roll angle: abs({}) > 50", roll).into(),
+            format!("Roll angle: abs({roll}) > 50").into(),
         ));
     }
     Ok(Some(roll))
@@ -132,7 +132,7 @@ fn read_groundspeed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     let gs = value * 2;
     if gs > 600 {
         return Err(DekuError::Assertion(
-            format!("Groundspeed value: {} > 600", gs).into(),
+            format!("Groundspeed value: {gs} > 600").into(),
         ));
     }
     Ok(Some(gs))
@@ -181,8 +181,7 @@ fn read_rate<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
             // signs must agree: left wing down = turn left
             return Err(DekuError::Assertion(
                 format!(
-                    "Roll angle {} and track rate {} signs do not agree.",
-                    roll, rate
+                    "Roll angle {roll} and track rate {rate} signs do not agree."
                 )
                 .into(),
             ));
@@ -220,8 +219,7 @@ fn read_tas<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     if let Some(gs) = gs {
         if !(80..=500).contains(&tas) | ((gs as i16 - tas as i16).abs() > 200) {
             return Err(DekuError::Assertion(format!(
-                "TAS = {} must be within [80, 500] and abs(GS - TAS) = {} < 200",
-                tas, gs
+                "TAS = {tas} must be within [80, 500] and abs(GS - TAS) = {gs} < 200"
             ).into()));
         }
     }

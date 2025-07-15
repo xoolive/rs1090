@@ -558,7 +558,7 @@ pub fn n_reg(hexid: u32) -> Option<String> {
     }
 
     let digit1 = (offset / 101711) + 1;
-    let mut reg = format!("N{}", digit1);
+    let mut reg = format!("N{digit1}");
     let mut offset = offset % 101711;
 
     if offset <= 600 {

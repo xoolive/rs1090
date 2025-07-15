@@ -18,6 +18,6 @@ pub fn main() {
                 continue 'airport;
             }
         }
-        println!("{}", airport);
+        println!("{airport}");
     }
 }

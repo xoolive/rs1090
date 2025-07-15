@@ -76,7 +76,7 @@ fn bench_file(c: &mut Criterion) {
     let mut group = c.benchmark_group("linear");
     let n = 1_000;
     group.throughput(Throughput::Elements(n));
-    group.bench_function(format!("{} lines", n), |b| {
+    group.bench_function(format!("{n} lines"), |b| {
         b.iter(|| first_lines(n as usize))
     });
     group.finish();

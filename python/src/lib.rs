@@ -114,10 +114,8 @@ fn decode_bds05(msg: String) -> PyResult<Vec<u8>> {
             Err(e) => Err(DecodeError(e).into()),
         }
     } else {
-        let msg = format!(
-            "Invalid typecode {} for BDS 0,5 (9 to 18 or 20 to 22)",
-            tc
-        );
+        let msg =
+            format!("Invalid typecode {tc} for BDS 0,5 (9 to 18 or 20 to 22)");
         Err(PyAssertionError::new_err(msg))
     }
 }
@@ -282,8 +280,7 @@ fn decode_bds65(msg: String) -> PyResult<Vec<u8>> {
             }
         }
         _ => Err(PyAssertionError::new_err(format!(
-            "Invalid typecode {} (31) or category {} (0 or 1) for BDS 6,5",
-            tc, enum_id
+            "Invalid typecode {tc} (31) or category {enum_id} (0 or 1) for BDS 6,5"
         ))),
     }
 }

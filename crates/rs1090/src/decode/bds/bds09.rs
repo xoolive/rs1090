@@ -400,7 +400,7 @@ impl fmt::Display for AirborneVelocity {
         }
         writeln!(f, "  NACv:          {}", &self.nac_v)?;
         if let Some(value) = &self.geo_minus_baro {
-            writeln!(f, "  GNSS delta:    {} ft", value)?;
+            writeln!(f, "  GNSS delta:    {value} ft")?;
         }
         Ok(())
     }

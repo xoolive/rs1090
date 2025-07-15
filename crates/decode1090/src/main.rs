@@ -176,7 +176,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 file.write_all(json.as_bytes()).await?;
                 file.write_all("\n".as_bytes()).await?;
             } else {
-                println!("{}", json);
+                println!("{json}");
             }
         }
     }
@@ -249,7 +249,7 @@ async fn process_entries(
             file.write_all(json.as_bytes()).await?;
             file.write_all("\n".as_bytes()).await?;
         } else {
-            println!("{}", json);
+            println!("{json}");
         }
     }
     Ok(())

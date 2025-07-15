@@ -67,7 +67,7 @@ fn read_wind_speed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         }
     }
     if value > 250 {
-        let msg = format!("Invalid wind speed {} kts > 250 kts", value);
+        let msg = format!("Invalid wind speed {value} kts > 250 kts");
         return Err(DekuError::Assertion(msg.into()));
     }
 

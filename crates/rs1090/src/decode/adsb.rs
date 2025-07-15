@@ -133,25 +133,25 @@ impl fmt::Display for ME {
             | ME::SurfaceSystemStatus { .. }
             | ME::AircraftOperationalCoordination { .. } => Ok(()),
             ME::BDS05(me) => {
-                write!(f, "{}", me)
+                write!(f, "{me}")
             }
             ME::BDS06(me) => {
-                write!(f, "{}", me)
+                write!(f, "{me}")
             }
             ME::BDS08(me) => {
-                write!(f, "{}", me)
+                write!(f, "{me}")
             }
             ME::BDS09(me) => {
-                write!(f, "{}", me)
+                write!(f, "{me}")
             }
             ME::BDS61(me) => {
-                write!(f, "{}", me)
+                write!(f, "{me}")
             }
             ME::BDS62(me) => {
-                write!(f, "{}", me)
+                write!(f, "{me}")
             }
             ME::BDS65(me) => {
-                write!(f, "{}", me)
+                write!(f, "{me}")
             }
         }
     }

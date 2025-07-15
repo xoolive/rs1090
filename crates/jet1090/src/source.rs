@@ -181,7 +181,7 @@ impl Source {
                     AddressPath::Long(AddressStruct {
                         address, port, ..
                     }) => {
-                        format!("{}:{}", address, port)
+                        format!("{address}:{port}")
                     }
                 };
                 build_serial(&name)
@@ -259,10 +259,9 @@ impl Source {
                             address,
                             port,
                             jump: None,
-                        }) => beast::BeastSource::Tcp(format!(
-                            "{}:{}",
-                            address, port
-                        )),
+                        }) => {
+                            beast::BeastSource::Tcp(format!("{address}:{port}"))
+                        }
                         #[cfg(feature = "ssh")]
                         AddressPath::Long(AddressStruct {
                             address,

@@ -235,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Some(log_file) if log_file != "-" => {
             let file = std::fs::File::create(log_file).unwrap_or_else(|_| {
-                panic!("fail to create log file: {}", log_file)
+                panic!("fail to create log file: {log_file}")
             });
             let file_layer = fmt::layer().with_writer(file).with_ansi(false);
             subscriber.with(file_layer).init();
@@ -268,7 +268,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filters = filters::Filters {
         df_filter: options
             .df_filter
-            .map(|df| df.into_iter().map(|v| format!("{}", v)).collect()),
+            .map(|df| df.into_iter().map(|v| format!("{v}")).collect()),
         aircraft_filter: options.aircraft_filter,
     };
 
@@ -567,7 +567,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(json) = serde_json::to_string(&msg) {
             if is_in {
                 if options.verbose {
-                    println!("{}", json);
+                    println!("{json}");
                 }
 
                 if let Some(file) = &mut file {

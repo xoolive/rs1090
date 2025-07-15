@@ -114,7 +114,7 @@ fn read_ias<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if (value == 0) | (value > 500) {
         return Err(DekuError::Assertion(
-            format!("IAS value {} is equal to 0 or greater than 500", value)
+            format!("IAS value {value} is equal to 0 or greater than 500")
                 .into(),
         ));
     }
@@ -148,7 +148,7 @@ fn read_mach<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     if (mach == 0.) | (mach > 1.) {
         return Err(DekuError::Assertion(
-            format!("Mach value {} equal to 0 or greater than 1 ", mach).into(),
+            format!("Mach value {mach} equal to 0 or greater than 1 ").into(),
         ));
     }
     if let Some(ias) = ias {
@@ -163,8 +163,7 @@ fn read_mach<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         if (ias > 250) & (mach < 0.4) {
             return Err(DekuError::Assertion(
                 format!(
-                    "IAS: {} and Mach: {} (250kts is Mach 0.45 at 10,000 ft)",
-                    ias, mach
+                    "IAS: {ias} and Mach: {mach} (250kts is Mach 0.45 at 10,000 ft)"
                 )
                 .into(),
             ));
@@ -173,8 +172,7 @@ fn read_mach<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         if (ias < 150) & (mach > 0.5) {
             return Err(DekuError::Assertion(
                 format!(
-                    "IAS: {} and Mach: {} (150kts is Mach 0.5 at FL400)",
-                    ias, mach
+                    "IAS: {ias} and Mach: {mach} (150kts is Mach 0.5 at FL400)"
                 )
                 .into(),
             ));

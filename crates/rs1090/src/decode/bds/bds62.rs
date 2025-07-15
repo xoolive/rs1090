@@ -164,10 +164,10 @@ impl fmt::Display for TargetStateAndStatusInformation {
             )?;
         }
         if let Some(sel_hdg) = &self.selected_heading {
-            writeln!(f, "  Selected hdg:  {:.1}°", sel_hdg)?;
+            writeln!(f, "  Selected hdg:  {sel_hdg:.1}°")?;
         }
         if let Some(qnh) = &self.barometric_setting {
-            writeln!(f, "  QNH:           {:.1} mbar", qnh)?;
+            writeln!(f, "  QNH:           {qnh:.1} mbar")?;
         }
         if self.mode_status {
             write!(f, "  Mode:         ")?;

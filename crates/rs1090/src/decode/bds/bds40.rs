@@ -115,8 +115,7 @@ fn read_selected<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     let value = (value + 8) / 100 * 100;
     if value > 45000 {
         let msg = format!(
-            "Value for selected_fms or selected_mcp: {} ft > 45000 ft",
-            value
+            "Value for selected_fms or selected_mcp: {value} ft > 45000 ft"
         );
         return Err(DekuError::Assertion(msg.into()));
     }

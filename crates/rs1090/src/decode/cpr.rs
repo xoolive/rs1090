@@ -90,10 +90,10 @@ impl FromStr for Position {
 
         let latitude: f64 = parts[0]
             .parse()
-            .map_err(|e| format!("Latitude parse error: {}", e))?;
+            .map_err(|e| format!("Latitude parse error: {e}"))?;
         let longitude: f64 = parts[1]
             .parse()
-            .map_err(|e| format!("Longitude parse error: {}", e))?;
+            .map_err(|e| format!("Longitude parse error: {e}"))?;
 
         Ok(Position {
             latitude,

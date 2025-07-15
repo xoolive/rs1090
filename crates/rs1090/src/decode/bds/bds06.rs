@@ -121,8 +121,8 @@ impl fmt::Display for SurfacePosition {
         let track = self
             .track
             .map_or_else(|| "None".to_string(), |track| format!("{track}°"));
-        writeln!(f, "  Groundspeed:   {}", groundspeed)?;
-        writeln!(f, "  Track angle:   {}", track)?;
+        writeln!(f, "  Groundspeed:   {groundspeed}")?;
+        writeln!(f, "  Track angle:   {track}")?;
         writeln!(f, "  CPR parity:    {}", self.parity)?;
         writeln!(f, "  CPR latitude:  ({})", self.lat_cpr)?;
         writeln!(f, "  CPR longitude: ({})", self.lon_cpr)?;

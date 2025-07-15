@@ -245,7 +245,7 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
         )
         .block(
             Block::default()
-                .title_bottom(format!("jet1090 ({} aircraft)", size,))
+                .title_bottom(format!("jet1090 ({size} aircraft)",))
                 .title_alignment(Alignment::Right)
                 .title_style(Style::new().blue().bold())
                 .padding(Padding::symmetric(1, 0))
@@ -369,18 +369,16 @@ impl Render for ColumnRender {
             Self::SQUAWK => {
                 s.squawk.map(|s| s.to_string()).unwrap_or("".to_string())
             }
-            Self::LATITUDE => s
-                .latitude
-                .map(|v| format!("{}", v))
-                .unwrap_or("".to_string()),
+            Self::LATITUDE => {
+                s.latitude.map(|v| format!("{v}")).unwrap_or("".to_string())
+            }
             Self::LONGITUDE => s
                 .longitude
-                .map(|v| format!("{}", v))
+                .map(|v| format!("{v}"))
                 .unwrap_or("".to_string()),
-            Self::ALTITUDE => s
-                .altitude
-                .map(|v| format!("{}", v))
-                .unwrap_or("".to_string()),
+            Self::ALTITUDE => {
+                s.altitude.map(|v| format!("{v}")).unwrap_or("".to_string())
+            }
             Self::SELALT => match (s.selected_altitude, s.altitude) {
                 (Some(sel), Some(alt)) if u16::abs_diff(sel, alt) <= 50 => {
                     "=".to_string()
@@ -392,33 +390,32 @@ impl Render for ColumnRender {
             },
             Self::GROUNDSPEED => s
                 .groundspeed
-                .map(|v| format!("{}", v))
+                .map(|v| format!("{v}"))
                 .unwrap_or("".to_string()),
             Self::TAS => {
-                s.tas.map(|v| format!("{}", v)).unwrap_or("".to_string())
+                s.tas.map(|v| format!("{v}")).unwrap_or("".to_string())
             }
             Self::IAS => {
-                s.ias.map(|v| format!("{}", v)).unwrap_or("".to_string())
+                s.ias.map(|v| format!("{v}")).unwrap_or("".to_string())
             }
             Self::MACH => {
-                s.mach.map(|v| format!("{}", v)).unwrap_or("".to_string())
+                s.mach.map(|v| format!("{v}")).unwrap_or("".to_string())
             }
             Self::VRATE => s
                 .vertical_rate
-                .map(|v| format!("{}", v))
+                .map(|v| format!("{v}"))
                 .unwrap_or("".to_string()),
             Self::TRACK => {
-                s.track.map(|v| format!("{}", v)).unwrap_or("".to_string())
+                s.track.map(|v| format!("{v}")).unwrap_or("".to_string())
             }
-            Self::HEADING => s
-                .heading
-                .map(|v| format!("{}", v))
-                .unwrap_or("".to_string()),
+            Self::HEADING => {
+                s.heading.map(|v| format!("{v}")).unwrap_or("".to_string())
+            }
             Self::ROLL => {
-                s.roll.map(|v| format!("{}", v)).unwrap_or("".to_string())
+                s.roll.map(|v| format!("{v}")).unwrap_or("".to_string())
             }
             Self::NACP => {
-                s.nacp.map(|v| format!("{}", v)).unwrap_or("".to_string())
+                s.nacp.map(|v| format!("{v}")).unwrap_or("".to_string())
             }
             Self::COUNT => s.count.to_string(),
             Self::REFERENCE => s

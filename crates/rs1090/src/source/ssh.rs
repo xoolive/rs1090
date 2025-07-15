@@ -139,8 +139,7 @@ async fn authenticate_by_private_key(
                 }
                 makiko::AuthPubkeyResult::Failure(failure) => {
                     info!(
-                        "The server rejected authentication with {:?}: {:?}",
-                        pubkey_algo, failure
+                        "The server rejected authentication with {pubkey_algo:?}: {failure:?}"
                     );
                 }
             }
@@ -152,7 +151,7 @@ async fn authenticate_by_private_key(
 fn get_params() -> SshConfig {
     let config_path = dirs::home_dir().unwrap().join(".ssh").join("config");
 
-    let err_msg = format!("{:?} does not exist", config_path);
+    let err_msg = format!("{config_path:?} does not exist");
     let mut reader = BufReader::new(File::open(&config_path).expect(&err_msg));
 
     SshConfig::default()
@@ -162,7 +161,7 @@ fn get_params() -> SshConfig {
                 | ParseRule::ALLOW_UNSUPPORTED_FIELDS,
         )
         .unwrap_or_else(|_| {
-            panic!("Failed to parse configuration file {:?}", config_path)
+            panic!("Failed to parse configuration file {config_path:?}")
         })
 }
 
@@ -198,7 +197,7 @@ async fn connect_server(
     // Check if the server is already connected
     // If so, return the existing connection
     if connection_map.lock().await.contains_key(server) {
-        info!("Reusing existing connection to {}", server);
+        info!("Reusing existing connection to {server}");
         return Ok(connection_map.lock().await.get(server).unwrap().clone());
     }
 
@@ -224,7 +223,7 @@ async fn connect_server(
                         .replace("%p", &port.to_string());
                     command.arg(arg);
                 }
-                info!("Executing proxy command: {:?}", command);
+                info!("Executing proxy command: {command:?}");
                 Io::Proxy(ProxyCommand::new(
                     command
                         .stdin(std::process::Stdio::piped())
@@ -352,7 +351,7 @@ impl TunnelledTcp {
         let connect_addr = (self.address.to_owned(), self.port);
         let origin_addr = ("0.0.0.0".into(), 0);
 
-        let err_msg = format!("Could not open a tunnel to {:?}", connect_addr);
+        let err_msg = format!("Could not open a tunnel to {connect_addr:?}");
         let (_tunnel, tunnel_rx) = target_client
             .connect_tunnel(channel_config, connect_addr, origin_addr)
             .await
@@ -375,7 +374,7 @@ impl TunnelledWebsocket {
         let connect_addr = (self.address.to_owned(), self.port);
         let origin_addr = ("0.0.0.0".into(), 0);
 
-        let err_msg = format!("Could not open a tunnel to {:?}", connect_addr);
+        let err_msg = format!("Could not open a tunnel to {connect_addr:?}");
         let (tunnel, tunnel_rx) = target_client
             .connect_tunnel(channel_config, connect_addr, origin_addr)
             .await

@@ -6,7 +6,7 @@ use tracing::info;
 fn main() {
     let device = enumerate("driver=rtlsdr").unwrap();
     for arg in device {
-        println!("{:#}", arg);
+        println!("{arg:#}");
 
         let device = match Device::new(arg) {
             Ok(device) => {
@@ -14,7 +14,7 @@ fn main() {
                 device
             }
             Err(error) => {
-                eprintln!("SoapySDR error: {}", error);
+                eprintln!("SoapySDR error: {error}");
                 std::process::exit(127);
             }
         };

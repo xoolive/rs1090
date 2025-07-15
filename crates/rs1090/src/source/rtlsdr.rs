@@ -39,7 +39,7 @@ pub async fn receiver<A: Into<Args> + fmt::Display + std::marker::Copy>(
     };
 
     let name = name.or(args
-        .map(|a| Some(format!("{}", a)))
+        .map(|a| Some(format!("{a}")))
         .unwrap_or(Some("rtlsdr".to_string())));
 
     let device = match device {
@@ -48,7 +48,7 @@ pub async fn receiver<A: Into<Args> + fmt::Display + std::marker::Copy>(
             device
         }
         Err(error) => {
-            eprintln!("SoapySDR error: {}", error);
+            eprintln!("SoapySDR error: {error}");
             std::process::exit(127);
         }
     };
