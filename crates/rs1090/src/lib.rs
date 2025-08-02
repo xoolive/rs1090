@@ -21,7 +21,7 @@ pub mod prelude {
     pub use crate::decode::Message;
     pub use crate::decode::DF::*;
     pub use crate::decode::{
-        cpr::Position, SensorMetadata, TimedMessage, ICAO,
+        cpr::{Position, RealtimeDecoder}, SensorMetadata, TimedMessage, ICAO,
     };
 
     /// This re-export is necessary for the following export
