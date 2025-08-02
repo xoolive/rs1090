@@ -102,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let update_reference = Some(Box::new(|pos: &AirbornePosition| {
             pos.alt.is_some_and(|alt| alt < 1000)
         })
-            as Box<dyn Fn(&AirbornePosition) -> bool>);
+            as Box<dyn Fn(&AirbornePosition) -> bool + Send + Sync>);
 
         // Print the JSON objects
         for mut json in json_objects.into_iter().flatten() {

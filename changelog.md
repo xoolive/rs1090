@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.14
+
+- Add RealtimeDecoder class for incremental real-time ADS-B position processing
+
 ## 0.4.9
 
 - Add ssh tunnelling for Websocket and SeRo sources (#199 #200)
