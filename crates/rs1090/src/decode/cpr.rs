@@ -16,7 +16,7 @@
 use super::adsb::ME;
 use super::bds::bds05::AirbornePosition;
 use super::bds::bds06::SurfacePosition;
-use super::{TimedMessage, DF, ICAO};
+use super::{TimedMessage, DF, ICAO, Message};
 use crate::data::airports::one_airport;
 use deku::prelude::*;
 use libm::fabs;
@@ -102,7 +102,7 @@ impl FromStr for Position {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct AircraftState {
     timestamp: f64,
     pos: Option<Position>,
@@ -421,7 +421,7 @@ pub fn surface_position_with_reference(
     })
 }
 
-pub type UpdateIf = Option<Box<dyn Fn(&AirbornePosition) -> bool>>;
+pub type UpdateIf = Option<Box<dyn Fn(&AirbornePosition) -> bool + Send + Sync>>;
 
 /**
  * Mutates the ME message based on recent past positions (parameter `timestamp`)
@@ -577,29 +577,134 @@ pub fn decode_positions(
     let _: Vec<()> = res
         .iter_mut()
         .map(|msg| {
-            if let Some(message) = &mut msg.message {
-                match &mut message.df {
-                    DF::ExtendedSquitterADSB(adsb) => decode_position(
-                        &mut adsb.message,
-                        msg.timestamp,
-                        &adsb.icao24,
-                        &mut aircraft,
-                        &mut reference,
-                        update_reference,
-                    ),
-                    DF::ExtendedSquitterTisB { cf, .. } => decode_position(
-                        &mut cf.me,
-                        msg.timestamp,
-                        &cf.aa,
-                        &mut aircraft,
-                        &mut reference,
-                        update_reference,
-                    ),
-                    _ => {}
-                }
-            }
+            process_single_message(msg, &mut aircraft, &mut reference, update_reference);
         })
         .collect();
+}
+
+/// Helper function to process a single message and update state
+/// This is shared between decode_positions and RealtimeDecoder
+fn process_single_message(
+    msg: &mut TimedMessage,
+    aircraft: &mut BTreeMap<ICAO, AircraftState>,
+    reference: &mut Option<Position>,
+    update_reference: &UpdateIf,
+) {
+    if let Some(message) = &mut msg.message {
+        match &mut message.df {
+            DF::ExtendedSquitterADSB(adsb) => decode_position(
+                &mut adsb.message,
+                msg.timestamp,
+                &adsb.icao24,
+                aircraft,
+                reference,
+                update_reference,
+            ),
+            DF::ExtendedSquitterTisB { cf, .. } => decode_position(
+                &mut cf.me,
+                msg.timestamp,
+                &cf.aa,
+                aircraft,
+                reference,
+                update_reference,
+            ),
+            _ => {}
+        }
+    }
+}
+
+
+
+/**
+ * Stateful decoder for realtime ADS-B position processing.
+ * 
+ * This decoder maintains state across multiple message processing calls,
+ * enabling incremental realtime processing while preserving the cross-aircraft
+ * context that makes batch processing effective.
+ */
+pub struct RealtimeDecoder {
+    aircraft: BTreeMap<ICAO, AircraftState>,
+    reference: Option<Position>,
+    update_reference: Option<Box<dyn Fn(&AirbornePosition) -> bool + Send + Sync>>,
+}
+
+impl RealtimeDecoder {
+    /// Create a new RealtimeDecoder with optional reference position
+    pub fn new(reference: Option<Position>) -> Self {
+        Self {
+            aircraft: BTreeMap::new(),
+            reference,
+            update_reference: None,
+        }
+    }
+    
+    /// Decode a single message and return the decoded message if available
+    pub fn decode(&mut self, msg: &mut TimedMessage) -> Option<Message> {
+        // Process the message using shared logic
+        process_single_message(
+            msg,
+            &mut self.aircraft,
+            &mut self.reference,
+            &self.update_reference,
+        );
+        
+        // Return the processed message
+        msg.message.clone()
+    }
+    
+    /// Process multiple messages and return all decoded messages
+    pub fn decode_batch(&mut self, messages: &mut [TimedMessage]) -> Vec<Message> {
+        let mut decoded_messages = Vec::new();
+        
+        for msg in messages {
+            if let Some(message) = self.decode(msg) {
+                decoded_messages.push(message);
+            }
+        }
+        
+        decoded_messages
+    }
+    
+    /// Get the current state for a specific aircraft
+    pub fn get_aircraft_state(&self, icao24: &ICAO) -> Option<&AircraftState> {
+        self.aircraft.get(icao24)
+    }
+    
+    /// Get the current reference position
+    pub fn get_reference_position(&self) -> Option<Position> {
+        self.reference
+    }
+    
+    /// Set the reference position
+    pub fn set_reference_position(&mut self, reference: Option<Position>) {
+        self.reference = reference;
+    }
+    
+    /// Set the update reference callback
+    pub fn set_update_reference_callback(
+        &mut self,
+        callback: Option<Box<dyn Fn(&AirbornePosition) -> bool + Send + Sync>>,
+    ) {
+        self.update_reference = callback;
+    }
+    
+    /// Get the number of aircraft being tracked
+    pub fn aircraft_count(&self) -> usize {
+        self.aircraft.len()
+    }
+    
+    /// Clear all aircraft state (useful for resetting the decoder)
+    pub fn clear_state(&mut self) {
+        self.aircraft.clear();
+    }
+    
+    /// Remove old aircraft state to prevent memory leaks
+    /// Removes aircraft that haven't been seen for more than max_age_seconds
+    pub fn prune_old_aircraft(&mut self, max_age_seconds: f64, current_time: f64) {
+        self.aircraft.retain(|_, state| {
+            current_time - state.timestamp < max_age_seconds
+        });
+    }
 }
 
 #[cfg(test)]
@@ -745,5 +850,103 @@ mod tests {
 
         assert_relative_eq!(latitude, 52.32061, max_relative = 1e-3);
         assert_relative_eq!(longitude, 4.73473, max_relative = 1e-3);
+    }
+}
+
+#[cfg(test)]
+mod realtime_decoder_tests {
+    use super::*;
+    use crate::prelude::*;
+    use hexlit::hex;
+
+    #[test]
+    fn test_realtime_decoder_creation() {
+        let decoder = RealtimeDecoder::new(None);
+        assert_eq!(decoder.aircraft_count(), 0);
+        assert!(decoder.get_reference_position().is_none());
+        
+        let decoder = RealtimeDecoder::new(Some(Position { latitude: 40.0, longitude: -75.0 }));
+        assert_eq!(decoder.aircraft_count(), 0);
+        assert!(decoder.get_reference_position().is_some());
+    }
+    
+    #[test]
+    fn test_realtime_decoder_single_message() {
+        let mut decoder = RealtimeDecoder::new(None);
+        
+        // Create a test message
+        let bytes = hex!("8D40058B58C901375147EFD09357");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        let mut timed_msg = TimedMessage {
+            timestamp: 1000.0,
+            frame: bytes.to_vec(),
+            message: Some(msg),
+            metadata: vec![],
+            decode_time: None,
+        };
+        
+        // Decode the message
+        let message = decoder.decode(&mut timed_msg);
+        
+        // Should return the message even if position not decoded yet
+        assert!(message.is_some());
+        
+        // Should track the aircraft
+        assert_eq!(decoder.aircraft_count(), 1);
+    }
+    
+    #[test]
+    fn test_realtime_decoder_odd_even_pair() {
+        let mut decoder = RealtimeDecoder::new(None);
+        
+        // Create odd and even messages for the same aircraft
+        let odd_bytes = hex!("8D40058B58C901375147EFD09357");
+        let even_bytes = hex!("8D40058B58C904A87F402D3B8C59");
+        
+        let (_, odd_msg) = Message::from_bytes((&odd_bytes, 0)).unwrap();
+        let (_, even_msg) = Message::from_bytes((&even_bytes, 0)).unwrap();
+        
+        let mut odd_timed = TimedMessage {
+            timestamp: 1000.0,
+            frame: odd_bytes.to_vec(),
+            message: Some(odd_msg),
+            metadata: vec![],
+            decode_time: None,
+        };
+        
+        let mut even_timed = TimedMessage {
+            timestamp: 1001.0,
+            frame: even_bytes.to_vec(),
+            message: Some(even_msg),
+            metadata: vec![],
+            decode_time: None,
+        };
+        
+        // Decode odd message first
+        let msg1 = decoder.decode(&mut odd_timed);
+        assert!(msg1.is_some()); // Should return the message
+        
+        // Decode even message - should decode message with position
+        let msg2 = decoder.decode(&mut even_timed);
+        assert!(msg2.is_some());
+        
+        if let Some(message) = msg2 {
+            // Check that the message contains position data
+            if let DF::ExtendedSquitterADSB(adsb) = &message.df {
+                if let ME::BDS05(airborne) = &adsb.message {
+                    if let (Some(lat), Some(lon)) = (airborne.latitude, airborne.longitude) {
+                        // Should be close to expected values
+                        assert!((lat - 49.81755).abs() < 0.001);
+                        assert!((lon - 6.08442).abs() < 0.001);
+                    } else {
+                        panic!("Position not decoded");
+                    }
+                } else {
+                    panic!("Not a BDS05 message");
+                }
+            } else {
+                panic!("Not an ADS-B message");
+            }
+        }
     }
 }
