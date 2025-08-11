@@ -86,4 +86,4 @@ test = false
 name = "airports"
 
 [build-dependencies]
-tonic-build = "0.13.1"
+tonic-build = "0.14.1"
