@@ -34,7 +34,7 @@ futures-util = "0.3.31"
 hex = "0.4.3"
 keepawake = "0.5.1"
 ratatui = "0.29.0"
-redis = { version = "0.32.3", features = ["tokio-comp"] }
+redis = { version = "0.32.5", features = ["tokio-comp"] }
 regex = "1.11.1"
 reqwest = { version = "0.12.20", default-features = false, features = [ "rustls-tls" ] }
 rs1090 = { version = "0.4.13", path = "../rs1090", features = ["aircraft"] }
