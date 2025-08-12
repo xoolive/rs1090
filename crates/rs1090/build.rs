@@ -1,6 +1,7 @@
 #[cfg(feature = "sero")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tonic_build::compile_protos("proto/SeRoAPI.proto")?;
+    tonic_prost_build::configure()
+        .compile_protos(&["proto/SeRoAPI.proto"], &["proto"])?;
     Ok(())
 }
 #[cfg(not(feature = "sero"))]
