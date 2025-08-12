@@ -326,7 +326,7 @@ impl TableColors {
 
 trait Render {
     fn cell(&self, snapshot: &Snapshot, now: u64) -> String;
-    fn header(&self, sort_key: &SortKey) -> Cell;
+    fn header(&self, sort_key: &SortKey) -> Cell<'_>;
     fn constraint(&self) -> Constraint;
 }
 
@@ -440,7 +440,7 @@ impl Render for ColumnRender {
         }
     }
 
-    fn header(&self, sort_key: &SortKey) -> Cell {
+    fn header(&self, sort_key: &SortKey) -> Cell<'_> {
         match self {
             ColumnRender::ICAO24 => Cell::from("icao24".to_string()),
             ColumnRender::TAIL => Cell::from("tail".to_string()),
