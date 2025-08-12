@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import pickle
 from typing import Iterable, Sequence, TypeVar, overload
 
@@ -27,6 +28,7 @@ from ._rust import (
     decode_bds65,
     decode_flarm,
     decode_flarm_vec,
+    RealtimeDecoder,
 )
 from .stubs import (
     Flarm,
@@ -101,6 +103,7 @@ decode_bds65 = unpickle_fun(decode_bds65)
 __all__ = [
     "Flarm",
     "Message",
+    "RealtimeDecoder",
     "batched",
     "decode",
     "decode_bds05",
@@ -195,6 +198,82 @@ def decode(
             payload = decode_1090t_vec(batches, ts, reference)
 
     return pickle.loads(bytes(payload))  # type: ignore
+
+
+
+
+
+class RealtimeDecoder:
+    """Python wrapper for the Rust RealtimeDecoder that returns full Message objects"""
+    
+    def __init__(self, reference: None | tuple[float, float] = None):
+        from ._rust import RealtimeDecoder as PyRealtimeDecoder
+        self._decoder = PyRealtimeDecoder(reference)
+    
+    @overload
+    def decode(self, msg: str, timestamp: None | float = None) -> Message | None: ...
+    
+    @overload
+    def decode(self, msg: list[str] | pd.Series, timestamp: None | list[float] | pd.Series = None) -> list[Message]: ...
+    
+    def decode(self, msg: str | list[str] | pd.Series, timestamp: None | float | list[float] | pd.Series = None) -> Message | None | list[Message]:
+        """Decode message(s) and return the full decoded message(s)"""
+        if isinstance(msg, str):
+            # Single message
+            if timestamp is None:
+                timestamp = time.time()
+            elif isinstance(timestamp, (list, pd.Series)):
+                raise ValueError("`timestamp` parameter must be a single float for single message")
+            
+            payload = self._decoder.decode(msg, timestamp)
+            if payload is None:
+                return None
+            return pickle.loads(bytes(payload))  # type: ignore
+        else:
+            # Multiple messages
+            if timestamp is not None and isinstance(timestamp, (int, float)):
+                raise ValueError("`timestamp` parameter must be a sequence of float for multiple messages")
+            if timestamp is not None and len(timestamp) != len(msg):
+                raise ValueError("`msg` and `timestamp` must be of the same length")
+            
+            # Convert to lists if needed
+            messages = list(msg) if not isinstance(msg, list) else msg
+            timestamps = list(timestamp) if timestamp is not None and not isinstance(timestamp, list) else timestamp
+            
+            if timestamps is None:
+                # Use current time for all messages
+                current_time = time.time()
+                timestamps = [current_time] * len(messages)
+            
+            # Process each message individually using the single message decode method
+            results = []
+            for msg, ts in zip(messages, timestamps):
+                payload = self._decoder.decode(msg, ts)
+                if payload is not None:
+                    results.append(pickle.loads(bytes(payload)))  # type: ignore
+            return results
+    
+
+    
+    def get_reference_position(self) -> None | tuple[float, float]:
+        """Get the current reference position"""
+        return self._decoder.get_reference_position()
+    
+    def set_reference_position(self, reference: None | tuple[float, float]) -> None:
+        """Set the reference position"""
+        self._decoder.set_reference_position(reference)
+    
+    def aircraft_count(self) -> int:
+        """Get the number of aircraft being tracked"""
+        return self._decoder.aircraft_count()
+    
+    def clear_state(self) -> None:
+        """Clear all aircraft state"""
+        self._decoder.clear_state()
+    
+    def prune_old_aircraft(self, max_age_seconds: float, current_time: float) -> None:
+        """Remove old aircraft state"""
+        self._decoder.prune_old_aircraft(max_age_seconds, current_time)
 
 
 @overload
