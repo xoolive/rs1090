@@ -21,6 +21,12 @@ The rs1090 library comes with:
 - a Python binding [rs1090](https://pypi.org/project/rs1090).
 - and a WebAssembly binding [rs1090-wasm](https://www.npmjs.com/package/rs1090-wasm).
 
+## Documentation
+
+The documentation for the core library is available on [docs.rs](https://docs.rs/rs1090/latest/rs1090/), generated directly from the source code.
+
+The [decode module](https://docs.rs/rs1090/latest/rs1090/decode/index.html) is probably the most useful part, in order to understand the content of various types of messages.
+
 ## Performance
 
 Benchmarking performed on the decoding of a gate-to-gate [European flight](./data/long_flight.csv):
