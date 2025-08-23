@@ -17,7 +17,7 @@ pip install rs1090
 
 ## Usage
 
-For single messages:
+For single messages (note that position can not be decoded without a reference):
 
 ```pycon
 >>> import rs1090
@@ -57,4 +57,12 @@ For FLARM messages (also as batches):
  'no_track': False,
  'stealth': False,
  'gps': 129}
+```
+
+For realtime processing of messages (see [realtime_decoder.py](/python/examples/realtime_decoder.py) for a full example):
+```py
+decoder = RealtimeDecoder()
+
+# When a message is received
+decoded_message = decoder.decode(message)
 ```
