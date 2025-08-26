@@ -23,7 +23,7 @@ use rs1090::decode::bds::bds60::HeadingAndSpeedReport;
 use rs1090::decode::bds::bds65::AircraftOperationStatus;
 use rs1090::decode::cpr::{
     airborne_position_with_reference, decode_positions,
-    surface_position_with_reference, Position,
+    surface_position_with_reference, Position, RealtimeDecoder,
 };
 use rs1090::decode::flarm::Flarm;
 use rs1090::prelude::*;
@@ -447,6 +447,63 @@ fn aircraft_information(
     Ok(WrapAircraftInfo(patterns(icao24, registration)?))
 }
 
+#[pyclass(name = "RealtimeDecoder")]
+struct PyRealtimeDecoder {
+    decoder: RealtimeDecoder,
+}
+
+#[pymethods]
+impl PyRealtimeDecoder {
+    #[new]
+    #[pyo3(signature = (reference=None))]
+    fn new(reference: Option<(f64, f64)>) -> Self {
+        let reference_pos = reference.map(|(lat, lon)| Position { latitude: lat, longitude: lon });
+        Self {
+            decoder: RealtimeDecoder::new(reference_pos),
+        }
+    }
+    
+    fn decode(&mut self, msg: String, timestamp: f64) -> PyResult<Option<Vec<u8>>> {
+        let bytes = hex::decode(&msg).map_err(|e| PyValueError::new_err(format!("Invalid hex: {}", e)))?;
+        let (_, message) = Message::from_bytes((&bytes, 0))
+            .map_err(|e| PyValueError::new_err(format!("Failed to decode message: {}", e)))?;
+        
+        let mut timed_msg = TimedMessage {
+            timestamp,
+            frame: bytes,
+            message: Some(message),
+            metadata: vec![],
+            decode_time: None,
+        };
+        
+        let decoded_message = self.decoder.decode(&mut timed_msg);
+        Ok(decoded_message.map(|msg| serde_pickle::to_vec(&msg, Default::default()).unwrap()))
+    }
+    
+
+    
+    fn get_reference_position(&self) -> Option<(f64, f64)> {
+        self.decoder.get_reference_position().map(|pos| (pos.latitude, pos.longitude))
+    }
+    
+    fn set_reference_position(&mut self, reference: Option<(f64, f64)>) {
+        let reference_pos = reference.map(|(lat, lon)| Position { latitude: lat, longitude: lon });
+        self.decoder.set_reference_position(reference_pos);
+    }
+    
+    fn aircraft_count(&self) -> usize {
+        self.decoder.aircraft_count()
+    }
+    
+    fn clear_state(&mut self) {
+        self.decoder.clear_state();
+    }
+    
+    fn prune_old_aircraft(&mut self, max_age_seconds: f64, current_time: f64) {
+        self.decoder.prune_old_aircraft(max_age_seconds, current_time);
+    }
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -476,6 +533,9 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // icao24 functions
     m.add_function(wrap_pyfunction!(aircraft_information, m)?)?;
+
+    // RealtimeDecoder class
+    m.add_class::<PyRealtimeDecoder>()?;
 
     Ok(())
 }
