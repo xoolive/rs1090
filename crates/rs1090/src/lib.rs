@@ -32,7 +32,7 @@ pub mod prelude {
     pub use crate::source::beast;
 
     #[cfg(feature = "rtlsdr")]
-    pub use crate::source::rtlsdr;
+    pub use crate::source::soapy;
 
     #[cfg(feature = "sero")]
     pub use crate::source::sero;
