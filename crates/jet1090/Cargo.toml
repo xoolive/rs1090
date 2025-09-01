@@ -11,7 +11,7 @@ edition.workspace = true
 homepage.workspace = true
 
 [features]
-rtlsdr = ['rs1090/rtlsdr']
+soapy = ['rs1090/soapy']
 sero = ['rs1090/sero']
 ssh = ['rs1090/ssh']
 
