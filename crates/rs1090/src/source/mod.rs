@@ -1,11 +1,14 @@
 #[cfg(not(target_arch = "wasm32"))]
 pub mod beast;
 
-#[cfg(feature = "rtlsdr")]
+pub mod demod;
 pub mod rtlsdr;
 
 #[cfg(feature = "sero")]
 pub mod sero;
+
+#[cfg(feature = "soapy")]
+pub mod soapy;
 
 #[cfg(feature = "ssh")]
 pub mod ssh;

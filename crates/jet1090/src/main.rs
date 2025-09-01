@@ -245,7 +245,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(feature = "rtlsdr")]
     if let Some(args) = cli_options.discover {
-        rtlsdr::enumerate(&args.to_string());
+        soapy::enumerate(&args.to_string());
         return Ok(());
     }
 
