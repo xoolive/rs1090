@@ -17,7 +17,7 @@ ssh = ['rs1090/ssh']
 
 [dependencies]
 chrono = "0.4.41"
-clap = { version = "4.5.45", features = [
+clap = { version = "4.5.47", features = [
     "color",
     "derive",
     "wrap_help",
