@@ -34,7 +34,7 @@ use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 use warp::Filter;
-use web::Query;
+
 
 #[derive(Default, Deserialize, Parser)]
 #[command(
@@ -407,57 +407,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(port) = options.serve_port {
-        tokio::spawn(async move {
-            let app_home = app_web.clone();
-            let home = warp::path::end()
-                .and(warp::any().map(move || app_home.clone()))
-                .and_then(|app: Arc<Mutex<Jet1090>>| async move {
-                    web::icao24(&app).await
-                });
-
-            let app_all = app_web.clone();
-            let all = warp::path("all")
-                .and(warp::any().map(move || app_all.clone()))
-                .and_then(|app: Arc<Mutex<Jet1090>>| async move {
-                    web::all(&app).await
-                });
-
-            let app_track = app_web.clone();
-            let track = warp::get()
-                .and(warp::path("track"))
-                .and(warp::any().map(move || app_track.clone()))
-                .and(warp::query::<TrackQuery>())
-                .and_then(
-                    |app: Arc<Mutex<Jet1090>>, q: TrackQuery| async move {
-                        web::track(&app, q).await
-                    },
-                );
-
-            let app_sensors = app_web.clone();
-            let sensors = warp::path("sensors")
-                .and(warp::any().map(move || app_sensors.clone()))
-                .and_then(|app: Arc<Mutex<Jet1090>>| async move {
-                    web::sensors(&app).await
-                });
-
-            let airports = warp::path("airports")
-                .and(warp::query::<web::Query>())
-                .and_then(
-                    |query: Query| async move { web::airports(query).await },
-                );
-
-            let cors = warp::cors()
-                .allow_any_origin()
-                .allow_headers(vec!["*"])
-                .allow_methods(vec!["GET"]);
-
-            let routes = warp::get()
-                .and(home.or(all).or(track).or(sensors).or(airports))
-                .recover(web::handle_rejection)
-                .with(cors);
-
-            warp::serve(routes).run(([0, 0, 0, 0], port)).await;
-        });
+        let app_web_clone = app_web.clone();
+        tokio::spawn(start_web_server(app_web_clone, port));
     }
 
     // I am not sure whether this size calibration is relevant, but let's try...
@@ -757,4 +708,57 @@ mod tests {
         assert!(options.interactive);
         assert_eq!(options.sources.len(), 2);
     }
+}
+
+async fn start_web_server(app_web: Arc<Mutex<Jet1090>>, port: u16) {
+    let app_home = app_web.clone();
+    let home = warp::path::end()
+        .and(warp::any().map(move || app_home.clone()))
+        .and_then(|app: Arc<Mutex<Jet1090>>| async move {
+            web::icao24(&app).await
+        });
+
+    let app_all = app_web.clone();
+    let all = warp::path("all")
+        .and(warp::any().map(move || app_all.clone()))
+        .and_then(|app: Arc<Mutex<Jet1090>>| async move {
+            web::all(&app).await
+        });
+
+    let app_track = app_web.clone();
+    let track = warp::get()
+        .and(warp::path("track"))
+        .and(warp::any().map(move || app_track.clone()))
+        .and(warp::query::<TrackQuery>())
+        .and_then(
+            |app: Arc<Mutex<Jet1090>>, q: TrackQuery| async move {
+                web::track(&app, q).await
+            },
+        );
+
+    let app_sensors = app_web.clone();
+    let sensors = warp::path("sensors")
+        .and(warp::any().map(move || app_sensors.clone()))
+        .and_then(|app: Arc<Mutex<Jet1090>>| async move {
+            web::sensors(&app).await
+        });
+
+    let airports = warp::path("airports")
+        .and(warp::query::<web::Query>())
+        .and_then(
+            |query: web::Query| async move { web::airports(query).await },
+        );
+
+    let cors = warp::cors()
+        .allow_any_origin()
+        .allow_headers(vec!["*"])
+        .allow_methods(vec!["GET"]);
+
+    let routes = warp::get()
+        .and(home.or(all).or(track).or(sensors).or(airports))
+        .recover(web::handle_rejection)
+        .with(cors);
+
+    let addr = format!("0.0.0.0:{}", port);
+    warp::serve(routes).run(addr.parse::<std::net::SocketAddr>().unwrap()).await;
 }
