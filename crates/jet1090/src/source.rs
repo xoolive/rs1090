@@ -377,13 +377,13 @@ mod test {
 
     #[test]
     fn test_source() {
-        let source = Source::from_str("rtlsdr:");
+        let source = Source::from_str("soapy:");
         assert!(source.is_ok());
         if let Ok(Source { address, .. }) = source {
             assert_eq!(address, Address::Soapy(None));
         }
 
-        let source = Source::from_str("rtlsdr://serial=00000001");
+        let source = Source::from_str("soapy://serial=00000001");
         assert!(source.is_ok());
         if let Ok(Source { address, .. }) = source {
             assert_eq!(
@@ -392,7 +392,7 @@ mod test {
             );
         }
 
-        let source = Source::from_str("rtlsdr:@LFBO");
+        let source = Source::from_str("soapy:@LFBO");
         assert!(source.is_ok());
         if let Ok(Source {
             address,
