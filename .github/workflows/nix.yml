@@ -18,3 +18,18 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@main
       - name: Run `nix build`
         run: nix build
+
+  nix-flake-update:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - uses: DeterminateSystems/update-flake-lock@main
+        with:
+          base: ${{ github.base_ref || 'master' }}
+          pr-title: "Update flake.lock"
+          pr-labels: |
+            dependencies
