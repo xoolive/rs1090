@@ -46,7 +46,7 @@ toml = "0.9.5"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 url = "2.5.7"
-warp = "0.4.2"
+warp = { version = "0.4.2", features = ["server"] }
 
 [[bin]]
 name = "jet1090"

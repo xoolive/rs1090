@@ -266,9 +266,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let redis_topic = options.redis_topic.unwrap_or("jet1090".to_string());
 
     let filters = filters::Filters {
-        df_filter: options
-            .df_filter
-            .map(|df| df.into_iter().map(|v| format!("{v}")).collect()),
+        df_filter: options.df_filter.map(|df| {
+            df.into_iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<String>>()
+        }),
         aircraft_filter: options.aircraft_filter,
     };
 
