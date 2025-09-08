@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use rs1090::prelude::*;
 
+#[cfg(feature = "rtlsdr")]
 use rs1090::source::rtlsdr;
 #[cfg(feature = "sero")]
 use rs1090::source::sero;
@@ -225,7 +226,17 @@ impl Source {
         name: Option<String>,
     ) {
         match &self.address {
-            Address::RtlSdr(_args) => rtlsdr::receiver(tx, serial, name).await,
+            Address::RtlSdr(_args) => {
+                #[cfg(not(feature = "rtlsdr"))]
+                {
+                    error!("Compile jet1090 with the rtlsdr feature");
+                    std::process::exit(127);
+                }
+                #[cfg(feature = "rtlsdr")]
+                {
+                    rtlsdr::receiver(tx, serial, name).await
+                }
+            }
             Address::Soapy(args) => {
                 #[cfg(not(feature = "soapy"))]
                 {

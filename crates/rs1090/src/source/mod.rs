@@ -2,6 +2,8 @@
 pub mod beast;
 
 pub mod demod;
+
+#[cfg(feature = "rtlsdr")]
 pub mod rtlsdr;
 
 #[cfg(feature = "sero")]
