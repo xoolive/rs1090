@@ -104,7 +104,7 @@ struct Options {
     /// More details are available at: <https://mode-s.org/jet1090/sources>
     sources: Vec<source::Source>,
 
-    #[cfg(feature = "rtlsdr")]
+    #[cfg(feature = "soapy")]
     /// List the detected devices, for now, only --discover rtlsdr is fully supported
     #[arg(long, value_name = "ARGS")]
     discover: Option<String>,
@@ -243,9 +243,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    #[cfg(feature = "rtlsdr")]
+    #[cfg(feature = "soapy")]
     if let Some(args) = cli_options.discover {
-        rtlsdr::enumerate(&args.to_string());
+        soapy::enumerate(&args.to_string());
         return Ok(());
     }
 

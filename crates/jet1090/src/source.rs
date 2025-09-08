@@ -8,6 +8,8 @@ use rs1090::prelude::*;
 use rs1090::source::rtlsdr;
 #[cfg(feature = "sero")]
 use rs1090::source::sero;
+#[cfg(feature = "soapy")]
+use rs1090::source::soapy;
 #[cfg(feature = "ssh")]
 use rs1090::source::ssh::{TunnelledTcp, TunnelledWebsocket};
 
@@ -82,8 +84,10 @@ pub enum Address {
     Udp(String),
     /// Address to a websocket feed, e.g. `ws://localhost:9876/1234`
     Websocket(WebsocketPath),
-    /// A RTL-SDR dongle (require feature `rtlsdr`): the parameter can be empty, or use other specifiers, e.g. `rtlsdr://serial=00000001`
-    Rtlsdr(Option<String>),
+    /// A RTL-SDR dongle (require feature `soapy`): the parameter can be empty, or use other specifiers, e.g. `soapy://rtlsdr?serial=00000001`
+    Soapy(Option<String>),
+    /// A RTL-SDR dongle: the parameter can be empty, or use other specifiers, e.g. `rtlsdr://serial=00000001`
+    RtlSdr(Option<String>),
     /// A token-based access to Sero Systems (require feature `sero`).
     Sero(SeroParams),
 }
@@ -147,7 +151,8 @@ impl FromStr for Source {
                 url.host_str().unwrap_or("0.0.0.0"),
                 url.port_or_known_default().unwrap()
             )),
-            "rtlsdr" => Address::Rtlsdr(url.host_str().map(|s| s.to_string())),
+            "soapy" => Address::Soapy(url.host_str().map(|s| s.to_string())),
+            "rtlsdr" => Address::RtlSdr(url.host_str().map(|s| s.to_string())),
             "ws" => Address::Websocket(WebsocketPath::Short(format!(
                 "ws://{}:{}/{}",
                 url.host_str().unwrap_or("0.0.0.0"),
@@ -196,7 +201,11 @@ impl Source {
                 };
                 build_serial(&name)
             }
-            Address::Rtlsdr(reference) => {
+            Address::Soapy(reference) => {
+                let name = reference.clone().unwrap_or("soapy".to_string());
+                build_serial(&name)
+            }
+            Address::RtlSdr(reference) => {
                 let name = reference.clone().unwrap_or("rtlsdr".to_string());
                 build_serial(&name)
             }
@@ -217,15 +226,26 @@ impl Source {
         name: Option<String>,
     ) {
         match &self.address {
-            Address::Rtlsdr(args) => {
+            Address::RtlSdr(_args) => {
                 #[cfg(not(feature = "rtlsdr"))]
                 {
-                    error!("Compile jet1090 with the rtlsdr feature, {:?} argument ignored", args);
+                    error!("Compile jet1090 with the rtlsdr feature");
                     std::process::exit(127);
                 }
                 #[cfg(feature = "rtlsdr")]
                 {
-                    rtlsdr::receiver::<&str>(tx, args.as_deref(), serial, name)
+                    rtlsdr::receiver(tx, serial, name).await
+                }
+            }
+            Address::Soapy(args) => {
+                #[cfg(not(feature = "soapy"))]
+                {
+                    error!("Compile jet1090 with the soapy feature, {:?} argument ignored", args);
+                    std::process::exit(127);
+                }
+                #[cfg(feature = "soapy")]
+                {
+                    soapy::receiver::<&str>(tx, args.as_deref(), serial, name)
                         .await
                 }
             }
@@ -357,22 +377,22 @@ mod test {
 
     #[test]
     fn test_source() {
-        let source = Source::from_str("rtlsdr:");
+        let source = Source::from_str("soapy:");
         assert!(source.is_ok());
         if let Ok(Source { address, .. }) = source {
-            assert_eq!(address, Address::Rtlsdr(None));
+            assert_eq!(address, Address::Soapy(None));
         }
 
-        let source = Source::from_str("rtlsdr://serial=00000001");
+        let source = Source::from_str("soapy://serial=00000001");
         assert!(source.is_ok());
         if let Ok(Source { address, .. }) = source {
             assert_eq!(
                 address,
-                Address::Rtlsdr(Some("serial=00000001".to_string()))
+                Address::Soapy(Some("serial=00000001".to_string()))
             );
         }
 
-        let source = Source::from_str("rtlsdr:@LFBO");
+        let source = Source::from_str("soapy:@LFBO");
         assert!(source.is_ok());
         if let Ok(Source {
             address,
@@ -381,7 +401,7 @@ mod test {
             ..
         }) = source
         {
-            assert_eq!(address, Address::Rtlsdr(None));
+            assert_eq!(address, Address::Soapy(None));
             assert_eq!(name, None);
             assert_eq!(pos.latitude, 43.628101);
             assert_eq!(pos.longitude, 1.367263);

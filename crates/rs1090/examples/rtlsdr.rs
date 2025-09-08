@@ -1,8 +1,8 @@
-#[cfg(feature = "rtlsdr")]
+#[cfg(feature = "soapy")]
 use soapysdr::{enumerate, Device};
 use tracing::info;
 
-#[cfg(feature = "rtlsdr")]
+#[cfg(feature = "soapy")]
 fn main() {
     let device = enumerate("driver=rtlsdr").unwrap();
     for arg in device {
@@ -22,7 +22,7 @@ fn main() {
     }
 }
 
-#[cfg(not(feature = "rtlsdr"))]
+#[cfg(not(feature = "soapy"))]
 fn main() {
     info!("rtlsdr feature not activated");
 }
