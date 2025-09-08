@@ -11,7 +11,7 @@ mod tui;
 mod web;
 
 use crate::tui::Event;
-use crate::web::TrackQuery;
+use crate::web::serve_web_api;
 use clap::{Command, CommandFactory, Parser, ValueHint};
 use clap_complete::{generate, Generator};
 use crossterm::event::KeyCode;
@@ -33,8 +33,6 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use warp::Filter;
-use web::Query;
 
 #[derive(Default, Deserialize, Parser)]
 #[command(
@@ -365,97 +363,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(minutes) = options.history_expire {
         // No need to start this task if we don't store history
         if minutes > 0 {
-            tokio::spawn(async move {
-                let app_expire = app_exp.clone();
-                loop {
-                    sleep(Duration::from_secs(60)).await;
-                    {
-                        let mut app = app_expire.lock().await;
-                        let now = SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .expect("SystemTime before unix epoch")
-                            .as_secs();
-
-                        let remove_keys = app
-                            .state_vectors
-                            .iter()
-                            .filter(|(_key, value)| {
-                                now > value.cur.lastseen + minutes * 60
-                            })
-                            .map(|(key, _)| key.to_string())
-                            .collect::<Vec<String>>();
-
-                        for key in remove_keys {
-                            app.state_vectors.remove(&key);
-                        }
-
-                        let _ = app
-                            .state_vectors
-                            .iter_mut()
-                            .map(|(_key, value)| {
-                                value.hist.retain(|elt| {
-                                    now < (elt.timestamp as u64) + minutes * 60
-                                })
-                            })
-                            .collect::<Vec<()>>();
-                    }
-                }
-            });
+            tokio::spawn(expire_aircraft(app_exp.clone(), minutes));
         }
     }
 
     if let Some(port) = options.serve_port {
-        tokio::spawn(async move {
-            let app_home = app_web.clone();
-            let home = warp::path::end()
-                .and(warp::any().map(move || app_home.clone()))
-                .and_then(|app: Arc<Mutex<Jet1090>>| async move {
-                    web::icao24(&app).await
-                });
-
-            let app_all = app_web.clone();
-            let all = warp::path("all")
-                .and(warp::any().map(move || app_all.clone()))
-                .and_then(|app: Arc<Mutex<Jet1090>>| async move {
-                    web::all(&app).await
-                });
-
-            let app_track = app_web.clone();
-            let track = warp::get()
-                .and(warp::path("track"))
-                .and(warp::any().map(move || app_track.clone()))
-                .and(warp::query::<TrackQuery>())
-                .and_then(
-                    |app: Arc<Mutex<Jet1090>>, q: TrackQuery| async move {
-                        web::track(&app, q).await
-                    },
-                );
-
-            let app_sensors = app_web.clone();
-            let sensors = warp::path("sensors")
-                .and(warp::any().map(move || app_sensors.clone()))
-                .and_then(|app: Arc<Mutex<Jet1090>>| async move {
-                    web::sensors(&app).await
-                });
-
-            let airports = warp::path("airports")
-                .and(warp::query::<web::Query>())
-                .and_then(
-                    |query: Query| async move { web::airports(query).await },
-                );
-
-            let cors = warp::cors()
-                .allow_any_origin()
-                .allow_headers(vec!["*"])
-                .allow_methods(vec!["GET"]);
-
-            let routes = warp::get()
-                .and(home.or(all).or(track).or(sensors).or(airports))
-                .recover(web::handle_rejection)
-                .with(cors);
-
-            warp::serve(routes).run(([0, 0, 0, 0], port)).await;
-        });
+        tokio::spawn(serve_web_api(app_web, port));
     }
 
     // I am not sure whether this size calibration is relevant, but let's try...
@@ -597,6 +510,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+async fn expire_aircraft(app_expire: Arc<Mutex<Jet1090>>, minutes: u64) {
+    loop {
+        sleep(Duration::from_secs(60)).await;
+        {
+            let mut app = app_expire.lock().await;
+            let now = SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("SystemTime before unix epoch")
+                .as_secs();
+
+            let remove_keys = app
+                .state_vectors
+                .iter()
+                .filter(|(_key, value)| now > value.cur.lastseen + minutes * 60)
+                .map(|(key, _)| key.to_string())
+                .collect::<Vec<String>>();
+
+            for key in remove_keys {
+                app.state_vectors.remove(&key);
+            }
+
+            let _ = app
+                .state_vectors
+                .iter_mut()
+                .map(|(_key, value)| {
+                    value.hist.retain(|elt| {
+                        now < (elt.timestamp as u64) + minutes * 60
+                    })
+                })
+                .collect::<Vec<()>>();
+        }
+    }
+}
 #[derive(Debug, Default)]
 pub struct Jet1090 {
     sensors: BTreeMap<u64, Sensor>,

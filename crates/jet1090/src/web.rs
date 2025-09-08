@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 use warp::http::StatusCode;
 use warp::reject::Rejection;
 use warp::reply::Reply;
+use warp::Filter;
 
 use crate::snapshot::Snapshot;
 use crate::Jet1090;
@@ -135,4 +136,62 @@ pub async fn handle_rejection(
     });
 
     Ok(warp::reply::with_status(json, code))
+}
+
+pub async fn serve_web_api(app: Arc<Mutex<Jet1090>>, port: u16) {
+    let home = warp::path::end().and_then(|| async {
+        Ok::<_, Infallible>(warp::reply::html(
+            "Welcome to the jet1090 REST API!<br>\
+            Try one of the following routes:<br>\
+            <ul>\
+            <li><a href=\"/all\">/all</a>: returns all current state vectors</li>\
+            <li><a href=\"/icao24\">/icao24</a>: returns all ICAO 24-bit addresses seen</li>\
+            <li>/track?icao24={icao24}&since={timestamp}: returns the trajectory of a given aircraft since the given timestamp (optional)</li>\
+            <li><a href=\"/sensors\">/sensors</a>: returns information about all sensors</li>\
+            <li>/airports?q={string}: returns a list of potential airports matching the query string</li>\
+            </ul>",
+        ))
+    });
+
+    let app_home = app.clone();
+    let icao24 = warp::path::end()
+        .and(warp::any().map(move || app_home.clone()))
+        .and_then(|app: Arc<Mutex<Jet1090>>| async move { icao24(&app).await });
+
+    let app_all = app.clone();
+    let all = warp::path("all")
+        .and(warp::any().map(move || app_all.clone()))
+        .and_then(|app: Arc<Mutex<Jet1090>>| async move { all(&app).await });
+
+    let app_track = app.clone();
+    let track = warp::get()
+        .and(warp::path("track"))
+        .and(warp::any().map(move || app_track.clone()))
+        .and(warp::query::<TrackQuery>())
+        .and_then(|app: Arc<Mutex<Jet1090>>, q: TrackQuery| async move {
+            track(&app, q).await
+        });
+
+    let app_sensors = app.clone();
+    let sensors = warp::path("sensors")
+        .and(warp::any().map(move || app_sensors.clone()))
+        .and_then(
+            |app: Arc<Mutex<Jet1090>>| async move { sensors(&app).await },
+        );
+
+    let airports = warp::path("airports")
+        .and(warp::query::<Query>())
+        .and_then(|query: Query| async move { airports(query).await });
+
+    let cors = warp::cors()
+        .allow_any_origin()
+        .allow_headers(vec!["*"])
+        .allow_methods(vec!["GET"]);
+
+    let routes = warp::get()
+        .and(home.or(icao24).or(all).or(track).or(sensors).or(airports))
+        .recover(handle_rejection)
+        .with(cors);
+
+    warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 }
