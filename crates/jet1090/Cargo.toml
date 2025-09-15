@@ -16,7 +16,7 @@ sero = ['rs1090/sero']
 ssh = ['rs1090/ssh']
 
 [dependencies]
-chrono = "0.4.41"
+chrono = "0.4.42"
 clap = { version = "4.5.47", features = [
     "color",
     "derive",
