@@ -87,4 +87,4 @@ test = false
 name = "airports"
 
 [build-dependencies]
-tonic-prost-build = "0.14.1"
+tonic-prost-build = "0.14.2"
