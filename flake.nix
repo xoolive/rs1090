@@ -5,7 +5,7 @@
   };
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05"; # Latest stable release
 
     fenix = {
       url = "github:nix-community/fenix";
@@ -14,7 +14,6 @@
 
     crane = {
       url = "github:ipetkov/crane";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     advisory-db = {
@@ -58,16 +57,18 @@
             pname = "rs1090";
             version = version;
 
-            nativeBuildInputs = with pkgs; [ pkg-config openssl python3 bzip2 soapysdr protobuf ] ++
-              lib.optionals pkgs.stdenv.isLinux [ clang mold ]
-            ;
-            buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin
-              [
-                pkgs.libiconv
-                pkgs.darwin.apple_sdk.frameworks.Security
-                pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-              ];
+            nativeBuildInputs = with pkgs; [ 
+              pkg-config openssl python3 bzip2 soapysdr protobuf 
+            ] ++ lib.optionals pkgs.stdenv.isLinux [ 
+              mold 
+            ];
 
+            buildInputs = lib.optionals pkgs.stdenv.isDarwin [ 
+              pkgs.libiconv 
+            ];
+
+            # Minimal environment - let Darwin stdenv handle the rest
+            LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
           };
 
           cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -75,16 +76,12 @@
         {
           devShells.default = pkgs.mkShell {
             inputsFrom = builtins.attrValues self.checks;
-            buildInputs = [ rustToolchain pkgs.pkg-config pkgs.openssl ];
-            shellHook =
-              if pkgs.stdenv.isDarwin then ''
-                export NIX_LDFLAGS="-L${lib.makeLibraryPath [pkgs.libiconv]} $NIX_LDFLAGS"
-                export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.SystemConfiguration}/Library/Frameworks -framework SystemConfiguration $NIX_LDFLAGS"
-                export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.Security}/Library/Frameworks -framework Security $NIX_LDFLAGS"
-              '' else if pkgs.stdenv.isLinux then ''
-                export RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold"
-              ''
-              else "";
+            buildInputs = [ rustToolchain pkgs.pkg-config pkgs.openssl ] ++ commonArgs.buildInputs;
+            nativeBuildInputs = commonArgs.nativeBuildInputs;
+
+            shellHook = lib.optionalString pkgs.stdenv.isLinux ''
+              export RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold"
+            '';
           };
 
           packages =
