@@ -210,7 +210,7 @@ impl Source {
      *
      * The next step will be deduplication.
      */
-    pub async fn receiver(
+    pub fn receiver(
         &self,
         tx: Sender<TimedMessage>,
         serial: u64,
@@ -225,8 +225,16 @@ impl Source {
                 }
                 #[cfg(feature = "rtlsdr")]
                 {
-                    rtlsdr::receiver::<&str>(tx, args.as_deref(), serial, name)
+                    let args = args.clone();
+                    tokio::spawn(async move {
+                        rtlsdr::receiver::<&str>(
+                            tx,
+                            args.as_deref(),
+                            serial,
+                            name,
+                        )
                         .await
+                    });
                 }
             }
             Address::Sero(sero) => {
@@ -236,7 +244,12 @@ impl Source {
                 }
                 #[cfg(feature = "sero")]
                 {
-                    sero::receiver(sero::SeroClient::from(sero), tx).await
+                    let client = sero::SeroClient::from(sero);
+                    tokio::spawn(async move {
+                        if let Err(e) = sero::receiver(client, tx).await {
+                            error!("{}", e.to_string());
+                        }
+                    });
                 }
             }
             _ => {
@@ -311,11 +324,13 @@ impl Source {
                     },
                     _ => unreachable!(),
                 };
-                if let Err(e) =
-                    beast::receiver(server_address, tx, serial, name).await
-                {
-                    error!("{}", e.to_string());
-                }
+                tokio::spawn(async move {
+                    if let Err(e) =
+                        beast::receiver(server_address, tx, serial, name).await
+                    {
+                        error!("{}", e.to_string());
+                    }
+                });
             }
         }
     }

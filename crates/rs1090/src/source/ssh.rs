@@ -16,6 +16,8 @@ use tokio::{
     process::{ChildStdin, ChildStdout, Command},
 };
 
+type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
 pub static CONNECTION_MAP: Lazy<Arc<Mutex<HashMap<String, Client>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
@@ -193,7 +195,7 @@ async fn connect_server(
     server: &str,
     params: &SshConfig,
     connection_map: Arc<Mutex<HashMap<String, Client>>>,
-) -> Result<Client, Box<dyn std::error::Error>> {
+) -> Result<Client, BoxError> {
     // Check if the server is already connected
     // If so, return the existing connection
     if connection_map.lock().await.contains_key(server) {
@@ -339,13 +341,19 @@ async fn connect_server(
 }
 
 impl TunnelledTcp {
-    pub async fn connect(
-        &self,
-    ) -> Result<TunnelReceiver, Box<dyn std::error::Error>> {
+    pub async fn connect(&self) -> Result<TunnelReceiver, BoxError> {
         let params = get_params();
 
         let target_client =
-            connect_server(&self.jump, &params, CONNECTION_MAP.clone()).await?;
+            connect_server(&self.jump, &params, CONNECTION_MAP.clone())
+                .await
+                .map_err(|e| {
+                    let msg = format!(
+                        "Could not connect to jump host {}: {}",
+                        &self.jump, e
+                    );
+                    BoxError::from(msg)
+                })?;
 
         let channel_config = makiko::ChannelConfig::default();
         let connect_addr = (self.address.to_owned(), self.port);
@@ -362,13 +370,19 @@ impl TunnelledTcp {
 }
 
 impl TunnelledWebsocket {
-    pub async fn connect(
-        &self,
-    ) -> Result<TunnelStream, Box<dyn std::error::Error>> {
+    pub async fn connect(&self) -> Result<TunnelStream, BoxError> {
         let params = get_params();
 
         let target_client =
-            connect_server(&self.jump, &params, CONNECTION_MAP.clone()).await?;
+            connect_server(&self.jump, &params, CONNECTION_MAP.clone())
+                .await
+                .map_err(|e| {
+                    let msg = format!(
+                        "Could not connect to jump host {}: {}",
+                        &self.jump, e
+                    );
+                    BoxError::from(msg)
+                })?;
 
         let channel_config = makiko::ChannelConfig::default();
         let connect_addr = (self.address.to_owned(), self.port);
@@ -385,13 +399,13 @@ impl TunnelledWebsocket {
 }
 
 impl TunnelledSero {
-    pub async fn connect(
-        &self,
-    ) -> Result<TunnelStream, Box<dyn std::error::Error>> {
+    pub async fn connect(&self) -> TunnelStream {
         let params = get_params();
 
         let target_client =
-            connect_server(&self.jump, &params, CONNECTION_MAP.clone()).await?;
+            connect_server(&self.jump, &params, CONNECTION_MAP.clone())
+                .await
+                .expect("Could not connect to jump host");
         let channel_config = makiko::ChannelConfig::default();
         let connect_addr = ("api.secureadsb.com".to_string(), 4201);
         let origin_addr = ("0.0.0.0".into(), 0);
@@ -401,7 +415,7 @@ impl TunnelledSero {
             .await
             .expect("Could not open a tunnel to api.secureadsb.com");
 
-        Ok(TunnelStream::new(tunnel, tunnel_rx))
+        TunnelStream::new(tunnel, tunnel_rx)
     }
 }
 

@@ -29,8 +29,8 @@ use crate::prelude::*;
 #[cfg(feature = "ssh")]
 use crate::source::ssh::TunnelledSero;
 
-type Result<T> =
-    std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+type StaticBoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
+type Result<T> = std::result::Result<T, StaticBoxError>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SeroClient {
@@ -48,52 +48,52 @@ async fn download_file(url: &str, destination: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub async fn receiver(sero: SeroClient, tx: mpsc::Sender<TimedMessage>) {
-    let mut stream = sero.rawstream().await.unwrap();
+pub async fn receiver(
+    sero: SeroClient,
+    tx: mpsc::Sender<TimedMessage>,
+) -> Result<()> {
+    let mut stream = sero.rawstream().await?;
     let tx_copy = tx.clone();
-    let info = &sero.info().await.unwrap();
+    let info = &sero.info().await?;
     let sensor_map: HashMap<u64, String> = info
         .sensor_info
         .iter()
         .map(|elt| (elt.sensor.unwrap().serial, elt.alias.to_string()))
         .collect();
-    tokio::spawn(async move {
-        while let Some(response) = stream.next().await {
-            if let Ok(msg) = response {
-                let bytes = msg.reply.as_slice();
-                let system_timestamp = now_in_ns() as f64 * 1e-9;
-                let metadata = msg
-                    .receptions
-                    .into_iter()
-                    .map(|rm| SensorMetadata {
-                        system_timestamp,
-                        gnss_timestamp: Some(since_gps_week_to_unix_s(
-                            rm.gnss_timestamp,
-                        )),
-                        nanoseconds: Some(since_gps_week_to_since_today(
-                            rm.gnss_timestamp,
-                        )),
-                        rssi: Some(rm.signal_level),
-                        serial: rm.sensor.unwrap().serial,
-                        name: sensor_map
-                            .get(&rm.sensor.unwrap().serial)
-                            .cloned(),
-                    })
-                    .collect();
+    while let Some(response) = stream.next().await {
+        if let Ok(msg) = response {
+            let bytes = msg.reply.as_slice();
+            let system_timestamp = now_in_ns() as f64 * 1e-9;
+            let metadata = msg
+                .receptions
+                .into_iter()
+                .map(|rm| SensorMetadata {
+                    system_timestamp,
+                    gnss_timestamp: Some(since_gps_week_to_unix_s(
+                        rm.gnss_timestamp,
+                    )),
+                    nanoseconds: Some(since_gps_week_to_since_today(
+                        rm.gnss_timestamp,
+                    )),
+                    rssi: Some(rm.signal_level),
+                    serial: rm.sensor.unwrap().serial,
+                    name: sensor_map.get(&rm.sensor.unwrap().serial).cloned(),
+                })
+                .collect();
 
-                let tmsg = TimedMessage {
-                    timestamp: system_timestamp,
-                    frame: bytes.to_vec(),
-                    message: None,
-                    metadata,
-                    decode_time: None,
-                };
-                if let Err(e) = tx_copy.send(tmsg).await {
-                    error!("{}", e.to_string());
-                }
+            let tmsg = TimedMessage {
+                timestamp: system_timestamp,
+                frame: bytes.to_vec(),
+                message: None,
+                metadata,
+                decode_time: None,
+            };
+            if let Err(e) = tx_copy.send(tmsg).await {
+                error!("{}", e.to_string());
             }
         }
-    });
+    }
+    Ok(())
 }
 
 impl SeroClient {
@@ -129,21 +129,19 @@ impl SeroClient {
 
         #[cfg(not(feature = "ssh"))]
         let channel = endpoint.connect().await?;
+
         #[cfg(feature = "ssh")]
-        let channel = match self.jump {
+        let channel = match &self.jump {
             None => endpoint.connect().await?,
-            Some(ref jump) => {
+            Some(jump) => {
                 let jump = jump.clone();
                 let connector = tower::service_fn(move |_uri: http::Uri| {
                     let jump = jump.clone();
                     async move {
                         let tunnel = TunnelledSero { jump };
-                        let stream =
-                            tunnel.connect().await.expect("Failed to connect");
+                        let stream = tunnel.connect().await;
                         let wrapped_stream = TokioIo::new(stream);
-                        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(
-                            wrapped_stream,
-                        )
+                        Ok::<_, std::io::Error>(wrapped_stream)
                     }
                 });
                 endpoint.connect_with_connector(connector).await?

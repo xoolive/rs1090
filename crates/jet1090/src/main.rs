@@ -381,9 +381,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for source in options.sources.into_iter() {
         let serial = source.serial();
         let tx_copy = tx.clone();
-        tokio::spawn(async move {
-            source.receiver(tx_copy, serial, source.name.clone()).await;
-        });
+        let source_name = source.name.clone();
+        source.receiver(tx_copy, serial, source_name);
     }
 
     tokio::spawn(async move {

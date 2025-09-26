@@ -323,7 +323,7 @@ impl DekuContainerRead<'_> for Message {
         }
 
         let value = Self::from_reader_with_ctx(reader, ())?;
-        let read_whole_byte = (reader.bits_read % 8) == 0;
+        let read_whole_byte = reader.bits_read.is_multiple_of(8);
         let idx = if read_whole_byte {
             reader.bits_read / 8
         } else {
