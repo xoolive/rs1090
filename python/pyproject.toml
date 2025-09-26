@@ -16,8 +16,8 @@ repository = "https://github.com/xoolive/rs1090"
 module-name = "rs1090._rust"
 features = ["pyo3/extension-module"]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
   "ipykernel>=6.29.5",
   "mypy>=1.8.0",
   "pip",
