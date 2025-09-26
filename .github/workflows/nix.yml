@@ -18,6 +18,8 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@main
       - name: Run `nix build`
         run: nix build
+      - name: Run `nix flake check`
+        run: nix flake check
 
   nix-flake-update:
     permissions:

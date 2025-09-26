@@ -164,10 +164,36 @@ You may run the following to get the `jet1090` and `decode1090` executables in y
 nix profile install
 ```
 
-For reference:
+### Development commands
 
 ```sh
 nix develop  # open a shell with the proper environment to compile rs1090
-nix build  # build the jet1090 executable
-nix run  # run the jet1090 executable
+nix build    # build the jet1090 executable (default package)
+nix run      # run the jet1090 executable directly
+```
+
+### Available packages
+
+```sh
+nix build .#jet1090    # build the jet1090 executable (same as default)
+```
+
+### Code quality and testing
+
+The flake provides several checks that you can run individually:
+
+```sh
+# Format checking and fixing
+nix fmt                    # format Nix files with nixpkgs-fmt
+nix run .#checks.fmt       # check Rust code formatting with rustfmt
+
+# Linting and static analysis
+nix run .#checks.clippy-check    # run Clippy lints with warnings as errors
+nix run .#checks.rustdoc         # generate and check documentation
+
+# Testing
+nix run .#checks.test-check      # run tests with cargo-nextest
+
+# Run all checks at once
+nix flake check                  # run all defined checks
 ```
