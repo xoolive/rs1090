@@ -62,8 +62,6 @@ pub async fn receiver<A: Into<Args> + fmt::Display + std::marker::Copy>(
     device
         .set_gain_element(DIRECTION, channel, "TUNER", RTLSDR_GAIN)
         .unwrap();
-    // It seems that it would be better to use automatic gain control
-    device.set_gain_mode(DIRECTION, channel, true).unwrap();
 
     let mut stream = device.rx_stream::<Complex<i16>>(&[channel]).unwrap();
 
