@@ -1016,6 +1016,8 @@ pub fn gray2alt(gray: u16) -> Result<i32, &'static str> {
 #[cfg(test)]
 mod tests {
 
+    use crate::prelude::AircraftOperationStatus;
+
     use super::*;
     use hexlit::hex;
 
@@ -1043,5 +1045,29 @@ mod tests {
         } else {
             unreachable!()
         }
+    }
+
+    #[test]
+    fn test_df18() {
+        // Referred in issue 337
+        let bytes = hex!("95c639eefbffffedd5fefbff4f6f");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let DF::ExtendedSquitterTisB { cf, .. } = &msg.df {
+            assert_eq!(format!("{}", cf.aa), "c639ee");
+            assert_eq!(cf.field_type, ControlFieldType::TISB_ADSB_RELAY);
+            if let ME::BDS65(me) = cf.me {
+                if let AircraftOperationStatus::Reserved(..) = me {
+                    // ok
+                } else {
+                    panic!("Expected Reserved BDS65");
+                }
+            }
+
+            // this one should not panic
+            let pretty = serde_json::to_string_pretty(&msg).unwrap();
+            println!("{}", pretty);
+            return;
+        }
+        unreachable!();
     }
 }

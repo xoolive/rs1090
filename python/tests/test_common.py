@@ -32,3 +32,12 @@ def test_idcode() -> None:
     msg = rs1090.decode("A800292DFFBBA9383FFCEB903D01")
     assert rs1090.is_df21(msg)
     assert msg["squawk"] == "1346"
+
+
+def test_df18() -> None:
+    # Referred in issue 337
+    msg = rs1090.decode("95c639eefbffffedd5fefbff4f6f")
+    assert rs1090.is_df18(msg)
+    assert msg["icao24"] == "c639ee"
+    assert msg["tisb"] == "TISB_ADSB_RELAY"
+    assert msg["bds"] == "65"
