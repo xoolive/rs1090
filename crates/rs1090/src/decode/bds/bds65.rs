@@ -24,7 +24,7 @@ pub enum AircraftOperationStatus {
     Surface(OperationStatusSurface),
 
     #[deku(id_pat = "2..=7")]
-    Reserved(#[deku(bits = "5")] u8, [u8; 5]),
+    Reserved(ReservedStatus),
 }
 
 impl fmt::Display for AircraftOperationStatus {
@@ -33,7 +33,11 @@ impl fmt::Display for AircraftOperationStatus {
         match &self {
             Self::Airborne(airborne) => write!(f, "{airborne}"),
             Self::Surface(surface) => write!(f, "{surface}"),
-            _ => Ok(()),
+            Self::Reserved(reserved) => write!(
+                f,
+                " Reserved: id={}, data={:?}",
+                reserved.id, reserved.data
+            ),
         }
     }
 }
@@ -450,4 +454,11 @@ pub struct Empty {}
 pub struct EmptyU8 {
     pub id: u8,
     pub unused: u8,
+}
+
+#[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+pub struct ReservedStatus {
+    #[deku(bits = "5")]
+    pub id: u8,
+    pub data: [u8; 5],
 }
