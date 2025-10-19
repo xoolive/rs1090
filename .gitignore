@@ -1,1 +1,4 @@
+# Produced by cargo build
 /target
+# Produced by nix
+result
