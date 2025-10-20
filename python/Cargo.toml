@@ -23,7 +23,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 hex = "0.4.3"
-pyo3 = "0.26.0"
+pyo3 = "0.27.0"
 rayon = "1.11.0"
 rs1090 = { version= "0.4.14", path = "../crates/rs1090" }
 serde-pickle = "1.2.0"
