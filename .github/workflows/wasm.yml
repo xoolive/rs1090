@@ -37,7 +37,9 @@ jobs:
       - name: Publish to npm (upon release)
         if: startsWith(github.ref, 'refs/tags/')
         working-directory: crates/rs1090-wasm/pkg
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # The token is no longer necessary because there is a trusted connection 
+        # https://docs.npmjs.com/trusted-publishers
+        # env:
+        #   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm publish
