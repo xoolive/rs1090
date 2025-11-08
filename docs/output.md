@@ -3,7 +3,7 @@
 ## Output in the terminal
 
 - The `--verbose` option dumps JSON entries to the terminal as messages are received.
-- The `--interactive` option is similar to the `dump1090 --interactive` and provides a table view of the visible aircraft.
+- The `--interactive` option is similar to the `dump1090 --interactive` and provides a table view of the visible aircraft. For example the following snapshot can be obtained with a locally connected dongle with `jet1090 --interactive rtlsdr://`
 
 ![jet1090 table view](images/jet1090-table.png)
 
