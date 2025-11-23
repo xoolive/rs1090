@@ -249,7 +249,8 @@ pub fn build_table(frame: &mut Frame, app: &mut Jet1090) {
                 .title_alignment(Alignment::Right)
                 .title_style(Style::new().blue().bold())
                 .padding(Padding::symmetric(1, 0))
-                .borders(Borders::ALL),
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded),
         )
         .bg(colors.buffer_bg)
         .row_highlight_style(
