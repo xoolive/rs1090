@@ -249,6 +249,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    if options.sources.is_empty() {
+        eprintln!(
+            "No source of data specified, use --help for more information"
+        );
+        std::process::exit(1);
+    }
+
     let mut redis_connect = match options
         .redis_url
         .map(|url| redis::Client::open(url).unwrap())
