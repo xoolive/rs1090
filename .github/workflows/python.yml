@@ -1,4 +1,4 @@
-name: Python 
+name: Python
 
 on:
   push:
@@ -12,7 +12,6 @@ permissions:
 
 jobs:
   python:
-
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -29,7 +28,7 @@ jobs:
       UV_CACHE_DIR: /tmp/.uv-cache
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Set up uv
         if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'macos-latest' }}
@@ -59,15 +58,15 @@ jobs:
           working-directory: python
           command: develop
           args: -E dev
-          sccache: 'true'
+          sccache: "true"
 
       - name: Run linter and formatter
         working-directory: python
         run: |
-            uv run ruff check
-            uv run ruff format --check
+          uv run ruff check
+          uv run ruff format --check
 
       - name: Run tests
         working-directory: python
         run: |
-            uv run pytest
+          uv run pytest

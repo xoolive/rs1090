@@ -16,7 +16,7 @@ on:
       - "container/**"
       - ".github/workflows/docker.yml"
   workflow_dispatch:
- 
+
 env:
   REGISTRY: ghcr.io
   OWNER: ${{ github.repository_owner }}
@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Get latest release version
         id: release
