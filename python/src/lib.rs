@@ -42,7 +42,9 @@ fn decode_1090(msg: String) -> PyResult<Vec<u8>> {
 fn decode_message_with_reference(me: &mut ME, reference: [f64; 2]) {
     let [latitude_ref, longitude_ref] = reference;
     match me {
-        ME::BDS05(airborne) => {
+        ME::BDS05 {
+            inner: airborne, ..
+        } => {
             if let Some(pos) = airborne_position_with_reference(
                 airborne,
                 latitude_ref,
@@ -52,7 +54,7 @@ fn decode_message_with_reference(me: &mut ME, reference: [f64; 2]) {
                 airborne.longitude = Some(pos.longitude);
             }
         }
-        ME::BDS06(surface) => {
+        ME::BDS06 { inner: surface, .. } => {
             if let Some(pos) = surface_position_with_reference(
                 surface,
                 latitude_ref,
@@ -105,8 +107,10 @@ fn decode_bds05(msg: String) -> PyResult<Vec<u8>> {
     let bytes = hex::decode(msg).unwrap();
     let tc = &bytes[4] >> 3;
     if (9..22).contains(&tc) && tc != 19 {
-        match AirbornePosition::from_bytes((&bytes[4..], 0)) {
-            Ok((_, msg)) => {
+        let mut input = std::io::Cursor::new(&bytes[4..]);
+        let mut reader = Reader::new(&mut input);
+        match AirbornePosition::from_reader_with_ctx(&mut reader, tc) {
+            Ok(msg) => {
                 let pkl =
                     serde_pickle::to_vec(&msg, Default::default()).unwrap();
                 Ok(pkl)

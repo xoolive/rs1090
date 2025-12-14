@@ -81,15 +81,31 @@ pub enum ME {
 
     #[deku(id_pat = "1..=4")]
     #[serde(rename = "08")]
-    BDS08(bds08::AircraftIdentification),
+    BDS08 {
+        #[serde(skip)]
+        id: u8,
+        #[serde(flatten)]
+        #[deku(ctx = "*id")]
+        inner: bds08::AircraftIdentification,
+    },
 
     #[deku(id_pat = "5..=8")]
     #[serde(rename = "06")]
-    BDS06(bds06::SurfacePosition),
+    BDS06 {
+        tc: u8,
+        #[serde(flatten)]
+        #[deku(ctx = "*tc")]
+        inner: bds06::SurfacePosition,
+    },
 
     #[deku(id_pat = "9..=18 | 20..=22")]
     #[serde(rename = "05")]
-    BDS05(bds05::AirbornePosition),
+    BDS05 {
+        tc: u8,
+        #[serde(flatten)]
+        #[deku(ctx = "*tc")]
+        inner: bds05::AirbornePosition,
+    },
 
     #[deku(id = "19")]
     #[serde(rename = "09")]
@@ -105,7 +121,7 @@ pub enum ME {
 
     #[deku(id_pat = "25..=27")]
     #[serde(rename = "id25_27")]
-    Reserved1 { unused: u8 },
+    Reserved1 { _id: u8, unused: u8 },
 
     #[deku(id = "28")]
     #[serde(rename = "61")]
@@ -132,14 +148,14 @@ impl fmt::Display for ME {
             | ME::Reserved1 { .. }
             | ME::SurfaceSystemStatus { .. }
             | ME::AircraftOperationalCoordination { .. } => Ok(()),
-            ME::BDS05(me) => {
-                write!(f, "{me}")
+            ME::BDS05 { inner, .. } => {
+                write!(f, "{inner}")
             }
-            ME::BDS06(me) => {
-                write!(f, "{me}")
+            ME::BDS06 { inner, .. } => {
+                write!(f, "{inner}")
             }
-            ME::BDS08(me) => {
-                write!(f, "{me}")
+            ME::BDS08 { inner, .. } => {
+                write!(f, "{inner}")
             }
             ME::BDS09(me) => {
                 write!(f, "{me}")

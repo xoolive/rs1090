@@ -287,6 +287,7 @@ fn magic_value(v: u8) -> Result<bool, DekuError> {
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "4", endian = "big")]
 pub enum AircraftType {
     Unknown = 0,

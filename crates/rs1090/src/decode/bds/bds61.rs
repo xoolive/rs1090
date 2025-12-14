@@ -42,6 +42,7 @@ pub enum AircraftStatusType {
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "3")]
 #[serde(rename_all = "snake_case")]
 pub enum EmergencyState {

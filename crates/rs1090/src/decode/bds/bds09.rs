@@ -126,6 +126,7 @@ pub enum AirborneVelocitySubType {
 }
 
 #[derive(Debug, PartialEq, DekuRead, Copy, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum Sign {
     Positive = 0,
@@ -296,6 +297,7 @@ impl Serialize for AirspeedSupersonicDecoding {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum AirspeedType {
     IAS = 0,
@@ -316,6 +318,7 @@ impl fmt::Display for AirspeedType {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum DirectionEW {
     WestToEast = 0,
@@ -323,6 +326,7 @@ pub enum DirectionEW {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, DekuRead)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum DirectionNS {
     SouthToNorth = 0,
@@ -330,6 +334,7 @@ pub enum DirectionNS {
 }
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum VerticalRateSource {
     #[serde(rename = "barometric")]

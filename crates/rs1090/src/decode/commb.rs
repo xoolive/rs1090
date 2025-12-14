@@ -13,7 +13,7 @@ use super::bds::bds50::TrackAndTurnReport;
 use super::bds::bds60::HeadingAndSpeedReport;
 use super::bds::bds65::AircraftOperationStatus;
 use super::AC13Field;
-use deku::prelude::*;
+use deku::{ctx::Order, prelude::*};
 use serde::Serialize;
 use std::fmt;
 use tracing::debug;
@@ -145,7 +145,7 @@ impl DekuReader<'_, AC13Field> for DF20DataSelector {
         Self: Sized,
     {
         let mut result = Self::default();
-        let res = reader.read_bits(56)?;
+        let res = reader.read_bits(56, Order::Msb0)?;
         let bits = res.unwrap();
         let buf = bits.into_vec();
         debug!(
@@ -161,7 +161,9 @@ impl DekuReader<'_, AC13Field> for DF20DataSelector {
         // Read the first 5 bits as a u8 and get the typecode
         let tc = &buf[0] >> 3;
         if (9..22).contains(&tc) && tc != 19 {
-            match AirbornePosition::try_from(buf.as_slice()) {
+            let mut input = std::io::Cursor::new(&buf);
+            let mut reader = Reader::new(&mut input);
+            match AirbornePosition::from_reader_with_ctx(&mut reader, tc) {
                 Ok(bds05) => match bds05.alt {
                     Some(alt) if alt == ac.0 => result.bds05 = Some(bds05),
                     _ => (),
@@ -252,7 +254,7 @@ impl DekuReader<'_> for DF21DataSelector {
         Self: Sized,
     {
         let mut result = Self::default();
-        let res = reader.read_bits(56)?;
+        let res = reader.read_bits(56, Order::Msb0)?;
         let buf = res.unwrap().into_vec();
         debug!(
             "Decoding {:?} according to various hypotheses",

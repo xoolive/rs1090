@@ -45,6 +45,7 @@ fn dist_haversine(pos1: &Position, pos2: &Position) -> f64 {
 
 /// A flag to qualify a CPR position as odd or even
 #[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "1")]
 #[serde(rename_all = "snake_case")]
 pub enum CPRFormat {
@@ -449,7 +450,10 @@ pub fn decode_position(
         even_msg: None,
     });
     match message {
-        ME::BDS05(airborne) => {
+        ME::BDS05 {
+            tc: _,
+            inner: airborne,
+        } => {
             let mut pos: Option<Position> = None;
 
             let latest_timestamp = match airborne.parity {
@@ -527,7 +531,10 @@ pub fn decode_position(
                 }
             }
         }
-        ME::BDS06(surface) => {
+        ME::BDS06 {
+            tc: _,
+            inner: surface,
+        } => {
             let mut pos = None;
             if let Some(latest_pos) = latest.pos {
                 let surface_pos = surface_position_with_reference(
@@ -619,7 +626,10 @@ mod tests {
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
                 match (msg1.message, msg2.message) {
-                    (ME::BDS05(m1), ME::BDS05(m2)) => (m1, m2),
+                    (
+                        ME::BDS05 { inner: m1, .. },
+                        ME::BDS05 { inner: m2, .. },
+                    ) => (m1, m2),
                     _ => unreachable!(),
                 }
             }
@@ -643,7 +653,10 @@ mod tests {
         let (msg1, msg2) = match (msg1.df, msg2.df) {
             (ExtendedSquitterADSB(msg1), ExtendedSquitterADSB(msg2)) => {
                 match (msg1.message, msg2.message) {
-                    (ME::BDS05(m1), ME::BDS05(m2)) => (m1, m2),
+                    (
+                        ME::BDS05 { inner: m1, .. },
+                        ME::BDS05 { inner: m2, .. },
+                    ) => (m1, m2),
                     _ => unreachable!(),
                 }
             }
@@ -666,7 +679,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS05(me) => me,
+                ME::BDS05 { inner: me, .. } => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -685,7 +698,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS05(me) => me,
+                ME::BDS05 { inner: me, .. } => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -710,7 +723,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS05(me) => me,
+                ME::BDS05 { inner: me, .. } => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -732,7 +745,7 @@ mod tests {
 
         let msg = match msg.df {
             ExtendedSquitterADSB(msg) => match msg.message {
-                ME::BDS06(me) => me,
+                ME::BDS06 { inner: me, .. } => me,
                 _ => unreachable!(),
             },
             _ => unreachable!(),

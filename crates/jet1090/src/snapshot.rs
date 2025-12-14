@@ -175,19 +175,19 @@ pub async fn update_snapshot(
                     aircraft.cur.altitude = Some(ac.0);
                 }
                 ExtendedSquitterADSB(adsb) => match &adsb.message {
-                    ME::BDS05(bds05) => {
+                    ME::BDS05 { inner: bds05, .. } => {
                         aircraft.cur.latitude = bds05.latitude;
                         aircraft.cur.longitude = bds05.longitude;
                         aircraft.cur.altitude = bds05.alt;
                     }
-                    ME::BDS06(bds06) => {
+                    ME::BDS06 { inner: bds06, .. } => {
                         aircraft.cur.latitude = bds06.latitude;
                         aircraft.cur.longitude = bds06.longitude;
                         aircraft.cur.track = bds06.track;
                         aircraft.cur.groundspeed = bds06.groundspeed;
                         aircraft.cur.altitude = None;
                     }
-                    ME::BDS08(bds08) => {
+                    ME::BDS08 { inner: bds08, .. } => {
                         if !bds08.callsign.contains("#") {
                             aircraft.cur.callsign =
                                 Some(bds08.callsign.to_string())
@@ -249,19 +249,19 @@ pub async fn update_snapshot(
                 ExtendedSquitterTisB { cf, .. } => {
                     aircraft.cur.typecode = Some("GRND".to_string());
                     match &cf.me {
-                        ME::BDS05(bds05) => {
+                        ME::BDS05 { inner: bds05, .. } => {
                             aircraft.cur.latitude = bds05.latitude;
                             aircraft.cur.longitude = bds05.longitude;
                             aircraft.cur.altitude = bds05.alt;
                         }
-                        ME::BDS06(bds06) => {
+                        ME::BDS06 { inner: bds06, .. } => {
                             aircraft.cur.latitude = bds06.latitude;
                             aircraft.cur.longitude = bds06.longitude;
                             aircraft.cur.track = bds06.track;
                             aircraft.cur.groundspeed = bds06.groundspeed;
                             aircraft.cur.altitude = None;
                         }
-                        ME::BDS08(bds08) => {
+                        ME::BDS08 { inner: bds08, .. } => {
                             aircraft.cur.callsign =
                                 Some(bds08.callsign.to_string())
                         }
