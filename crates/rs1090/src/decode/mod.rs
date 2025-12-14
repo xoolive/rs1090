@@ -9,7 +9,7 @@ pub mod time;
 use adsb::{ADSB, ME};
 use commb::{DF20DataSelector, DF21DataSelector};
 use crc::modes_checksum;
-use deku::prelude::*;
+use deku::{ctx::Order, prelude::*};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
@@ -261,6 +261,8 @@ pub enum DF {
     /// 24: Comm-D Extended, Downlink Format 24 (3.1.2.7.3)
     #[deku(id_pat = "24..=31")]
     CommDExtended {
+        #[serde(skip)]
+        id: u8,
         /// Reserved
         #[deku(bits = "1")]
         spare: u8,
@@ -302,7 +304,7 @@ impl DekuContainerRead<'_> for Message {
     {
         let reader = &mut deku::reader::Reader::new(input.0);
         if input.1 != 0 {
-            reader.skip_bits(input.1)?;
+            reader.skip_bits(input.1, Order::Msb0)?;
         }
 
         let value = Self::from_reader_with_ctx(reader, ())?;
@@ -319,7 +321,7 @@ impl DekuContainerRead<'_> for Message {
         let mut cursor = deku::no_std_io::Cursor::new(input.0);
         let reader = &mut Reader::new(&mut cursor);
         if input.1 != 0 {
-            reader.skip_bits(input.1)?;
+            reader.skip_bits(input.1, Order::Msb0)?;
         }
 
         let value = Self::from_reader_with_ctx(reader, ())?;
@@ -346,7 +348,7 @@ impl DekuReader<'_> for Message {
 
         let mut remaining_bytes = vec![];
 
-        let value = reader.read_bits(8)?;
+        let value = reader.read_bits(8, Order::Msb0)?;
         let res = value.unwrap().into_vec();
         remaining_bytes.extend_from_slice(&res);
 
@@ -360,7 +362,7 @@ impl DekuReader<'_> for Message {
         };
         debug!("Reading {} bits based on DF={}", bit_len, df);
 
-        let value = reader.read_bits(bit_len - 8)?;
+        let value = reader.read_bits(bit_len - 8, Order::Msb0)?;
         let res = value.unwrap().into_vec();
         remaining_bytes.extend_from_slice(&res);
 
@@ -751,6 +753,7 @@ impl AC13Field {
 
 /// Transponder level and additional information (3.1.2.5.2.2.1)
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "3")]
 #[allow(non_camel_case_types)]
 pub enum Capability {
@@ -793,6 +796,7 @@ impl fmt::Display for Capability {
 
 /// Airborne or Ground and SPI (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "3")]
 #[serde(rename_all = "snake_case")]
 pub enum FlightStatus {
@@ -826,6 +830,7 @@ impl fmt::Display for FlightStatus {
 
 /// The downlink request (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "5")]
 pub enum DownlinkRequest {
     None = 0b00000,
@@ -846,6 +851,7 @@ pub struct UtilityMessage {
 
 /// The utility message type (used in DF=4, 5, 20 or 21)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "2")]
 pub enum UtilityMessageType {
     NoInformation = 0b00,
@@ -929,6 +935,7 @@ impl fmt::Display for ControlFieldType {
 
 /// Uplink / Downlink (DF=24)
 #[derive(Debug, PartialEq, Eq, DekuRead, Copy, Clone)]
+#[repr(u8)]
 #[deku(id_type = "u8", bits = "1")]
 pub enum KE {
     DownlinkELMTx = 0,
@@ -1056,7 +1063,7 @@ mod tests {
             assert_eq!(format!("{}", cf.aa), "c639ee");
             assert_eq!(cf.field_type, ControlFieldType::TISB_ADSB_RELAY);
             if let ME::BDS65(me) = cf.me {
-                if let AircraftOperationStatus::Reserved(..) = me {
+                if let AircraftOperationStatus::Reserved { .. } = me {
                     // ok
                 } else {
                     panic!("Expected Reserved BDS65");

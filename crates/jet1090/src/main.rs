@@ -425,7 +425,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(message) = &mut msg.message {
             match &mut message.df {
                 ExtendedSquitterADSB(adsb) => match adsb.message {
-                    ME::BDS05(_) | ME::BDS06(_) => {
+                    ME::BDS05 { .. } | ME::BDS06 { .. } => {
                         let serial = msg
                             .metadata
                             .first()
@@ -455,7 +455,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 },
                 ExtendedSquitterTisB { cf, .. } => match cf.me {
-                    ME::BDS05(_) | ME::BDS06(_) => {
+                    ME::BDS05 { .. } | ME::BDS06 { .. } => {
                         let serial = msg
                             .metadata
                             .first()

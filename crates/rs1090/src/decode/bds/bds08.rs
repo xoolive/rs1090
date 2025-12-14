@@ -17,14 +17,11 @@ use tracing::{debug, trace};
  */
 
 #[derive(Debug, PartialEq, DekuRead, Serialize, Clone)]
-//#[deku(ctx = "id: u8")]
+#[deku(ctx = "id: u8")]
 pub struct AircraftIdentification {
-    #[deku(bits = 5)]
-    pub id: u8,
-
     /// The typecode of the aircraft (one of A, B, C, D)
     #[serde(skip)]
-    #[deku(skip, default = "Typecode::try_from(*id)?")]
+    #[deku(skip, default = "Typecode::try_from(id)?")]
     pub tc: Typecode,
 
     /// The category of the aircraft
@@ -235,13 +232,16 @@ mod tests {
         let bytes = hex!("8d406b902015a678d4d220aa4bda");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         if let ExtendedSquitterADSB(adsb_msg) = msg.df {
-            if let ME::BDS08(AircraftIdentification {
-                id: _id,
-                tc,
-                ca,
-                callsign,
-                wake_vortex,
-            }) = adsb_msg.message
+            if let ME::BDS08 {
+                inner:
+                    AircraftIdentification {
+                        tc,
+                        ca,
+                        callsign,
+                        wake_vortex,
+                    },
+                ..
+            } = adsb_msg.message
             {
                 assert_eq!(format!("{tc}{ca}"), "A0");
                 assert_eq!(format!("{wake_vortex}"), "No category information");
