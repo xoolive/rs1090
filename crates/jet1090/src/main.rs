@@ -70,7 +70,7 @@ struct Options {
 
     /// Disable history expiration
     #[arg(long, conflicts_with = "history_expire")]
-    no_history_expire: bool,
+    no_history_expire: Option<bool>,
 
     /// Downlink formats to select for stdout, file output and history in REST API (keep empty to select all)
     #[arg(long, value_name = "DF")]
@@ -196,11 +196,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli_options.serve_port.is_some() {
         options.serve_port = cli_options.serve_port;
     }
-    if cli_options.no_history_expire {
+    if cli_options.no_history_expire.is_some_and(|x| x) {
         options.history_expire = None;
     } else if let Some(history_expire) = cli_options.history_expire {
         // If `history_expire` is the default value (15) and `no_history_expire` is true, set to None
-        if history_expire == 15 && cli_options.no_history_expire {
+        if history_expire == 15
+            && cli_options.no_history_expire.is_some_and(|x| x)
+        {
             options.history_expire = None;
         } else {
             options.history_expire = Some(history_expire);
@@ -705,7 +707,7 @@ mod tests {
             verbose = false
             interactive = true
             serve_port = 8080
-            expire = 1
+            no_history_expire = true
             prevent_sleep = false
             update_position = false
 
@@ -722,6 +724,7 @@ mod tests {
         .unwrap();
 
         assert!(options.interactive);
+        assert!(options.history_expire.is_none());
         assert_eq!(options.sources.len(), 2);
     }
 }
