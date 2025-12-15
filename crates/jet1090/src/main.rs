@@ -59,8 +59,18 @@ struct Options {
     serve_port: Option<u16>,
 
     /// How much history to expire (in minutes), 0 for no history
-    #[arg(long, env = "EXPIRE_AIRCRAFT", short = 'x')]
+    #[arg(
+        long,
+        env = "EXPIRE_AIRCRAFT",
+        short = 'x',
+        default_value = "15",
+        conflicts_with = "no_history_expire"
+    )]
     history_expire: Option<u64>,
+
+    /// Disable history expiration
+    #[arg(long, conflicts_with = "history_expire")]
+    no_history_expire: bool,
 
     /// Downlink formats to select for stdout, file output and history in REST API (keep empty to select all)
     #[arg(long, value_name = "DF")]
@@ -186,8 +196,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli_options.serve_port.is_some() {
         options.serve_port = cli_options.serve_port;
     }
-    if cli_options.history_expire.is_some() {
-        options.history_expire = cli_options.history_expire;
+    if cli_options.no_history_expire {
+        options.history_expire = None;
+    } else if let Some(history_expire) = cli_options.history_expire {
+        // If `history_expire` is the default value (15) and `no_history_expire` is true, set to None
+        if history_expire == 15 && cli_options.no_history_expire {
+            options.history_expire = None;
+        } else {
+            options.history_expire = Some(history_expire);
+        }
     }
     if cli_options.df_filter.is_some() {
         options.df_filter = cli_options.df_filter;
