@@ -36,7 +36,7 @@ jobs:
       - name: Get latest release version
         id: release
         run: |
-          RESPONSE=$(curl -s https://api.github.com/repos/xoolive/rs1090/releases/latest)
+          RESPONSE=$(curl -s https://api.github.com/repos/xoolive/jet1090/releases/latest)
           TAG_VERSION=$(echo $RESPONSE | jq -r .tag_name)
 
           # Remove the 'v'
