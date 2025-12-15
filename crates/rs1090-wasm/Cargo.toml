@@ -1,7 +1,7 @@
 [package]
 name = "rs1090-wasm"
 description = "A real-time comprehensive Mode S and ADS-B data decoder"
-repository = "https://github.com/xoolive/rs1090"
+repository = "https://github.com/xoolive/jet1090"
 keywords = ["aircraft", "ADS-B", "Mode-S", "decoding"]
 readme = "readme.md"
 authors.workspace = true

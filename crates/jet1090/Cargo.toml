@@ -1,7 +1,7 @@
 [package]
 name = "jet1090"
 description = "A real-time comprehensive Mode S and ADS-B data decoder"
-repository = "https://github.com/xoolive/rs1090"
+repository = "https://github.com/xoolive/jet1090"
 keywords = ["aircraft", "ADS-B", "Mode-S", "decoding"]
 readme = "readme.md"
 authors.workspace = true
@@ -17,12 +17,7 @@ ssh = ['rs1090/ssh']
 
 [dependencies]
 chrono = "0.4.42"
-clap = { version = "4.5.53", features = [
-    "color",
-    "derive",
-    "wrap_help",
-    "env",
-] }
+clap = { version = "4.5.53", features = ["color", "derive", "wrap_help", "env"] }
 clap_complete = "4.5.61"
 clap_complete_nushell = "4.5.10"
 crossterm = { version = "0.29.0", features = ["event-stream"] }
@@ -36,7 +31,7 @@ keepawake = "0.5.1"
 ratatui = "0.29.0"
 redis = { version = "1.0.1", features = ["tokio-comp"] }
 regex = "1.12.2"
-reqwest = { version = "0.12.25", default-features = false, features = [ "rustls-tls" ] }
+reqwest = { version = "0.12.25", default-features = false, features = ["rustls-tls"] }
 rs1090 = { version = "0.4.14", path = "../rs1090", features = ["aircraft"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.143"

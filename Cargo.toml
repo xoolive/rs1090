@@ -8,7 +8,7 @@ edition = "2021"
 readme = "readme.md"
 version = "0.4.14"
 authors = ["Xavier Olive <git@xoolive.org>"]
-homepage = "https://github.com/xoolive/rs1090"
+homepage = "https://github.com/xoolive/jet1090"
 documentation = "https://crates.io/crates/rs1090"
 
 [workspace.metadata.release]

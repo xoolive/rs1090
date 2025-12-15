@@ -1,6 +1,6 @@
 # Installation instructions
 
-The latest release and installation instructions are published [on GitHub Releases](https://github.com/xoolive/rs1090/releases/).
+The latest release and installation instructions are published [on GitHub Releases](https://github.com/xoolive/jet1090/releases/).
 
 Current version is v0.4.1
 
@@ -11,7 +11,7 @@ Current version is v0.4.1
     This script requires that you install the [SoapySDR dependencies](#dependencies).
 
     ```sh
-    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/xoolive/rs1090/releases/download/v0.4.1/jet1090-installer.sh | sh
+    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/xoolive/jet1090/releases/download/v0.4.14/jet1090-installer.sh | sh
     ```
 
     Update to next release with:
@@ -25,7 +25,7 @@ Current version is v0.4.1
     This script requires that you install the [SoapySDR dependencies](#dependencies).
 
     ```sh
-    powershell -ExecutionPolicy ByPass -c "irm https://github.com/xoolive/rs1090/releases/download/v0.4.1/jet1090-installer.ps1 | iex"
+    powershell -ExecutionPolicy ByPass -c "irm https://github.com/xoolive/jet1090/releases/download/v0.4.14/jet1090-installer.ps1 | iex"
     ```
 
     Update to next release with:
@@ -113,7 +113,7 @@ The prebuilt binaries are compiled with all features activated. In particular, s
     Nix takes care of its own dependencies. The script has been tested for Linux and MacOS.
 
     ```sh
-    git clone https://github.com/xoolive/rs1090
+    git clone https://github.com/xoolive/jet1090
     nix profile install
     ```
 

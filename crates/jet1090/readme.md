@@ -10,7 +10,7 @@ Run the following Cargo command:
 cargo install jet1090
 ```
 
-You may also install already compiled versions from the [GitHub Releases](https://github.com/xoolive/rs1090/releases) page.
+You may also install already compiled versions from the [GitHub Releases](https://github.com/xoolive/jet1090/releases) page.
 
 ## Support for RTL-SDR dongles
 

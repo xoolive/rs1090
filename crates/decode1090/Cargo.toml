@@ -1,7 +1,7 @@
 [package]
 name = "decode1090"
 description = "Companion application to rs1090 to decode Mode S and ADS-B signals"
-repository = "https://github.com/xoolive/rs1090"
+repository = "https://github.com/xoolive/jet1090"
 keywords = ["aircraft", "ADS-B", "Mode-S", "decoding"]
 readme = "readme.md"
 authors.workspace = true

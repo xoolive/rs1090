@@ -10,7 +10,7 @@ classifiers = [
 dynamic = ["version"]
 
 [project.urls]
-repository = "https://github.com/xoolive/rs1090"
+repository = "https://github.com/xoolive/jet1090"
 
 [tool.maturin]
 module-name = "rs1090._rust"

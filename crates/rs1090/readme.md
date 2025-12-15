@@ -1,8 +1,11 @@
-# rs1090
+# jet1090 and rs1090
 
-rs1090 is a Rust library to decode Mode S, ADS-B and FLARM messages.
+**jet1090** is a high-performance ADS-B decoder written in Rust, similar to dump1090, but with more capabilities. You may install it from the [Releases page](https://github.com/xoolive/jet1090/releases) but might want to read the [documentation](https://mode-s.org/jet1090) first.  
+**rs1090** is the underlying Rust library to decode Mode S, ADS-B and FLARM messages, with Python and WebAssembly bindings.
 
-It takes its inspiration from the Python [pyModeS](https://github.com/junzis/pyModeS) library, and uses [deku](https://github.com/sharksforarms/deku) in order to decode binary data in a clean declarative way.
+![jet1090](https://raw.githubusercontent.com/xoolive/jet1090/refs/heads/master/docs/images/jet1090-table.png)
+
+The project takes its inspiration from the Python [pyModeS](https://github.com/junzis/pyModeS) library, and uses [deku](https://github.com/sharksforarms/deku) in order to decode binary data in a clean declarative way.
 The project started as a fork of a very similar project called [adsb-deku](https://crates.io/crates/adsb_deku), but modules have been refactored to match [pyModeS](https://github.com/junzis/pyModeS) design, implementations extensively reviewed, simplified, corrected, and completed.
 
 The directions ambitioned by rs1090 include:
@@ -12,8 +15,6 @@ The directions ambitioned by rs1090 include:
 - providing efficient multi-receiver Mode S decoding;
 - serving real-time enriched trajectory data to external applications.
 
-If you just want something stable to decode ADS-B messages from your Raspberry and visualize the data on a map, you may want to stick to one of the dump0190 implementations.
-
 The rs1090 library comes with:
 
 - a companion application [decode1090](https://crates.io/crates/decode1090),
@@ -22,6 +23,8 @@ The rs1090 library comes with:
 - and a WebAssembly binding [rs1090-wasm](https://www.npmjs.com/package/rs1090-wasm).
 
 ## Documentation
+
+The documentation for the jet1090 application is available on [https://mode-s.org/jet1090](https://mode-s.org/jet1090).
 
 The documentation for the core library is available on [docs.rs](https://docs.rs/rs1090/latest/rs1090/), generated directly from the source code.
 
@@ -41,7 +44,7 @@ The Python script for benchmarking is in [python/examples](python/examples/bench
 The Rust benchmark is executed with `cargo bench`.  
 Both scripts are run on an Intel(R) Core(TM) i7-10850H CPU @ 2.70GHz.
 
-![Benchmark image](https://raw.githubusercontent.com/xoolive/rs1090/refs/heads/master/python/examples/benchmark.svg)
+![Benchmark image](https://raw.githubusercontent.com/xoolive/jet1090/refs/heads/master/python/examples/benchmark.svg)
 
 > [!NOTE]  
 > The default out-of-the-box mode of `rs1090` is an execution distributed on all your cores. This benchmark was performed on a regular laptop. It can be much faster on supercomputers, but considering that most laptops now have at least 4 cores, this benchmark yields the speed-up you should get on your own computer.
@@ -78,12 +81,6 @@ fn main() {
 ```
 
 See more examples in the `crates/rs1090/examples` folder.
-
-## jet1090
-
-The jet1090 executable is documented on [https://mode-s.org/jet1090](https://mode-s.org/jet1090)
-
-![jet1090](https://raw.githubusercontent.com/xoolive/rs1090/refs/heads/master/docs/images/jet1090-table.png)
 
 ## Python bindings
 
@@ -147,7 +144,7 @@ Usage is documented on [https://observablehq.com/@xoolive/rs1090](https://observ
 
 ## decode1090
 
-Prebuilt binaries are available on the [Releases page](https://github.com/xoolive/rs1090/releases?q=decode1090).  
+Prebuilt binaries are available on the [Releases page](https://github.com/xoolive/jet1090/releases?q=decode1090).  
 Usage is available with the help command.
 
 ```sh
