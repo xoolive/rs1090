@@ -2,6 +2,9 @@ name: "Nix build"
 on:
   pull_request:
   push:
+  schedule:
+    - cron: "0 0 1 * *" # Runs at midnight UTC on the 1st of every month
+
 jobs:
   tests:
     strategy:
@@ -20,7 +23,7 @@ jobs:
         run: nix build
 
   nix-flake-update:
-    if: github.ref == 'refs/heads/master'
+    if: github.event_name == 'schedule'
     permissions:
       contents: write
       pull-requests: write
