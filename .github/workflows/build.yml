@@ -65,7 +65,7 @@ jobs:
                     echo "$HOME/.cargo/bin" >> $GITHUB_PATH
                   fi
             - name: "Install dependencies for Windows"
-              if: "${{ matrix.runner == 'windows-2019' }}"
+              if: "${{ matrix.runner == 'windows-2022' }}"
               run: |
                   # Pothos SDR (soapy)
                   curl -L https://downloads.myriadrf.org/builds/PothosSDR/PothosSDR-2021.07.25-vc16-x64.exe -o pothossdr.exe
