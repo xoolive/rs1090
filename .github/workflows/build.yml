@@ -1,0 +1,115 @@
+name: Build executables
+
+on:
+    push:
+        branches:
+            - master
+            - main
+    pull_request:
+
+jobs:
+    # Run 'dist plan' to determine what tasks we need to do
+    plan:
+        runs-on: "ubuntu-latest"
+        outputs:
+            val: ${{ steps.plan.outputs.manifest }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - name: Install dist
+              shell: bash
+              run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.3/cargo-dist-installer.sh | sh"
+            - name: Cache dist
+              uses: actions/upload-artifact@v4
+              with:
+                  name: cargo-dist-cache
+                  path: ~/.cargo/bin/dist
+            - id: plan
+              run: |
+                  dist plan --output-format=json > plan-dist-manifest.json
+                  echo "dist ran successfully"
+                  cat plan-dist-manifest.json
+                  echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
+            - name: "Upload dist-manifest.json"
+              uses: actions/upload-artifact@v4
+              with:
+                  name: artifacts-plan-dist-manifest
+                  path: plan-dist-manifest.json
+
+    # Build and package all the platform-specific things
+    build-local-artifacts:
+        name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
+        needs:
+            - plan
+        if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null }}
+        strategy:
+            fail-fast: false
+            matrix: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix }}
+        runs-on: ${{ matrix.runner }}
+        container: ${{ matrix.container && matrix.container.image || null }}
+        env:
+            BUILD_MANIFEST_NAME: target/distrib/${{ join(matrix.targets, '-') }}-dist-manifest.json
+        steps:
+            - name: enable windows longpaths
+              run: |
+                  git config --global core.longpaths true
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+            - name: Install Rust non-interactively if not already installed
+              if: ${{ matrix.container }}
+              run: |
+                  if ! command -v cargo > /dev/null 2>&1; then
+                    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                    echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+                  fi
+            - name: "Install dependencies for Windows"
+              if: "${{ matrix.runner == 'windows-2022' }}"
+              run: |
+                  # Pothos SDR (soapy)
+                  curl -L https://downloads.myriadrf.org/builds/PothosSDR/PothosSDR-2021.07.25-vc16-x64.exe -o pothossdr.exe
+                  7z x -opothos -y pothossdr.exe
+                  echo "${{github.workspace}}/pothos/bin" >> $GITHUB_PATH
+                  # protobuf compiler
+                  curl -L https://github.com/protocolbuffers/protobuf/releases/download/v28.3/protoc-28.3-win64.zip -o protoc.zip
+                  mkdir protoc 
+                  7z x -oprotoc -y protoc.zip
+                  echo "${{github.workspace}}/protoc/bin" >> $GITHUB_PATH
+                  # for pkg-config?
+                  echo "C:\\msys64\\mingw64\\bin" >> $GITHUB_PATH
+              shell: "bash"
+            - name: Install dist
+              run: ${{ matrix.install_dist.run }}
+            # Get the dist-manifest
+            - name: Fetch local artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  pattern: artifacts-*
+                  path: target/distrib/
+                  merge-multiple: true
+            - name: Install dependencies
+              run: |
+                  ${{ matrix.packages_install }}
+            - name: Build artifacts
+              run: |
+                  # Actually do builds and make zips and whatnot
+                  dist build --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
+                  echo "dist ran successfully"
+            - id: cargo-dist
+              name: Post-build
+              shell: bash
+              run: |
+                  # Parse out what we just built and upload it to scratch storage
+                  echo "paths<<EOF" >> "$GITHUB_OUTPUT"
+                  dist print-upload-files-from-manifest --manifest dist-manifest.json >> "$GITHUB_OUTPUT"
+                  echo "EOF" >> "$GITHUB_OUTPUT"
+
+                  cp dist-manifest.json "$BUILD_MANIFEST_NAME"
+            - name: "Upload artifacts"
+              uses: actions/upload-artifact@v4
+              with:
+                  name: artifacts-build-local-${{ join(matrix.targets, '_') }}
+                  path: |
+                      ${{ steps.cargo-dist.outputs.paths }}
+                      ${{ env.BUILD_MANIFEST_NAME }}
