@@ -1,6 +1,8 @@
 [project]
 name = "rs1090"
 requires-python = ">=3.10"
+readme = "readme.md"
+license = "MIT"
 dependencies = ["pandas>=2.2.0", "typing_extensions>=4.10.0"]
 classifiers = [
   "Programming Language :: Rust",
