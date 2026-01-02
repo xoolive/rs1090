@@ -412,7 +412,10 @@ impl fmt::Display for Message {
                     writeln!(f, "  Air/Ground:    airborne")?;
                     writeln!(f, "  Altitude:      {altitude} ft barometric")?;
                 } else {
-                    writeln!(f, "  Air/Ground:    ground or altitude unavailable")?;
+                    writeln!(
+                        f,
+                        "  Air/Ground:    ground or altitude unavailable"
+                    )?;
                 }
             }
             DF::SurveillanceAltitudeReply { fs, ac, .. } => {
@@ -443,7 +446,10 @@ impl fmt::Display for Message {
                     writeln!(f, "  Air/Ground:    airborne")?;
                     writeln!(f, "  Baro altitude: {altitude} ft")?;
                 } else {
-                    writeln!(f, "  Air/Ground:    ground or altitude unavailable")?;
+                    writeln!(
+                        f,
+                        "  Air/Ground:    ground or altitude unavailable"
+                    )?;
                 }
             }
             DF::ExtendedSquitterADSB(msg) => {
@@ -712,7 +718,9 @@ impl Serialize for IdentityCode {
 /// Can be positive up to ~50,000 ft for high-altitude cruise
 /// None indicates altitude data is not available (all-zeros per DO-260B §2.2.5.1.5)
 #[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
-pub struct AC13Field(#[deku(reader = "Self::read(deku::reader)")] pub Option<i32>);
+pub struct AC13Field(
+    #[deku(reader = "Self::read(deku::reader)")] pub Option<i32>,
+);
 
 impl AC13Field {
     fn read<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
