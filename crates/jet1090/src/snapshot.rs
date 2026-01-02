@@ -174,7 +174,7 @@ pub async fn update_snapshot(
                     aircraft.cur.squawk = Some(*id)
                 }
                 SurveillanceAltitudeReply { ac, .. } => {
-                    aircraft.cur.altitude = Some(ac.0);
+                    aircraft.cur.altitude = ac.0;
                 }
                 ExtendedSquitterADSB(adsb) => match &adsb.message {
                     ME::BDS05 { inner: bds05, .. } => {

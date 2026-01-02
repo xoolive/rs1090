@@ -408,20 +408,21 @@ impl fmt::Display for Message {
             DF::ShortAirAirSurveillance { ac, .. } => {
                 writeln!(f, " DF0. Short Air-Air Surveillance")?;
                 writeln!(f, "  ICAO Address:  {crc:06x} (Mode S / ADS-B)")?;
-                if ac.0 > 0 {
-                    let altitude = ac.0;
+                if let Some(altitude) = ac.0 {
                     writeln!(f, "  Air/Ground:    airborne")?;
                     writeln!(f, "  Altitude:      {altitude} ft barometric")?;
                 } else {
-                    writeln!(f, "  Air/Ground:    ground")?;
+                    writeln!(
+                        f,
+                        "  Air/Ground:    ground or altitude unavailable"
+                    )?;
                 }
             }
             DF::SurveillanceAltitudeReply { fs, ac, .. } => {
                 writeln!(f, " DF4. Surveillance, Altitude Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:06x} (Mode S / ADS-B)")?;
                 writeln!(f, "  Air/Ground:    {fs}")?;
-                if ac.0 > 0 {
-                    let altitude = ac.0;
+                if let Some(altitude) = ac.0 {
                     writeln!(f, "  Altitude:      {altitude} ft barometric")?;
                 }
             }
@@ -441,12 +442,14 @@ impl fmt::Display for Message {
             DF::LongAirAirSurveillance { ac, .. } => {
                 writeln!(f, " DF16. Long Air-Air ACAS")?;
                 writeln!(f, "  ICAO Address:  {crc:06x} (Mode S / ADS-B)")?;
-                if ac.0 > 0 {
-                    let altitude = ac.0;
+                if let Some(altitude) = ac.0 {
                     writeln!(f, "  Air/Ground:    airborne")?;
                     writeln!(f, "  Baro altitude: {altitude} ft")?;
                 } else {
-                    writeln!(f, "  Air/Ground:    ground")?;
+                    writeln!(
+                        f,
+                        "  Air/Ground:    ground or altitude unavailable"
+                    )?;
                 }
             }
             DF::ExtendedSquitterADSB(msg) => {
@@ -460,8 +463,9 @@ impl fmt::Display for Message {
             DF::CommBAltitudeReply { ac, bds, .. } => {
                 writeln!(f, " DF20. Comm-B, Altitude Reply")?;
                 writeln!(f, "  ICAO Address:  {crc:x?}")?;
-                let altitude = ac.0;
-                writeln!(f, "  Altitude:      {altitude} ft")?;
+                if let Some(altitude) = ac.0 {
+                    writeln!(f, "  Altitude:      {altitude} ft")?;
+                }
                 write!(f, "  {bds}")?;
             }
             DF::CommBIdentityReply { id, bds, .. } => {
@@ -712,17 +716,25 @@ impl Serialize for IdentityCode {
 /// 13 bit encoded altitude
 /// Can be negative for airports below sea level (e.g., Amsterdam Schiphol at -11 ft)
 /// Can be positive up to ~50,000 ft for high-altitude cruise
+/// None indicates altitude data is not available (all-zeros per DO-260B §2.2.5.1.5)
 #[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
-pub struct AC13Field(#[deku(reader = "Self::read(deku::reader)")] pub i32);
+pub struct AC13Field(
+    #[deku(reader = "Self::read(deku::reader)")] pub Option<i32>,
+);
 
 impl AC13Field {
     fn read<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         reader: &mut Reader<R>,
-    ) -> Result<i32, DekuError> {
+    ) -> Result<Option<i32>, DekuError> {
         let ac13field = u16::from_reader_with_ctx(
             reader,
             (deku::ctx::Endian::Big, deku::ctx::BitSize(13)),
         )?;
+
+        // Check for all-zeros: altitude not available (DO-260B §2.2.5.1.5)
+        if ac13field == 0 {
+            return Ok(None);
+        }
 
         let m_bit = ac13field & 0x0040;
         let q_bit = ac13field & 0x0010;
@@ -731,7 +743,7 @@ impl AC13Field {
             // Metric encoding (meters converted to feet)
             let meters = ((ac13field & 0x1f80) >> 2) | (ac13field & 0x3f);
             let feet = (meters as f32 * 3.28084) as i32;
-            Ok(feet)
+            Ok(Some(feet))
         } else if q_bit != 0 {
             // Q-bit encoding: 25 ft increments with -1000 ft offset
             // This supports negative altitudes for below-sea-level airports
@@ -740,14 +752,15 @@ impl AC13Field {
                 | ((ac13field & 0x0020) >> 1)
                 | (ac13field & 0x000f);
             let altitude = i32::from(n) * 25 - 1000;
-            Ok(altitude)
+            Ok(Some(altitude))
         } else {
             // 11 bit Gillham coded altitude
             if let Ok(n) = gray2alt(decode_id13(ac13field)) {
                 let altitude = 100 * n;
-                Ok(altitude)
+                Ok(Some(altitude))
             } else {
-                Ok(0)
+                // Invalid Gillham pattern
+                Ok(None)
             }
         }
     }
@@ -1036,7 +1049,7 @@ mod tests {
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
         match msg.df {
             DF::CommBAltitudeReply { ac, .. } => {
-                assert_eq!(ac.0, 39000);
+                assert_eq!(ac.0, Some(39000));
             }
             _ => unreachable!(),
         }

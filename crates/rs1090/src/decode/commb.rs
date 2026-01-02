@@ -164,10 +164,8 @@ impl DekuReader<'_, AC13Field> for DF20DataSelector {
             let mut input = std::io::Cursor::new(&buf);
             let mut reader = Reader::new(&mut input);
             match AirbornePosition::from_reader_with_ctx(&mut reader, tc) {
-                Ok(bds05) => match bds05.alt {
-                    Some(alt) if alt == ac.0 => result.bds05 = Some(bds05),
-                    _ => (),
-                },
+                Ok(bds05) if bds05.alt == ac.0 => result.bds05 = Some(bds05),
+                Ok(_) => (),
                 Err(e) => debug!("Hypothesis BDS05: {}", e.to_string()),
             }
         } else {
