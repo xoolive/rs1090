@@ -381,7 +381,7 @@ impl Render for ColumnRender {
                 s.altitude.map(|v| format!("{v}")).unwrap_or("".to_string())
             }
             Self::SELALT => match (s.selected_altitude, s.altitude) {
-                (Some(sel), Some(alt)) if u16::abs_diff(sel, alt) <= 50 => {
+                (Some(sel), Some(alt)) if i32::abs_diff(i32::from(sel), alt) <= 50 => {
                     "=".to_string()
                 }
                 (Some(sel), _) => {

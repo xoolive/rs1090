@@ -374,10 +374,10 @@ mod tests {
             let n = ((alt_field & 0x0fe0) >> 1) | (alt_field & 0x000f);
             
             // Apply formula
-            let altitude = i32::from(n) * 25 - 1000;
+            let altitude = n * 25 - 1000;
             
             assert_eq!(
-                altitude as i16, expected_alt,
+                altitude, expected_alt,
                 "Altitude field 0x{:03x} (n={}) should decode to {} ft, got {} ft",
                 alt_field, n, expected_alt, altitude
             );

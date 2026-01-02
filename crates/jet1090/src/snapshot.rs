@@ -36,7 +36,9 @@ pub struct Snapshot {
     /// WGS84 longitude angle in degrees
     pub longitude: Option<f64>,
     /// Barometric altitude in feet, expressed in ISA
-    pub altitude: Option<u16>,
+    /// Can be negative for airports below sea level (e.g., Amsterdam Schiphol)
+    /// Can be positive up to ~50,000 ft for cruise altitude
+    pub altitude: Option<i32>,
     /// Altitude selected in the FMS
     pub selected_altitude: Option<u16>,
     /// Ground speed, in knots
