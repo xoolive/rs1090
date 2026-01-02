@@ -25,7 +25,7 @@ pub struct MeteorologicalRoutineAirReport {
     pub temperature: f64,
 
     #[deku(reader = "read_pressure(deku::reader)")]
-    /// Average static pressure
+    /// Average static pressure (in hPa)
     pub pressure: Option<u16>,
 
     #[deku(reader = "read_turbulence(deku::reader)")]
@@ -141,12 +141,13 @@ fn read_pressure<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         }
     }
 
-    // Never seen any anyway
-    Err(DekuError::Assertion(
-        "Pressure never seen before, message deemed invalid".into(),
-    ))
-
-    // return Ok((rest, Some(value)));
+    // BDS 4,4 Average Static Pressure: 11-bit value represents pressure directly in hPa
+    // Per ICAO Doc 9871 Table A-2-68:
+    //   - Range: [0, 2048] hPa
+    //   - LSB = 1 hPa (raw value = pressure in hPa)
+    //   - MSB = 1024 hPa
+    // No scaling formula needed (unlike BDS 4,0 which uses 800 + value * 0.1)
+    Ok(Some(value))
 }
 
 fn read_turbulence<R: deku::no_std_io::Read + deku::no_std_io::Seek>(

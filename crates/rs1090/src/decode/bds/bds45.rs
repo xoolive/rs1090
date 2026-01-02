@@ -135,6 +135,12 @@ fn read_pressure<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     trace!("Reading pressure status {} value {}", status, value);
 
+    // BDS 4,5 Average Static Pressure: 11-bit value represents pressure directly in hPa
+    // Per ICAO Doc 9871 Table A-2-69:
+    //   - Range: [0, 2048] hPa
+    //   - LSB = 1 hPa (raw value = pressure in hPa)
+    //   - MSB = 1024 hPa
+    // No scaling formula needed (unlike BDS 4,0 which uses 800 + value * 0.1)
     match (status, value) {
         (true, value) => Ok(Some(value)),
         //(false, _) => Ok(None),
