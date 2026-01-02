@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Fix altitude decoding to support negative altitudes for below-sea-level airports (EHAM, etc.)
+- Fix altitude field 0x000 (all-zeros) incorrectly decoded instead of "not available" per DO-260B spec
+- **BREAKING**: Change AC13Field to wrap Option<i32> instead of i32 for proper "altitude unavailable" handling
+- Fix invalid Gillham altitude patterns returning misleading 0 ft instead of None
 
 ## 0.4.9
 
