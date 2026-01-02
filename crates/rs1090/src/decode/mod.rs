@@ -710,13 +710,15 @@ impl Serialize for IdentityCode {
 }
 
 /// 13 bit encoded altitude
+/// Can be negative for airports below sea level (e.g., Amsterdam Schiphol at -11 ft)
+/// Can be positive up to ~50,000 ft for high-altitude cruise
 #[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
-pub struct AC13Field(#[deku(reader = "Self::read(deku::reader)")] pub u16);
+pub struct AC13Field(#[deku(reader = "Self::read(deku::reader)")] pub i32);
 
 impl AC13Field {
     fn read<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         reader: &mut Reader<R>,
-    ) -> Result<u16, DekuError> {
+    ) -> Result<i32, DekuError> {
         let ac13field = u16::from_reader_with_ctx(
             reader,
             (deku::ctx::Endian::Big, deku::ctx::BitSize(13)),
@@ -726,24 +728,24 @@ impl AC13Field {
         let q_bit = ac13field & 0x0010;
 
         if m_bit != 0 {
+            // Metric encoding (meters converted to feet)
             let meters = ((ac13field & 0x1f80) >> 2) | (ac13field & 0x3f);
-            // convert to ft
-            Ok((meters as f32 * 3.28084) as u16)
+            let feet = (meters as f32 * 3.28084) as i32;
+            Ok(feet)
         } else if q_bit != 0 {
+            // Q-bit encoding: 25 ft increments with -1000 ft offset
+            // This supports negative altitudes for below-sea-level airports
             // 11 bit integer resulting from the removal of bit Q and M
             let n = ((ac13field & 0x1f80) >> 2)
                 | ((ac13field & 0x0020) >> 1)
                 | (ac13field & 0x000f);
-            if n > 40 {
-                Ok(n * 25 - 1000) // 25 ft interval
-            } else {
-                // TODO error?
-                Ok(0)
-            }
+            let altitude = i32::from(n) * 25 - 1000;
+            Ok(altitude)
         } else {
             // 11 bit Gillham coded altitude
             if let Ok(n) = gray2alt(decode_id13(ac13field)) {
-                Ok((100 * n) as u16)
+                let altitude = 100 * n;
+                Ok(altitude)
             } else {
                 Ok(0)
             }

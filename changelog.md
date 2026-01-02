@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix altitude decoding to support negative altitudes for below-sea-level airports (EHAM, etc.)
+
 ## 0.4.9
 
 - Add ssh tunnelling for Websocket and SeRo sources (#199 #200)
