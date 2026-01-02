@@ -179,8 +179,8 @@ impl fmt::Display for Source {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decode::{DF, Message};
     use crate::decode::adsb::{ADSB, ME};
+    use crate::decode::{Message, DF};
     use hexlit::hex;
 
     #[test]
@@ -191,7 +191,7 @@ mod tests {
         // Q-bit set, N=27, altitude = 27*25-1000 = -325 ft
         let bytes = hex!("8d484fde5803b647ecec4fcdd74f");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-        
+
         if let DF::ExtendedSquitterADSB(ADSB {
             message: ME::BDS05 { inner: pos, .. },
             ..
@@ -209,7 +209,7 @@ mod tests {
         // N=28, altitude = 28*25-1000 = -300 ft
         let bytes = hex!("8d4845575803c647bcec2a980abc");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-        
+
         if let DF::ExtendedSquitterADSB(ADSB {
             message: ME::BDS05 { inner: pos, .. },
             ..
@@ -227,7 +227,7 @@ mod tests {
         // N=29, altitude = 29*25-1000 = -275 ft
         let bytes = hex!("8d3424d25803d64c18ee03351f89");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-        
+
         if let DF::ExtendedSquitterADSB(ADSB {
             message: ME::BDS05 { inner: pos, .. },
             ..
@@ -245,7 +245,7 @@ mod tests {
         // Altitude field 0x058 (88), N=40, altitude = 40*25-1000 = 0 ft
         let bytes = hex!("8d4401e458058645a8ea90496290");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-        
+
         if let DF::ExtendedSquitterADSB(ADSB {
             message: ME::BDS05 { inner: pos, .. },
             ..
@@ -263,7 +263,7 @@ mod tests {
         // Altitude = 25 ft
         let bytes = hex!("8d346355580596459cea86756acc");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-        
+
         if let DF::ExtendedSquitterADSB(ADSB {
             message: ME::BDS05 { inner: pos, .. },
             ..
@@ -281,7 +281,7 @@ mod tests {
         // Altitude = 50 ft
         let bytes = hex!("8d3463555805a64584ea756d352e");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-        
+
         if let DF::ExtendedSquitterADSB(ADSB {
             message: ME::BDS05 { inner: pos, .. },
             ..
@@ -299,7 +299,7 @@ mod tests {
         // Altitude = 100 ft
         let bytes = hex!("8d3463555805c2d9f6f0f3f1b6c3");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-        
+
         if let DF::ExtendedSquitterADSB(ADSB {
             message: ME::BDS05 { inner: pos, .. },
             ..
@@ -317,7 +317,7 @@ mod tests {
         // N=80, altitude = 80*25-1000 = 1000 ft
         let bytes = hex!("8d346355580b064116e70a269f97");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-        
+
         if let DF::ExtendedSquitterADSB(ADSB {
             message: ME::BDS05 { inner: pos, .. },
             ..
@@ -335,7 +335,7 @@ mod tests {
         // Higher altitude to ensure positive values still work
         let bytes = hex!("8d343386581f06318ad4fecab734");
         let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
-        
+
         if let DF::ExtendedSquitterADSB(ADSB {
             message: ME::BDS05 { inner: pos, .. },
             ..
@@ -352,30 +352,34 @@ mod tests {
         // Test the altitude decoding formula for Q-bit encoding
         // Formula: altitude = (n * 25) - 1000
         // where n is extracted from the 12-bit altitude field
-        
+
         let test_cases = vec![
             // (alt_field_value, expected_altitude)
-            (0x03a, -350),  // n=26: 26*25-1000 = -350
-            (0x03b, -325),  // n=27: 27*25-1000 = -325
-            (0x03e, -250),  // n=30: 30*25-1000 = -250
-            (0x050, -200),  // n=32: 32*25-1000 = -200
-            (0x058, 0),     // n=40: 40*25-1000 = 0
-            (0x070, 200),   // n=48: 48*25-1000 = 200
-            (0x0b0, 1000),  // n=80: 80*25-1000 = 1000
-            (0x1f0, 5000),  // n=240: 240*25-1000 = 5000
+            (0x03a, -350), // n=26: 26*25-1000 = -350
+            (0x03b, -325), // n=27: 27*25-1000 = -325
+            (0x03e, -250), // n=30: 30*25-1000 = -250
+            (0x050, -200), // n=32: 32*25-1000 = -200
+            (0x058, 0),    // n=40: 40*25-1000 = 0
+            (0x070, 200),  // n=48: 48*25-1000 = 200
+            (0x0b0, 1000), // n=80: 80*25-1000 = 1000
+            (0x1f0, 5000), // n=240: 240*25-1000 = 5000
         ];
 
         for (alt_field, expected_alt) in test_cases {
             // Verify Q-bit is set (bit 4)
             let q_bit = alt_field & 0x10;
-            assert!(q_bit > 0, "Q-bit should be set for field 0x{:03x}", alt_field);
-            
+            assert!(
+                q_bit > 0,
+                "Q-bit should be set for field 0x{:03x}",
+                alt_field
+            );
+
             // Extract n value
             let n = ((alt_field & 0x0fe0) >> 1) | (alt_field & 0x000f);
-            
+
             // Apply formula
             let altitude = n * 25 - 1000;
-            
+
             assert_eq!(
                 altitude, expected_alt,
                 "Altitude field 0x{:03x} (n={}) should decode to {} ft, got {} ft",
