@@ -1,14 +1,18 @@
 #![doc = include_str!("../readme.md")]
 
 use clap::Parser;
+use flate2::read::GzDecoder;
 use rs1090::decode::cpr::{decode_position, AircraftState, Position, UpdateIf};
 use rs1090::decode::SensorMetadata;
 use rs1090::prelude::*;
 use serde::{Deserialize, Serialize};
+use sevenz_rust::SevenZReader;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
+use std::io::Read;
+use std::path::Path;
 use tokio::fs::{self, File};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -40,6 +44,40 @@ struct Options {
     msgs: Vec<String>,
 }
 
+/// Read and decompress input file based on extension
+async fn read_input_file(input_path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let path = Path::new(input_path);
+    let extension = path.extension().and_then(|e| e.to_str());
+    
+    match extension {
+        Some("7z") => {
+            // Read .7z file directly into memory without temp files
+            let mut archive = SevenZReader::open(path, sevenz_rust::Password::empty())?;
+            let mut content = String::new();
+            
+            // Read first entry in archive (assume single .jsonl file inside)
+            archive.for_each_entries(|_entry, reader| {
+                reader.read_to_string(&mut content)?;
+                Ok(false) // Stop after first entry
+            })?;
+            
+            Ok(content)
+        }
+        Some("gz") => {
+            // Decompress .gz file using flate2
+            let file = std::fs::File::open(path)?;
+            let mut decoder = GzDecoder::new(file);
+            let mut content = String::new();
+            decoder.read_to_string(&mut content)?;
+            Ok(content)
+        }
+        _ => {
+            // Regular file - read directly
+            Ok(tokio::fs::read_to_string(path).await?)
+        }
+    }
+}
+
 // We create this struct because it is too troublesome to have Deserialize for
 // Message at this point.
 #[derive(Serialize, Deserialize)]
@@ -60,8 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let options = Options::parse();
 
     let input_file = if let Some(input_path) = options.input {
-        let file = fs::File::open(input_path).await?;
-        Some(file)
+        Some(input_path)
     } else {
         None
     };
@@ -69,8 +106,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output_file = if let Some(output_path) = options.output {
         Some(
             fs::OpenOptions::new()
-                .append(true)
+                .write(true)
                 .create(true)
+                .truncate(true)
                 .open(output_path)
                 .await?,
         )
@@ -81,10 +119,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut reference = options.reference;
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
 
-    if let Some(mut file) = input_file {
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await?;
-        let content_str = String::from_utf8_lossy(&contents);
+    if let Some(input_path) = input_file {
+        let content_str = read_input_file(&input_path).await?;
 
         let raw_messages: Vec<&str> = content_str.split('\n').collect();
 
