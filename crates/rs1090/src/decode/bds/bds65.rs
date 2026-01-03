@@ -3,14 +3,91 @@ use serde::Serialize;
 use std::fmt;
 
 /**
- * ## Aircraft operation status (BDS 6,5)
+ * ## Aircraft Operational Status (BDS 6,5 / TYPE=31)
  *
- * The structures of this message type differ significantly over different ADS-B
- * versions. The message has been defined in all ADS-B versions. But in
- * practice, it is not implemented in ADS-B version 0. From version 1 onward,
- * the operational status includes more information, such as ADS-B version,
- * accuracy, and integrity indicators.
+ * Extended Squitter ADS-B message providing operational capabilities and modes.  
+ * Per ICAO Doc 9871 Table B-2-101: BDS code 6,5 — Extended squitter aircraft operational status
  *
+ * Purpose: To provide the capability class and current operational mode of
+ * ATC-related applications and other operational information.
+ *
+ * Message Structure (56 bits):
+ * | TYPE | SUBTYPE | CC    | LW  | OM   | VERSION | NIC | NAC_P | BAQ | SIL | NIC_BARO | TRK_HDG | HRD | RES |
+ * |------|---------|-------|-----|------|---------|-----|-------|-----|-----|----------|---------|-----|-----|
+ * | 5    | 3       | 16    | 4   | 16   | 3       | 1   | 4     | 1   | 2   | 1        | 1       | 1   | 2   |
+ *
+ * Field Encoding per ICAO Doc 9871 §B.2.3.10:
+ *
+ * **TYPE Code** (bits 1-5): Fixed value 31 (11111 binary)
+ *
+ * **Subtype** (bits 6-8): 3-bit subtype field
+ *   - 0 = Airborne Status Message
+ *   - 1 = Surface Status Message
+ *   - 2-7 = Reserved
+ *
+ * **Capability Class (CC) Codes** (bits 9-24): 16-bit capability field
+ *   - Airborne (Subtype 0): ACAS, CDTI, ARV, TS, TC capabilities
+ *     * Bits 9-10: Reserved (0)
+ *     * Bit 11: ACAS (TCAS Resolution Advisory Active)
+ *     * Bit 12: CDTI (Cockpit Display of Traffic Information)
+ *     * Bits 13-14: Reserved (0)
+ *     * Bit 15: ARV (Air-Referenced Velocity Report Capability)
+ *     * Bit 16: TS (Target State Report Capability)
+ *     * Bits 17-18: TC (Target Trajectory Change Report Capability)
+ *       - 0 = No capability
+ *       - 1 = TC+0 reports only
+ *       - 2 = Multiple TC reports
+ *       - 3 = Reserved
+ *     * Bits 19-24: Reserved
+ *   - Surface (Subtype 1): Similar capabilities for surface operations
+ *
+ * **Length/Width (L/W) Codes** (bits 25-28): 4-bit aircraft size (Surface only)
+ *   - Encodes aircraft dimensions per §B.2.3.10.11
+ *
+ * **Operational Mode (OM) Codes** (bits 29-44): 16-bit operational mode field
+ *   - Various operational flags and modes per §B.2.3.10.4
+ *
+ * **Version Number** (bits 45-47): 3-bit ADS-B version
+ *   - 0 = Not implemented (DO-260)
+ *   - 1 = DO-260A
+ *   - 2 = DO-260B
+ *   - 3-7 = Reserved for future versions
+ *   - Note: Message structure differs significantly between versions
+ *
+ * **NIC Supplement** (bit 48): Navigation Integrity Category supplement
+ *   - Used with NIC from position messages
+ *
+ * **NAC_P** (bits 49-52): Navigation Accuracy Category - Position
+ *   - 4-bit horizontal position accuracy indicator
+ *
+ * **BAQ** (bit 53): Barometric Altitude Quality (when 0, bits 54-56 reserved)
+ *
+ * **SIL** (bits 54-55): Source Integrity Level (2 bits)
+ *   - Probability of position integrity
+ *
+ * **NIC_BARO** (bit 56): Barometric altitude cross-check flag
+ *
+ * **TRK/HDG** (bit 57): Track angle vs. heading (Airborne)
+ *   - 0 = True track angle
+ *   - 1 = Magnetic heading
+ *
+ * **HRD** (bit 58): Heading Reference Direction (Airborne)
+ *   - 0 = True north
+ *   - 1 = Magnetic north
+ *
+ * **Reserved** (bits 59-56): Reserved for future use
+ *
+ * Version Differences:
+ * - Version 0 (DO-260): Not implemented in practice, basic structure
+ * - Version 1 (DO-260A): Added accuracy and integrity indicators
+ * - Version 2 (DO-260B): Enhanced with additional operational modes
+ *
+ * Transmission:
+ * - Message delivery accomplished using event-driven protocol
+ * - Broadcast when capability or operational status changes
+ *
+ * Reference: ICAO Doc 9871 Table B-2-101, §B.2.3.10  
+ * Additional details: DO-260B §2.2.3.2.7.2
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
@@ -352,13 +429,13 @@ pub struct AirborneV2 {
     pub sil_s: u8,
 }
 
-/// ADS-B version as defined from different ICAO documents.
+/// ADS-B version as defined from different ICAO documents.  
 /// Reference: ICAO 9871 (5.3.2.3)
 ///
 /// There are three ADS-B versions implemented so far, starting from version 0
-/// (specification defined in RTCA document DO-260). Version 1 was introduced
-/// around 2008 (DO-260A), and version 2 around 2012 (DO-260B). Version 3 is
-/// currently being developed.
+/// (specification defined in RTCA document DO-260).  
+/// Version 1 was introduced around 2008 (DO-260A), and version 2 around 2012 (DO-260B).
+/// Version 3 is currently being developed.
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 #[deku(id_type = "u8", bits = "3")]
 #[serde(tag = "version")]

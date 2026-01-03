@@ -2,48 +2,192 @@ use deku::prelude::*;
 use serde::Serialize;
 
 /**
-* ## Heading and speed report (BDS 6,0)
-*
-* - Barometric altitude rate
-*   1. Air Data System
-*   2. Inertial Reference System/Flight Management System
-*
-* - Inertial vertical velocity:
-*   1. Flight Management Computer / GNSS integrated
-*   2. Flight Management Computer (General)
-*   3. Inertial Reference System/Flight Management System
-*
-*/
+ * ## Heading and Speed Report (BDS 6,0)
+ *
+ * Comm-B message providing aircraft heading and speed data.
+ * Per ICAO Doc 9871 Table A-2-96: BDS code 6,0 — Heading and speed report
+ *
+ * Purpose: Provides heading and speed data to ground systems for improved
+ * trajectory prediction and conflict detection.
+ *
+ * Message Structure (56 bits):
+ * | HDG   | IAS  | MACH | BARO | INER |
+ * |-------|------|------|------|------|
+ * | 1+1+10| 1+10 | 1+10 | 1+1+9| 1+1+9|
+ *
+ * Field Encoding per ICAO Doc 9871:
+ *
+ * **Magnetic Heading** (bits 1-12):
+ *   - Bit 1: Status (0=invalid, 1=valid)
+ *   - Bit 2: Sign (0=east, 1=west)
+ *   - Bits 3-12: 10-bit heading magnitude
+ *     * MSB = 90 degrees
+ *     * LSB = 90/512 degrees (≈0.1758°)
+ *     * Range: [-180, +180] degrees (two's complement)
+ *     * Converted to [0, 360]° for display (e.g., 315° = -45°)
+ *
+ * **Indicated Airspeed (IAS)** (bits 13-23):
+ *   - Bit 13: Status (0=invalid, 1=valid)
+ *   - Bits 14-23: 10-bit IAS value
+ *     * MSB = 512 kt
+ *     * LSB = 1 kt
+ *     * Range: [0, 1023] kt
+ *     * Formula: IAS = value × 1 kt
+ *
+ * **Mach Number** (bits 24-34):
+ *   - Bit 24: Status (0=invalid, 1=valid)
+ *   - Bits 25-34: 10-bit Mach value
+ *     * MSB = 2.048 Mach
+ *     * LSB = 2.048/512 Mach (≈0.004 Mach)
+ *     * Range: [0, 4.092] Mach
+ *     * Formula: Mach = value × (2.048/512)
+ *
+ * **Barometric Altitude Rate** (bits 35-45):
+ *   - Bit 35: Status (0=invalid, 1=valid)
+ *   - Bit 36: Sign (0=climbing, 1=descending/"below")
+ *   - Bits 37-45: 9-bit vertical rate value
+ *     * MSB = 8,192 ft/min
+ *     * LSB = 32 ft/min (8192/256)
+ *     * Range: [-16,384, +16,352] ft/min
+ *     * Formula: rate = value × 32 ft/min (two's complement)
+ *     * Special values: 0 or 511 = no rate information (returns 0)
+ *
+ * **Inertial Vertical Velocity** (bits 46-56):
+ *   - Bit 46: Status (0=invalid, 1=valid)
+ *   - Bit 47: Sign (0=climbing, 1=descending/"below")
+ *   - Bits 48-56: 9-bit vertical velocity value
+ *     * MSB = 8,192 ft/min
+ *     * LSB = 32 ft/min (8192/256)
+ *     * Range: [-16,384, +16,352] ft/min
+ *     * Formula: velocity = value × 32 ft/min (two's complement)
+ *     * Special values: 0 or 511 = no velocity information (returns 0)
+ *
+ * Data Source Notes per ICAO Doc 9871:
+ * - **Barometric Altitude Rate**: Solely derived from barometric measurement
+ *   (Air Data System or IRS/FMS). Usually unsteady and may suffer from
+ *   barometric instrument inertia.
+ * - **Inertial Vertical Velocity**: Derived from inertial equipment (IRS, AHRS)
+ *   using different sources than barometric (FMC/GNSS integrated, FMC general,
+ *   or IRS/FMS). More filtered and smooth parameter. When barometric altitude
+ *   rate is integrated and smoothed with inertial data (baro-inertial), it
+ *   shall be transmitted in this field.
+ *
+ * Validation Rules per ICAO Doc 9871:
+ * - If parameter exceeds range, use maximum allowable value (requires GFM intervention)
+ * - Data should be from sources controlling the aircraft (when possible)
+ * - LSB values obtained by rounding
+ * - If parameter unavailable, all bits set to ZERO by GFM
+ *
+ * Implementation Validation:
+ * - IAS must be in range (0, 500] kt (operational validation)
+ * - Mach must be in range (0, 1] (subsonic aircraft assumption)
+ * - IAS and Mach cross-validation:
+ *   * If IAS > 250 kt, then Mach must be ≥ 0.4 (250 kt ≈ Mach 0.45 at 10,000 ft)
+ *   * If IAS < 150 kt, then Mach must be ≤ 0.5 (150 kt ≈ Mach 0.5 at FL400)
+ * - Vertical rate/velocity abs value ≤ 6,000 ft/min (typical operational limit)
+ *
+ * Note: Two's complement coding used for all signed fields (§A.2.2.2)
+ * Additional implementation guidelines in ICAO Doc 9871 §D.2.4.6
+ */
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[serde(tag = "bds", rename = "60")]
 pub struct HeadingAndSpeedReport {
-    #[deku(reader = "read_heading(deku::reader)")] // 12 bits
-    /// The magnetic heading is the aircraft's heading with respect to the magnetic North
+    /// Magnetic Heading (bits 1-12): Per ICAO Doc 9871 Table A-2-96  
+    /// Aircraft magnetic heading in degrees (magnetic north reference).  
+    /// Encoding details:
+    ///   - Bit 1: Status (0=invalid, 1=valid)
+    ///   - Bit 2: Sign (0=east, 1=west)
+    ///   - Bits 3-12: 10-bit heading magnitude
+    ///   - MSB = 90 degrees
+    ///   - LSB = 90/512 degrees (≈0.1758°)
+    ///   - Formula: heading = value × (90/512) degrees (two's complement)
+    ///   - Range: [-180, +180] degrees (internal), converted to [0, 360]° for output
+    ///   - Example: 315° encoded as -45°
+    ///
+    /// Returns None if status bit is 0.
+    #[deku(reader = "read_heading(deku::reader)")]
     #[serde(rename = "heading", skip_serializing_if = "Option::is_none")]
     pub magnetic_heading: Option<f64>,
 
-    #[deku(reader = "read_ias(deku::reader)")] // 11 bits
+    /// Indicated Airspeed (bits 13-23): Per ICAO Doc 9871 Table A-2-96  
+    /// Aircraft indicated airspeed in knots.  
+    /// Encoding details:
+    ///   - Bit 13: Status (0=invalid, 1=valid)
+    ///   - Bits 14-23: 10-bit IAS value
+    ///   - MSB = 512 kt
+    ///   - LSB = 1 kt
+    ///   - Formula: IAS = value × 1 kt
+    ///   - Range: [0, 1023] kt
+    ///
+    /// Returns None if status bit is 0.
+    /// Implementation validates IAS ∈ (0, 500] kt (operational range).  
+    /// Note: TAS (True Airspeed) is available in BDS 5,0.
+    #[deku(reader = "read_ias(deku::reader)")]
     #[serde(rename = "IAS", skip_serializing_if = "Option::is_none")]
-    /// Indicated Airspeed (IAS) in kts, TAS is in BDS 0,5
     pub indicated_airspeed: Option<u16>,
 
-    #[deku(reader = "read_mach(deku::reader, *indicated_airspeed)")] // 11 bits
+    /// Mach Number (bits 24-34): Per ICAO Doc 9871 Table A-2-96  
+    /// Aircraft Mach number (ratio of aircraft speed to speed of sound).  
+    /// Encoding details:
+    ///   - Bit 24: Status (0=invalid, 1=valid)
+    ///   - Bits 25-34: 10-bit Mach value
+    ///   - MSB = 2.048 Mach
+    ///   - LSB = 2.048/512 Mach (≈0.004 Mach)
+    ///   - Formula: Mach = value × (2.048/512)
+    ///   - Range: [0, 4.092] Mach
+    ///
+    /// Returns None if status bit is 0.  
+    /// Implementation validates:
+    ///   - Mach ∈ (0, 1] (subsonic aircraft)
+    ///   - Cross-validation with IAS:
+    ///     * If IAS > 250 kt: Mach ≥ 0.4 (250 kt ≈ Mach 0.45 at 10,000 ft)
+    ///     * If IAS < 150 kt: Mach ≤ 0.5 (150 kt ≈ Mach 0.5 at FL400)
+    #[deku(reader = "read_mach(deku::reader, *indicated_airspeed)")]
     #[serde(rename = "Mach", skip_serializing_if = "Option::is_none")]
-    /// Mach number
     pub mach_number: Option<f64>,
 
-    #[deku(reader = "read_vertical(deku::reader)")] // 11 bits
-    /// Barometric altitude rates (in ft/mn) are only derived from
-    /// barometer measurements (noisy).
+    /// Barometric Altitude Rate (bits 35-45): Per ICAO Doc 9871 Table A-2-96  
+    /// Vertical rate derived solely from barometric measurement in ft/min.  
+    /// Encoding details:
+    ///   - Bit 35: Status (0=invalid, 1=valid)
+    ///   - Bit 36: Sign (0=climbing, 1=descending)
+    ///   - Bits 37-45: 9-bit vertical rate magnitude
+    ///   - MSB = 8,192 ft/min
+    ///   - LSB = 32 ft/min (8192/256)
+    ///   - Formula: rate = value × 32 ft/min (two's complement)
+    ///   - Range: [-16,384, +16,352] ft/min
+    ///   - Special values: 0 or 511 = no rate information (returns 0)
+    ///
+    /// Returns None if status bit is 0, returns Some(0) if value is 0 or 511.  
+    /// Implementation validates abs(rate) ≤ 6,000 ft/min.  
+    /// Source: Air Data System or Inertial Reference System/FMS.  
+    /// Note: Usually unsteady and may suffer from barometric instrument inertia.
+    #[deku(reader = "read_vertical(deku::reader)")]
     #[serde(
         rename = "vrate_barometric",
         skip_serializing_if = "Option::is_none"
     )]
     pub barometric_altitude_rate: Option<i16>,
 
-    #[deku(reader = "read_vertical(deku::reader)")] // 11 bits
-    /// Inertial vertical velocities (in ft/mn) are values provided by
-    /// navigational equipment from different sources including the FMS
+    /// Inertial Vertical Velocity (bits 46-56): Per ICAO Doc 9871 Table A-2-96  
+    /// Vertical velocity from inertial/navigational equipment in ft/min.  
+    /// Encoding details:
+    ///   - Bit 46: Status (0=invalid, 1=valid)
+    ///   - Bit 47: Sign (0=climbing, 1=descending)
+    ///   - Bits 48-56: 9-bit vertical velocity magnitude
+    ///   - MSB = 8,192 ft/min
+    ///   - LSB = 32 ft/min (8192/256)
+    ///   - Formula: velocity = value × 32 ft/min (two's complement)
+    ///   - Range: [-16,384, +16,352] ft/min
+    ///   - Special values: 0 or 511 = no velocity information (returns 0)
+    ///
+    /// Returns None if status bit is 0, returns Some(0) if value is 0 or 511.  
+    /// Implementation validates abs(velocity) ≤ 6,000 ft/min.  
+    /// Sources: FMC/GNSS integrated, FMC (General), or IRS/FMS.  
+    /// Note: More filtered and smooth than barometric rate. When barometric
+    /// altitude rate is integrated and smoothed with inertial data
+    /// (baro-inertial), it shall be transmitted in this field.
+    #[deku(reader = "read_vertical(deku::reader)")]
     #[serde(
         rename = "vrate_inertial",
         skip_serializing_if = "Option::is_none"

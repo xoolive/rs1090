@@ -4,10 +4,57 @@ use serde::Serialize;
 use tracing::{debug, trace};
 
 /**
- * ## Aircraft and airline registration markings (BDS 2,1)
+ * ## Aircraft and Airline Registration Markings (BDS 2,1)
  *
- * To permit ground systems to identify the aircraft without the
+ * Comm-B message providing aircraft and airline registration information.  
+ * Per ICAO Doc 9871 Table A-2-33: BDS code 2,1 — Aircraft and airline registration markings
+ *
+ * Purpose: To permit ground systems to identify the aircraft without the
  * necessity of compiling and maintaining continuously updated data banks.
+ *
+ * Message Structure (56 bits):
+ * | AC_STAT | AC_REG (7 chars) | AL_STAT | AL_REG (2 chars) |
+ * |---------|------------------|---------|------------------|
+ * | 1       | 42 (6×7)         | 1       | 12 (6×2)         |
+ *
+ * Field Encoding per ICAO Doc 9871:
+ *
+ * **Aircraft Registration Status** (bit 1):
+ *   - 0 = aircraft registration not available or invalid
+ *   - 1 = aircraft registration available and valid
+ *
+ * **Aircraft Registration Number** (bits 2-43): 7 characters, 6 bits each
+ *   - Character encoding per ICAO Annex 10, Vol IV, Table 3-7
+ *   - Valid characters: A-Z (1-26), 0-9 (48-57), # (0), space (32)
+ *   - Example formats: "N12345", "G#ABCD", "VH#VKI"
+ *   - Must match pattern: [A-Z0-9]+[\\s#]?[A-Z0-9]+
+ *
+ * **Airline Registration Status** (bit 44):
+ *   - 0 = airline designation not available or invalid
+ *   - 1 = airline designation available and valid
+ *
+ * **ICAO Airline Registration Marking** (bits 45-56): 2 characters, 6 bits each
+ *   - Character encoding per ICAO Annex 10, Vol IV, Table 3-7
+ *   - Valid characters: A-Z (1-26), 0-9 (48-57)
+ *   - Note: Most transponders don't implement this field (status=0)
+ *
+ * Character Set (6-bit encoding):
+ * - 0 (000000) = # (no character marker)
+ * - 1-26 (000001-011010) = A-Z
+ * - 32 (100000) = space
+ * - 48-57 (110000-111001) = 0-9
+ *
+ * Validation Rules:
+ * - If status bit is 0, all character bits must be 0
+ * - If status bit is 1, characters must form valid registration
+ * - Aircraft registration must match expected national format
+ * - Airline designation rarely implemented in practice
+ *
+ * Note: This provides aircraft tail number/registration separate from
+ * callsign (BDS 2,0/0,8), allowing ground systems to identify aircraft
+ * without maintaining extensive databases.
+ *
+ * Reference: ICAO Doc 9871 Table A-2-33, Annex 10 Vol IV Table 3-7
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
@@ -15,18 +62,22 @@ use tracing::{debug, trace};
 pub struct AircraftAndAirlineRegistrationMarkings {
     #[deku(bits = "1")]
     #[serde(skip)]
+    /// Aircraft Registration Status
     pub ac_status: bool,
 
     #[deku(reader = "aircraft_registration_read(deku::reader, *ac_status)")]
     #[serde(rename = "registration")]
+    /// Aircraft Registration Number (7 characters)
     pub aircraft_registration: Option<String>,
 
     #[deku(bits = "1")]
     #[serde(skip)]
+    /// Airline Registration Status
     pub al_status: bool,
 
     #[deku(reader = "airline_registration_read(deku::reader, *al_status)")]
     #[serde(rename = "airline", skip_serializing_if = "Option::is_none")]
+    /// ICAO Airline Registration Marking (2 characters)
     pub airline_registration: Option<String>,
 }
 

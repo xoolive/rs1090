@@ -3,38 +3,138 @@ use serde::Serialize;
 
 /**
  * ## Meteorological Routine Air Report (BDS 4,4)
+ *
+ * Comm-B message providing meteorological data collected from aircraft sensors.  
+ * Per ICAO Doc 9871 Table A-2-68: BDS code 4,4 — Meteorological routine air report
+ *
+ * Purpose: Allows meteorological data collection by ground systems for weather
+ * forecasting and analysis.
+ *
+ * Message Structure (56 bits):
+ * | FOM | WIND SPD | WIND DIR | TEMP | PRESS | TURB | HUMID | RSVD |
+ * |-----|----------|----------|------|-------|------|-------|------|
+ * | 4   | 1+9      | 9        | 11   | 1+11  | 1+2  | 1+6   | 4    |
+ *
+ * Field Encoding per ICAO Doc 9871:
+ *
+ * **FOM/Source** (bits 1-4): Figure of Merit / Navigation source
+ *   - 0: Invalid
+ *   - 1: INS (Inertial Navigation System)
+ *   - 2: GNSS (GPS, etc.)
+ *   - 3: DME/DME
+ *   - 4: VOR/DME
+ *   - 5-15: Reserved
+ *
+ * **Wind Speed** (bits 5-14):
+ *   - Bit 5: Status (0=invalid, 1=valid)
+ *   - Bits 6-14: 9-bit wind speed
+ *     * LSB = 1 kt, MSB = 256 kt
+ *     * Range: [0, 511] kt (Annex 3 requires [0, 250] kt)
+ *
+ * **Wind Direction** (bits 15-23):
+ *   - 9-bit direction (true north)
+ *   - MSB = 180 degrees, LSB = 180/256 degrees (≈0.703°)
+ *   - Range: [0, 360] degrees
+ *   - Only valid if wind_speed status is valid
+ *
+ * **Static Air Temperature** (bits 24-34):
+ *   - Bit 24: Sign (0=positive, 1=negative)
+ *   - Bits 25-34: 10-bit temperature value
+ *     * MSB = 64°C, LSB = 0.25°C
+ *     * Range: [-128, +128]°C (Annex 3 requires [-80, +60]°C)
+ *     * Two's complement encoding
+ *
+ * **Average Static Pressure** (bits 35-46):
+ *   - Bit 35: Status (0=invalid, 1=valid)
+ *   - Bits 36-46: 11-bit pressure value
+ *     * MSB = 1024 hPa, LSB = 1 hPa
+ *     * **Direct encoding**: value = pressure in hPa (no offset)
+ *     * Range: [0, 2048] hPa
+ *   - Note: Not an Annex 3 requirement
+ *
+ * **Turbulence** (bits 47-49):
+ *   - Bit 47: Status (0=invalid, 1=valid)
+ *   - Bits 48-49: 2-bit turbulence level
+ *     * 00: Nil, 01: Light, 10: Moderate, 11: Severe
+ *     * Definitions per PANS-ATM (Doc 4444)
+ *
+ * **Humidity** (bits 50-56):
+ *   - Bit 50: Status (0=invalid, 1=valid)
+ *   - Bits 51-56: 6-bit humidity percentage
+ *     * MSB = 100%, LSB = 100/64% (≈1.5625%)
+ *     * Range: [0, 100]%
+ *
+ * **Reserved** (bits 57-60): 4 bits reserved
+ *
+ * Note: Two's complement coding used for all signed fields (§A.2.2.2)
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[serde(tag = "bds", rename = "44")]
 pub struct MeteorologicalRoutineAirReport {
-    /// Figure of merit / source
+    /// Figure of Merit / Source (bits 1-4): Per ICAO Doc 9871 Table A-2-68  
+    /// Indicates navigation data source quality:
+    ///   - 0: Invalid
+    ///   - 1: INS (Inertial Navigation System)
+    ///   - 2: GNSS (Global Navigation Satellite System)
+    ///   - 3: DME/DME (Distance Measuring Equipment)
+    ///   - 4: VOR/DME (VHF Omnidirectional Range / DME)
+    ///   - 5-15: Reserved
     #[deku(bits = 4)]
-    #[serde(skip)]
-    pub figure_of_merit: u8,
+    #[deku(reader = "read_figure_of_merit(deku::reader)")]
+    pub figure_of_merit: FigureOfMerit,
 
     #[deku(reader = "read_wind_speed(deku::reader)")]
-    /// Wind speed in kts
+    /// Wind Speed (bits 5-14): Per ICAO Doc 9871 Table A-2-68  
+    /// 9-bit wind speed in knots (LSB=1 kt, range [0, 511] kt)  
+    /// Returns None if status bit (bit 5) is 0.
     pub wind_speed: Option<u16>,
+
     #[deku(reader = "read_wind_direction(deku::reader, *wind_speed)")]
-    /// Wind direction in degrees
+    /// Wind Direction (bits 15-23): Per ICAO Doc 9871 Table A-2-68  
+    /// 9-bit direction from true north (LSB=180/256°, range [0, 360]°)  
+    /// Only valid if wind_speed is Some.
     pub wind_direction: Option<f64>,
 
     #[deku(reader = "read_temperature(deku::reader)")]
-    /// Static air temperature in Celsius (decoded with LSB=0,25)
+    /// Static Air Temperature (bits 24-34): Per ICAO Doc 9871 Table A-2-68  
+    /// 11-bit signed temperature (LSB=0.25°C, range [-128, +128]°C)  
+    /// Two's complement encoding.
     pub temperature: f64,
 
     #[deku(reader = "read_pressure(deku::reader)")]
-    /// Average static pressure (in hPa)
+    /// Average Static Pressure (bits 35-46): Per ICAO Doc 9871 Table A-2-68  
+    /// 11-bit pressure in hPa (LSB=1 hPa, direct encoding, range [0, 2048] hPa)  
+    /// Returns None if status bit (bit 35) is 0.
     pub pressure: Option<u16>,
 
     #[deku(reader = "read_turbulence(deku::reader)")]
-    /// Average static pressure
+    /// Turbulence (bits 47-49): Per ICAO Doc 9871 Table A-2-68  
+    /// 2-bit turbulence level (Nil, Light, Moderate, Severe)  
+    /// Definitions per PANS-ATM (Doc 4444).  
+    /// Returns None if status bit (bit 47) is 0.
     pub turbulence: Option<Turbulence>,
 
     #[deku(reader = "read_humidity(deku::reader)")]
-    /// Percentage of humidity
+    /// Humidity (bits 50-56): Per ICAO Doc 9871 Table A-2-68  
+    /// 6-bit humidity percentage (LSB=100/64%, range [0, 100]%)  
+    /// Returns None if status bit (bit 50) is 0.
     pub humidity: Option<f64>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Clone)]
+pub enum FigureOfMerit {
+    /// Invalid
+    Invalid,
+    /// Inertial Navigation System
+    INS,
+    /// Global Navigation Satellite System
+    GNSS,
+    /// DME (Distance Measuring Equipment) / DME
+    DMEDME,
+    /// VHF Omnidirectional Range / DME
+    VORDME,
+    Reserved(u8),
 }
 
 #[derive(Debug, PartialEq, Serialize, Clone)]
@@ -45,6 +145,25 @@ pub enum Turbulence {
     Severe,
 }
 
+fn read_figure_of_merit<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
+    reader: &mut Reader<R>,
+) -> Result<FigureOfMerit, DekuError> {
+    let value = u8::from_reader_with_ctx(
+        reader,
+        (deku::ctx::Endian::Big, deku::ctx::BitSize(4)),
+    )?;
+
+    let fom = match value {
+        0 => FigureOfMerit::Invalid,
+        1 => FigureOfMerit::INS,
+        2 => FigureOfMerit::GNSS,
+        3 => FigureOfMerit::DMEDME,
+        4 => FigureOfMerit::VORDME,
+        n @ 5..=15 => FigureOfMerit::Reserved(n),
+        _ => unreachable!(),
+    };
+    Ok(fom)
+}
 fn read_wind_speed<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
 ) -> Result<Option<u16>, DekuError> {
@@ -177,7 +296,7 @@ fn read_turbulence<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
         1 => Some(Turbulence::Light),
         2 => Some(Turbulence::Moderate),
         3 => Some(Turbulence::Severe),
-        _ => None, // never happens anyway
+        _ => unreachable!(),
     };
 
     Ok(value)

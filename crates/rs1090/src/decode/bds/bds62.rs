@@ -5,24 +5,147 @@ use serde::Serialize;
 use std::fmt;
 
 /**
- * ## Target State and Status Information (BDS 6,2)
+ * ## Target State and Status Information (BDS 6,2 / TYPE=29)
+ *
+ * Extended Squitter ADS-B message providing aircraft target state and status.  
+ * Per DO-260B §2.2.3.2.7.1: Target State and Status Messages (TYPE=29, Subtype=1)
+ *
+ * Purpose: Provides the selected altitude, heading, barometric setting, and
+ * autopilot/flight mode status for trajectory prediction and conflict detection.
+ *
+ * Message Structure (56 bits):
+ * | TYPE | SUB | SIL | SRC | ALT  | QNH | HDGS | HDG | NACP | NICB | SIL | STAT | AP | VN | AH | IMF | APR | TCAS | LN | RES |
+ * |------|-----|-----|-----|------|-----|------|-----|------|------|-----|------|----|----|----|----|-----|------|----|----|
+ * | 5    | 2   | 1   | 1   | 11   | 9   | 1    | 9   | 4    | 1    | 2   | 1    | 1  | 1  | 1  | 1  | 1   | 1    | 1  | 2  |
+ *
+ * Field Encoding per DO-260B §2.2.3.2.7.1.3:
+ *
+ * **Subtype** (bits 6-7): Must be 01 (1) for DO-260B compliance
+ *
+ * **SIL Supplement** (bit 8): Source Integrity Level probability basis
+ *   - 0 = per hour basis (GNSS sources)
+ *   - 1 = per sample basis (IRU, DME/DME sources)
+ *
+ * **Selected Altitude Source** (bit 9):
+ *   - 0 = MCP/FCU (Mode Control Panel / Flight Control Unit)
+ *   - 1 = FMS (Flight Management System)
+ *   - Set to 0 if no valid altitude data available
+ *
+ * **Selected Altitude** (bits 10-20):
+ *   - 11-bit field containing MCP/FCU or FMS selected altitude
+ *   - LSB = 32 ft
+ *   - Formula: altitude = value × 32 ft (if value > 1)
+ *   - Range: [0, 65,472] ft
+ *   - value=0: No data or invalid data
+ *   - value=1: 0 ft
+ *   - value=2047: 65,472 ft
+ *   - Implementation rounds to nearest 100 ft: ((value - 1) × 32 + 16) / 100 × 100
+ *   - Note: May not reflect true intention during VNAV/approach modes
+ *
+ * **Barometric Pressure Setting** (bits 21-29):
+ *   - 9-bit field encoding QNH/QFE minus 800 millibars
+ *   - LSB = 0.8 mbar
+ *   - Formula: pressure = 800 + value × 0.8 mbar (if value > 0)
+ *   - Range: [800, 1208.4] mbar
+ *   - value=0: No data or invalid data
+ *   - value=1: 800.0 mbar
+ *   - value=511: 1208.0 mbar
+ *   - Values outside [800, 1208.4] mbar encoded as 0
+ *   - Note: Can represent QFE or QNH depending on local procedures
+ *
+ * **Selected Heading Status** (bit 30):
+ *   - 0 = heading data not available or invalid
+ *   - 1 = heading data available and valid
+ *
+ * **Selected Heading Sign** (bit 31):
+ *   - 0 = Positive (0° to 179.9°)
+ *   - 1 = Negative (180° to 359.9°, encoded as -180° to -0.7°)
+ *
+ * **Selected Heading** (bits 32-39):
+ *   - 8-bit field encoding selected heading (magnetic)
+ *   - LSB = 180/256 degrees (≈0.703125°)
+ *   - Formula: heading = value × (180/256) degrees
+ *   - Range: [0, 359.9] degrees
+ *   - Angular system: [-180, +180] degrees internally, converted to [0, 360]°
+ *   - Returns None if status bit = 0
+ *
+ * **NAC_P** (bits 40-43): Navigation Accuracy Category - Position (4 bits)
+ *   - Indicates horizontal position accuracy
+ *   - Values 0-15, higher values = better accuracy
+ *
+ * **NIC_BARO** (bit 44): Navigation Integrity Category - Barometric
+ *   - 0 = barometric altitude not cross-checked
+ *   - 1 = barometric altitude cross-checked with another pressure source
+ *
+ * **SIL** (bits 45-46): Source Integrity Level (2 bits)
+ *   - Per sample or per hour probability (see SIL Supplement)
+ *   - Values 0-3, higher values = better integrity
+ *
+ * **Mode Status** (bit 47): Status bit for following mode flags
+ *   - 0 = mode flags invalid
+ *   - 1 = mode flags valid
+ *
+ * - **Autopilot Engaged** (bit 48): 1 = autopilot engaged (if mode_status=1)
+ * - **VNAV Mode Engaged** (bit 49): 1 = VNAV active (if mode_status=1)
+ * - **Altitude Hold Mode** (bit 50): 1 = altitude hold active (if mode_status=1)
+ * - **IMF** (bit 51): Reserved for ADS-R flag
+ * - **Approach Mode** (bit 52): 1 = approach mode active (if mode_status=1)
+ * - **TCAS Operational** (bit 53): 1 = TCAS/ACAS operational (ALWAYS valid)
+ * - **LNAV Mode Engaged** (bit 54): 1 = LNAV active (if mode_status=1)
+ * - **Reserved** (bits 55-56): Reserved bits
+ *
+ * Important Notes per DO-260B:
+ * - Selected altitude may not reflect true intention during certain flight modes
+ * - Many aircraft only transmit MCP/FCU selected altitude, not FMS altitude
+ * - Target altitude (next level-off altitude) may differ from selected altitude
+ * - Barometric setting represents value currently being used to fly the aircraft
+ * - Mode flags are only valid if mode_status bit is set
+ * - TCAS operational flag is always valid regardless of mode_status
+ *
+ * Reference: DO-260B §2.2.3.2.7.1, Figure 2-10
  */
 #[derive(Copy, Clone, Debug, Serialize, PartialEq, DekuRead)]
 pub struct TargetStateAndStatusInformation {
-    #[deku(bits = "2")] // bits 5..=6
+    /// Subtype (bits 6-7): Per DO-260B §2.2.3.2.7.1.2  
+    /// Identifies format of Target State and Status Message.  
+    /// Encoding:
+    ///   - 0 = Reserved (DO-260A format)
+    ///   - 1 = DO-260B format (required for MOPS compliance)
+    ///   - 2-3 = Reserved
+    ///
+    /// DO-260B compliant systems must transmit subtype=1.
+    #[deku(bits = "2")]
     #[serde(skip)]
-    /// The subtype bits must be equal to 1.
-    /// There seems to be a specification for a subtype 0 but I have seen no
-    /// such message to this date.
     pub subtype: u8,
 
-    #[deku(pad_bits_before = "1")] // bit 7
+    /// Selected Altitude Source (bit 9): Per DO-260B §2.2.3.2.7.1.3.2  
+    /// Indicates source of selected altitude data.  
+    /// Encoding:
+    ///   - 0 = MCP/FCU (Mode Control Panel / Flight Control Unit)
+    ///   - 1 = FMS (Flight Management System)
+    ///
+    /// Set to 0 if no valid altitude data available.  
+    /// Note: Many aircraft only provide MCP/FCU altitude, not FMS altitude.
+    #[deku(pad_bits_before = "1")]
     #[serde(rename = "source")]
-    /// The source for the selected altitude (FMS or MCP/FCU)
-    pub alt_source: AltSource, // bit 8
+    pub alt_source: AltSource,
 
+    /// Selected Altitude (bits 10-20): Per DO-260B §2.2.3.2.7.1.3.3
+    /// MCP/FCU or FMS selected altitude in feet.
+    /// Encoding details:
+    ///   - LSB = 32 ft
+    ///   - Formula: altitude = value × 32 ft (if value > 1)
+    ///   - Range: [0, 65,472] ft
+    ///   - value=0: No data or invalid data
+    ///   - value=1: 0 ft
+    ///   - value=2047: 65,472 ft
+    ///
+    /// Implementation rounds to nearest 100 ft: ((value - 1) × 32 + 16) / 100 × 100  
+    /// Returns None if value ≤ 1.  
+    /// Note: May not reflect true intention during VNAV or approach modes.  
+    /// This is the selected altitude, not necessarily the target altitude.
     #[deku(
-        bits = "11",// bit 9..20
+        bits = "11",
         endian = "big",
         map = "|altitude: u16| -> Result<_, DekuError> {
             Ok(
@@ -32,12 +155,24 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// The selected altitude in the FMS or MCP/FCU, in feet
-    /// (encoded as a multiple of 32 + 16, but rounded to the closest 100 ft)
     pub selected_altitude: Option<u16>,
 
+    /// Barometric Pressure Setting (bits 21-29): Per DO-260B §2.2.3.2.7.1.3.4  
+    /// QNH or QFE setting in millibars.  
+    /// Encoding details:
+    ///   - LSB = 0.8 mbar
+    ///   - Formula: pressure = 800 + value × 0.8 mbar (if value > 0)
+    ///   - Range: [800, 1208.4] mbar
+    ///   - value=0: No data or invalid data
+    ///   - value=1: 800.0 mbar
+    ///   - value=511: 1208.0 mbar
+    ///
+    /// Values outside [800, 1208.4] mbar are encoded as 0.  
+    /// Returns None if value = 0.  
+    /// Note: Can represent QFE or QNH depending on local procedures.  
+    /// This is the value currently being used to fly the aircraft.
     #[deku(
-        bits = "9", // bit 20..29
+        bits = "9",
         endian = "big",
         map = "|qnh: u32| -> Result<_, DekuError> {
             if qnh == 0 { Ok(None) }
@@ -45,48 +180,82 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// The barometric pressure setting (in millibars)
     pub barometric_setting: Option<f32>,
 
-    #[deku(bits = "1")] // bit 29
+    /// Selected Heading Status (bit 30): Per DO-260B §2.2.3.2.7.1.3.5  
+    /// Status bit for selected heading validity.  
+    /// Encoding:
+    ///   - 0 = heading data not available or invalid
+    ///   - 1 = heading data available and valid
+    #[deku(bits = "1")]
     #[serde(skip)]
-    /// This flag encodes whether the selected heading is valid
     pub heading_status: bool,
 
+    /// Selected Heading (bits 31-39): Per DO-260B §2.2.3.2.7.1.3.6/3.7  
+    /// Selected heading in degrees (magnetic north reference).  
+    /// Encoding details:
+    ///   - Bit 31: Sign (0=positive [0-179.9°], 1=negative [180-359.9°])
+    ///   - Bits 32-39: 8-bit heading magnitude
+    ///   - LSB = 180/256 degrees (≈0.703125°)
+    ///   - Formula: heading = value × (180/256) degrees
+    ///   - Range: [0, 359.9] degrees
+    ///   - Angular system: [-180, +180]° internally, converted to [0, 360]°
+    ///
+    /// Returns None if heading_status = 0.
     #[deku(
-        bits = "9",// bit 30..39
+        bits = "9",
         endian = "big",
         map = "|heading: u16| -> Result<_, DekuError> {
             if *heading_status {Ok(Some(heading as f32 * 180.0 / 256.0))} 
             else {Ok(None)}
         }"
     )]
-    /// The selected heading (w.r.t magnetic North).
-    /// None if not available.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected_heading: Option<f32>,
 
+    /// NAC_P (bits 40-43): Per DO-260B §2.2.3.2.7.1.3.8  
+    /// Navigation Accuracy Category - Position.  
+    /// 4-bit value indicating horizontal position accuracy.  
+    /// Values 0-15, higher values indicate better accuracy.
     #[deku(bits = "4")]
     #[serde(rename = "NACp")]
-    /// Navigation Accuracy Category, Position (NACp)
     pub nac_p: u8,
 
+    /// NIC_BARO (bit 44): Per DO-260B §2.2.3.2.7.1.3.9  
+    /// Navigation Integrity Category - Barometric.  
+    /// Encoding:
+    ///   - 0 = barometric altitude not cross-checked with another source
+    ///   - 1 = barometric altitude cross-checked with another pressure source
     #[deku(bits = "1")]
-    /// Barometric Altitude Integrity Code (NIC baro), reflects whether the
-    /// baroaltitude is crosschecked with another source of pressure
     #[serde(skip)]
     pub nic_baro: bool,
 
+    /// SIL (bits 45-46): Per DO-260B §2.2.3.2.7.1.3.10  
+    /// Source Integrity Level (2 bits).  
+    /// Probability basis determined by SIL Supplement (bit 8).  
+    /// Values 0-3, higher values indicate better integrity.
     #[deku(bits = "2")]
-    #[serde(skip)] // per sample
-    /// The Surveillance Integrity Level (SIL), per sample
+    #[serde(skip)]
     pub sil: u8,
 
+    /// Mode Status (bit 47): Per DO-260B §2.2.3.2.7.1.3.11  
+    /// Status bit for MCP/FCU mode flags.  
+    /// Encoding:
+    ///   - 0 = mode flags (autopilot, VNAV, LNAV, altitude hold, approach) invalid
+    ///   - 1 = mode flags valid
+    ///
+    /// Note: TCAS operational flag is always valid regardless of this bit.
     #[deku(bits = "1")]
     #[serde(skip)]
-    /// This flag encodes whether the following flags are valid
     pub mode_status: bool,
 
+    /// Autopilot Engaged (bit 48): Per DO-260B §2.2.3.2.7.1.3.12  
+    /// Autopilot engagement status.  
+    /// Encoding:
+    ///   - 0 = autopilot not engaged
+    ///   - 1 = autopilot engaged
+    ///
+    /// Returns None if mode_status = 0.
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
@@ -94,10 +263,15 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Decode the autopilot engagement.
-    /// None if not available
     pub autopilot: Option<bool>,
 
+    /// VNAV Mode Engaged (bit 49): Per DO-260B §2.2.3.2.7.1.3.13  
+    /// Vertical Navigation mode status.  
+    /// Encoding:
+    ///   - 0 = VNAV mode not engaged
+    ///   - 1 = VNAV mode engaged
+    ///
+    /// Returns None if mode_status = 0.
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
@@ -105,10 +279,15 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Decode the VNAV mode.
-    /// None if not available
     pub vnav_mode: Option<bool>,
 
+    /// Altitude Hold Mode (bit 50): Per DO-260B §2.2.3.2.7.1.3.14  
+    /// Altitude hold mode status.  
+    /// Encoding:
+    ///   - 0 = altitude hold mode not active
+    ///   - 1 = altitude hold mode active
+    ///
+    /// Returns None if mode_status = 0.
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
@@ -116,15 +295,21 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Decode the altitude hold mode.
-    /// None if not available
     pub alt_hold: Option<bool>,
 
+    /// IMF (bit 51): Per DO-260B §2.2.3.2.7.1.3.15  
+    /// Reserved for ADS-R (Automatic Dependent Surveillance-Rebroadcast) flag.
     #[deku(bits = "1")]
     #[serde(skip)]
-    // Not so sure what this is...
     pub imf: bool,
 
+    /// Approach Mode (bit 52): Per DO-260B §2.2.3.2.7.1.3.16  
+    /// Approach mode status.  
+    /// Encoding:
+    ///   - 0 = approach mode not active
+    ///   - 1 = approach mode active
+    ///
+    /// Returns None if mode_status = 0.
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
@@ -132,14 +317,25 @@ pub struct TargetStateAndStatusInformation {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Decode the approach mode.
-    /// None if not available
     pub approach_mode: Option<bool>,
 
-    #[deku(bits = "1")] // bit 52, ALWAYS
-    /// Decode whether TCAS/ACAS is operational. This flag is **always** valid.
+    /// TCAS Operational (bit 53): Per DO-260B §2.2.3.2.7.1.3.17  
+    /// TCAS/ACAS operational status.  
+    /// Encoding:
+    ///   - 0 = TCAS/ACAS not operational
+    ///   - 1 = TCAS/ACAS operational
+    ///
+    /// Note: This flag is ALWAYS valid, regardless of mode_status bit.
+    #[deku(bits = "1")]
     pub tcas_operational: bool,
 
+    /// LNAV Mode Engaged (bit 54): Per DO-260B §2.2.3.2.7.1.3.18  
+    /// Lateral Navigation mode status.  
+    /// Encoding:
+    ///   - 0 = LNAV mode not engaged
+    ///   - 1 = LNAV mode engaged
+    ///
+    /// Returns None if mode_status = 0.
     #[deku(
         bits = "1",
         map = "|val: bool| -> Result<_, DekuError> {
@@ -148,8 +344,6 @@ pub struct TargetStateAndStatusInformation {
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[deku(pad_bits_after = "2")]
-    /// Decode LNAV mode.
-    /// None if not available
     pub lnav_mode: Option<bool>,
 }
 
@@ -206,17 +400,21 @@ impl fmt::Display for TargetStateAndStatusInformation {
     }
 }
 
+/// Selected Altitude Source: Per DO-260B §2.2.3.2.7.1.3.2
+/// Indicates the source of the selected altitude data.
 #[derive(Copy, Clone, Debug, Serialize, PartialEq, DekuRead)]
 #[deku(id_type = "u8", bits = "1")]
-/// Encode the source of information for selected altitude
 pub enum AltSource {
+    /// Mode Control Panel / Flight Control Unit
+    /// Manual altitude selection by pilot via MCP/FCU panel.
     #[deku(id = "0")]
     #[serde(rename = "MCP/FCU")]
-    /// Mode Control Panel/Flight Control Unit
     MCP,
 
-    #[deku(id = "1")]
     /// Flight Management System
+    /// Altitude from FMS flight plan.
+    /// Note: Many aircraft only provide MCP/FCU altitude, not FMS.
+    #[deku(id = "1")]
     FMS,
 }
 impl fmt::Display for AltSource {

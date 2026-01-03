@@ -8,57 +8,124 @@ use std::fmt;
 /**
  * ## Airborne Velocity (BDS 0,9)
  *
- * Airborne velocities are all transmitted with Type Code 19. Four different
- * subtypes are defined in bits 6-8 of the ME field. All sub-types share a
- * similar overall message structure.
+ * Extended squitter message providing aircraft velocity information.  
+ * Per ICAO Doc 9871 Tables A-2-9a and A-2-9b: BDS code 0,9 — Extended squitter
+ * airborne velocity
  *
- * Subtypes 1 and 2 are used to report ground speeds of aircraft. Subtypes 3 and
- * 4 are used to report aircraft true airspeed or indicated airspeed. Reporting
- * of airspeed in ADS-B only occurs when aircraft position cannot be determined
- * based on the GNSS system. In the real world, subtype 3 messages are very
- * rare.
+ * All airborne velocities use Type Code 19. Four subtypes (bits 6-8) define
+ * different velocity reporting methods optimized for normal and supersonic flight.
  *
- * Subtypes 2 and 4 are designed for supersonic aircraft. Their message
- * structures are identical to subtypes 1 and 3, but with the speed resolution
- * of 4 kt instead of 1 kt. However, since there are no operational supersonic
- * airliners currently, there is no ADS-B airborne velocity message with
- * subtypes 2 and 4 at this moment.
+ * Message Structure (56 bits):
+ * | TC | ST  | IC | IFR | NACv | VELOCITY DATA (22 bits) | VR DATA | GNSS DIFF |
+ * | -- | --- | -- | --- | ---- | ----------------------- | ------- | --------- |
+ * | 5  | 3   | 1  | 1   | 3    | 22                      | 11      | 8         |
  *
+ * Field Encoding per ICAO Doc 9871 §A.2.3.5:
+ * - TC (bits 1-5): Format Type Code = 19 (fixed)
+ * - ST (bits 6-8): Subtype (3 bits)
+ *   * 0: Reserved
+ *   * 1: Ground speed (subsonic, LSB=1 kt)
+ *   * 2: Ground speed (supersonic, LSB=4 kt)
+ *   * 3: Airspeed + heading (subsonic, LSB=1 kt)
+ *   * 4: Airspeed + heading (supersonic, LSB=4 kt)
+ *   * 5-7: Reserved
+ * - IC (bit 9): Intent Change Flag per §A.2.3.5.3
+ * - IFR (bit 10): IFR Capability Flag per §A.2.3.5.4
+ * - NACv (bits 11-13): Navigation Accuracy Category - Velocity (NUCv in ADS-B v0)
+ *
+ * **Subtypes 1 & 2**: Ground speed (velocity over ground)
+ * - Bits 14-24: East-West velocity (1 sign bit + 10-bit value)
+ * - Bits 25-35: North-South velocity (1 sign bit + 10-bit value)
+ * - Ground speed and track computed from E-W and N-S components
+ *
+ * **Subtypes 3 & 4**: Airspeed and heading (when GNSS unavailable)
+ * - Bit 14: Heading status (0=unavailable, 1=available)
+ * - Bits 15-24: Magnetic heading (10 bits, LSB=360/1024 degrees)
+ * - Bit 25: Airspeed type (0=IAS, 1=TAS)
+ * - Bits 26-35: Airspeed (10 bits)
+ *
+ * **Vertical Rate** (bits 36-46):
+ * - Bit 36: Source (0=GNSS, 1=Barometric)
+ * - Bit 37: Sign (0=Up, 1=Down)
+ * - Bits 38-46: Rate value (9 bits, LSB=64 ft/min)
+ *
+ * **GNSS Altitude Difference** (bits 49-56):
+ * - Bit 49: Sign (0=Above baro, 1=Below baro)
+ * - Bits 50-56: Difference (7 bits, LSB=25 ft)
+ *
+ * Note: Subtypes 2 and 4 (supersonic) are rare as no operational supersonic
+ * airliners currently use ADS-B.
+ *
+ * Note: Subtype 3 messages are very rare in practice; most aircraft report
+ * ground speed (subtypes 1/2) based on GNSS position.
  */
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 pub struct AirborneVelocity {
     #[deku(bits = "3")]
     #[serde(skip)]
-    /// The subtype value
+    /// Subtype (bits 6-8): Per ICAO Doc 9871 Table A-2-9a/b  
+    /// Determines velocity encoding method:
+    ///   - 0: Reserved
+    ///   - 1: Ground speed, subsonic (E-W and N-S components, LSB=1 kt)
+    ///   - 2: Ground speed, supersonic (E-W and N-S components, LSB=4 kt)
+    ///   - 3: Airspeed + heading, subsonic (LSB=1 kt)
+    ///   - 4: Airspeed + heading, supersonic (LSB=4 kt)
+    ///   - 5-7: Reserved
+    ///
+    /// Supersonic encoding used if velocity exceeds 1,022 kt.
     pub subtype: u8,
 
     #[deku(bits = "1")]
     #[serde(skip)]
-    /// The intent change flag
+    /// Intent Change Flag (bit 9): Per ICAO Doc 9871 §A.2.3.5.3  
+    /// Indicates change in aircraft intent (flight plan/trajectory):
+    ///   - false (0): No change in intent
+    ///   - true (1): Intent change detected
+    ///
+    /// Triggered 4s after new data in registers 40-42₁₆, remains set for 18±1s.
+    /// Intent change includes updates to selected altitude, heading, etc.
     pub intent_change: bool,
 
     #[deku(bits = "1")]
     #[serde(skip)]
-    /// The IFR capability flag
+    /// IFR Capability Flag (bit 10): Per ICAO Doc 9871 §A.2.3.5.4  
+    /// Indicates ADS-B equipage level:
+    ///   - false (0): No capability for ADS-B conflict detection (below Class A1)
+    ///   - true (1): Capable of ADS-B conflict detection and higher (Class A1+)
     pub ifr_capability: bool,
 
     #[deku(bits = "3")]
     #[serde(rename = "NACv")]
-    /// The Navigation Accuracy Category, velocity (NACv)
+    /// Navigation Accuracy Category - Velocity (bits 11-13)  
+    /// Per ICAO Doc 9871 Table A-2-9a: NUCᵣ (NACv in ADS-B v1+)  
+    /// Indicates velocity measurement accuracy (95% bounds):
     ///
-    /// It is a NUCv if ADS-B version is 0.
+    /// | NACv | Horizontal Velocity Error | Vertical Velocity Error    |
+    /// |------|---------------------------|----------------------------|
+    /// | 0    | Unknown                   | Unknown                    |
+    /// | 1    | < 10 m/s                  | < 15.2 m/s (50 fps)        |
+    /// | 2    | < 3 m/s                   | < 4.6 m/s (15 fps)         |
+    /// | 3    | < 1 m/s                   | < 1.5 m/s (5 fps)          |
+    /// | 4    | < 0.3 m/s                 | < 0.46 m/s (1.5 fps)       |
+    ///
+    /// Note: Called NUCv (Navigation Uncertainty Category) in ADS-B version 0.
     pub nac_v: u8,
 
     #[deku(ctx = "*subtype")]
     #[serde(flatten)]
-    /// Contains a ground or an air speed depending on the subtype
+    /// Velocity Data (bits 14-35): 22 bits, encoding depends on subtype  
+    /// See AirborneVelocitySubType enum for subtype-specific structures.
     pub velocity: AirborneVelocitySubType,
 
-    /// The source for the vertical rate measurement
+    /// Vertical Rate Source (bit 36): Per ICAO Doc 9871 Table A-2-9a
+    ///   - Barometric (0): Rate based on barometric pressure altitude
+    ///   - GNSS (1): Rate based on GNSS geometric altitude
     pub vrate_src: VerticalRateSource,
 
     #[serde(skip)]
-    /// The sign of the vertical rate value
+    /// Vertical Rate Sign (bit 37): Per ICAO Doc 9871 Table A-2-9a
+    ///   - Positive (0): Climbing (upward)
+    ///   - Negative (1): Descending (downward)
     pub vrate_sign: Sign,
     #[deku(
         endian = "big",
@@ -71,22 +138,64 @@ pub struct AirborneVelocity {
         }"
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// The vertical rate value in ft/mn, None if unavailable
+    /// Vertical Rate (bits 38-46): Per ICAO Doc 9871 Table A-2-9a  
+    /// 9-bit value encoding climb/descent rate:
+    ///   - LSB = 64 ft/min
+    ///   - Formula: rate = (value - 1) × 64 ft/min (signed by vrate_sign)
+    ///   - Range: [0, 32,576] ft/min (value 1-510)
+    ///   - value=0: No vertical rate information available (returns None)
+    ///   - value=511: >32,608 ft/min
+    ///
+    /// Sign bit determines direction: 0=climbing, 1=descending
     pub vertical_rate: Option<i16>,
 
     #[deku(bits = "2")]
     #[serde(skip)]
+    /// Reserved (bits 47-48): Reserved for turn indicator (not implemented)
     pub reserved: u8,
 
     #[serde(skip)]
-    /// The sign of the difference between the GNSS height and the barometric altitude
+    /// GNSS Altitude Difference Sign (bit 49): Per ICAO Doc 9871 §A.2.3.5.7
+    ///   - Positive (0): GNSS altitude above barometric altitude
+    ///   - Negative (1): GNSS altitude below barometric altitude
     pub gnss_sign: Sign,
 
     #[deku(reader = "read_geobaro(deku::reader, *gnss_sign)")]
-    /// The signed difference between the GNSS height and the barometric altitude
+    /// GNSS-Barometric Altitude Difference (bits 50-56)  
+    /// Per ICAO Doc 9871 §A.2.3.5.7: Difference between GNSS and barometric altitude
+    /// 7-bit field encoding signed difference:
+    ///   - LSB = 25 ft
+    ///   - Formula: diff = (value - 1) × 25 ft (signed by gnss_sign)
+    ///   - Range: [0, 3,125] ft (value 1-126)
+    ///   - value=0 or 1: No information available (returns None)
+    ///   - value=127: 3,137.5 ft
+    ///
+    /// Uses GNSS HAE (Height Above Ellipsoid) if available, else GNSS MSL.
+    /// For TC 9-10, only GNSS HAE used; field set to zeros if unavailable.
     pub geo_minus_baro: Option<i16>,
 }
 
+/// Decode GNSS-barometric altitude difference from 7-bit field
+///
+/// Per ICAO Doc 9871 §A.2.3.5.7: Difference from barometric altitude in
+/// airborne velocity messages
+///
+/// The difference between barometric altitude and GNSS height is encoded:
+/// - Bit 49: Sign bit (0=GNSS above baro, 1=GNSS below baro)
+/// - Bits 50-56: 7-bit unsigned value
+///
+/// Encoding:
+/// - LSB = 25 ft
+/// - Formula: difference = (value - 1) × 25 ft
+/// - Range: [0, 3,137.5] ft for values 1-127
+/// - value ≤ 1: No information available (returns None)
+///
+/// GNSS source priority:
+/// 1. GNSS HAE (Height Above Ellipsoid) - preferred
+/// 2. GNSS MSL (Mean Sea Level) - if HAE unavailable (for TC 11-18)
+/// 3. For TC 9-10: Only HAE used; field zeros if unavailable
+///
+/// Returns: Signed difference in feet, or None if unavailable
 fn read_geobaro<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
     reader: &mut Reader<R>,
     gnss_sign: Sign,
@@ -156,6 +265,43 @@ impl fmt::Display for Sign {
     }
 }
 
+/// Ground Speed Decoding (Subtypes 1 & 2)
+///
+/// Per ICAO Doc 9871 Table A-2-9a: Velocity over ground encoding
+///
+/// Velocity is encoded as East-West and North-South components:
+///
+/// **East-West Velocity** (bits 14-24):
+/// - Bit 14: Direction (0=East, 1=West)
+/// - Bits 15-24: 10-bit velocity magnitude
+///
+/// **North-South Velocity** (bits 25-35):
+/// - Bit 25: Direction (0=North, 1=South)  
+/// - Bits 26-35: 10-bit velocity magnitude
+///
+/// **Subtype 1** (Normal, LSB=1 kt):
+/// - value=0: No velocity information
+/// - value=1: 0 kt
+/// - value=2: 1 kt
+/// - ...
+/// - value=1022: 1,021 kt
+/// - value=1023: >1,021.5 kt
+///
+/// **Subtype 2** (Supersonic, LSB=4 kt):
+/// - value=0: No velocity information
+/// - value=1: 0 kt
+/// - value=2: 4 kt
+/// - value=3: 8 kt
+/// - ...
+/// - value=1022: 4,084 kt
+/// - value=1023: >4,086 kt
+///
+/// Supersonic encoding used when either E-W OR N-S exceeds 1,022 kt.
+/// Switch back to normal when both drop below 1,000 kt.
+///
+/// Ground speed and track angle computed from components:
+/// - groundspeed = √(ew_vel² + ns_vel²)
+/// - track = atan2(ew_vel, ns_vel) converted to degrees (0-360°)
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct GroundSpeedDecoding {
     #[serde(skip)]
@@ -196,9 +342,38 @@ pub struct GroundSpeedDecoding {
     pub track: f64,
 }
 
+/// Airspeed Subsonic Decoding (Subtype 3)
+///
+/// Per ICAO Doc 9871 Table A-2-9b: Airspeed and heading (subsonic)
+///
+/// Used when GNSS position unavailable, reports airspeed and heading instead.
+/// Subtype 3 messages are rare in practice.
+///
+/// **Magnetic Heading** (bits 14-24):
+/// - Bit 14: Status (0=not available, 1=available)
+/// - Bits 15-24: 10-bit heading value
+///   * MSB = 180 degrees
+///   * LSB = 360/1024 degrees (≈0.3516°)
+///   * Formula: heading = value × (360/1024) degrees
+///   * Range: [0, 359.6484°]
+///   * Zero indicates magnetic north
+///
+/// **Airspeed** (bits 25-35):
+/// - Bit 25: Type (0=IAS Indicated Airspeed, 1=TAS True Airspeed)
+/// - Bits 26-35: 10-bit airspeed value
+///   * LSB = 1 kt
+///   * value=0: No airspeed information
+///   * value=1: 0 kt
+///   * value=2: 1 kt
+///   * ...
+///   * value=1022: 1,021 kt
+///   * value=1023: >1,021.5 kt
+///
+/// Supersonic version (subtype 4) uses LSB=4 kt for airspeeds >1,022 kt.
 #[derive(Debug, PartialEq, DekuRead, Clone)]
 pub struct AirspeedSubsonicDecoding {
     #[deku(bits = "1")]
+    /// Heading Status (bit 14): 0=not available, 1=available
     pub status_heading: bool,
 
     #[deku(
@@ -208,8 +383,13 @@ pub struct AirspeedSubsonicDecoding {
             Ok(if *status_heading { Some(val as f64 * 360. / 1024.) } else { None })
         }"
     )]
+    /// Magnetic Heading (bits 15-24): Clockwise from magnetic north  
+    /// Formula: heading = value × (360/1024) degrees  
+    /// LSB = 360/1024 degrees (≈0.3516°)  
+    /// Returns None if status_heading is false.
     pub heading: Option<f64>,
 
+    /// Airspeed Type (bit 25): 0=IAS (Indicated), 1=TAS (True)
     pub airspeed_type: AirspeedType,
 
     #[deku(
@@ -220,6 +400,9 @@ pub struct AirspeedSubsonicDecoding {
             Ok(Some(value - 1))
         }"
     )]
+    /// Airspeed (bits 26-35): IAS or TAS in knots  
+    /// Formula: airspeed = (value - 1) kt  
+    /// value=0 returns None (no information)
     pub airspeed: Option<u16>,
 }
 
@@ -246,9 +429,30 @@ impl Serialize for AirspeedSubsonicDecoding {
     }
 }
 
+/// Airspeed Supersonic Decoding (Subtype 4)
+///
+/// Per ICAO Doc 9871 Table A-2-9b: Airspeed and heading (supersonic)
+///
+/// Identical structure to subtype 3 but with 4× speed resolution for supersonic flight.
+///
+/// **Airspeed** (bits 26-35):
+/// - LSB = 4 kt (vs 1 kt for subtype 3)
+/// - value=0: No airspeed information
+/// - value=1: 0 kt
+/// - value=2: 4 kt
+/// - value=3: 8 kt
+/// - ...
+/// - value=1022: 4,084 kt
+/// - value=1023: >4,086 kt
+///
+/// Supersonic encoding used when airspeed exceeds 1,022 kt.
+/// Switch back to normal (subtype 3) when airspeed drops below 1,000 kt.
+///
+/// Note: Rare in practice as no operational supersonic airliners currently use ADS-B.
 #[derive(Debug, PartialEq, DekuRead, Clone)]
 pub struct AirspeedSupersonicDecoding {
     #[deku(bits = "1")]
+    /// Heading Status (bit 14): 0=not available, 1=available
     pub status_heading: bool,
 
     #[deku(
@@ -258,8 +462,11 @@ pub struct AirspeedSupersonicDecoding {
             Ok(if *status_heading { Some(val as f32 * 360. / 1024.) } else { None })
         }"
     )]
+    /// Magnetic Heading (bits 15-24): Same as subtype 3  
+    /// LSB = 360/1024 degrees (≈0.3516°)
     pub heading: Option<f32>,
 
+    /// Airspeed Type (bit 25): 0=IAS (Indicated), 1=TAS (True)
     pub airspeed_type: AirspeedType,
 
     #[deku(
@@ -270,6 +477,9 @@ pub struct AirspeedSupersonicDecoding {
             Ok(Some(4*(value - 1)))
         }"
     )]
+    /// Airspeed (bits 26-35): IAS or TAS in knots (supersonic resolution)  
+    /// Formula: airspeed = 4 × (value - 1) kt  
+    /// LSB = 4 kt for supersonic speeds
     pub airspeed: Option<u16>,
 }
 

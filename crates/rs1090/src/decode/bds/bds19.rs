@@ -2,12 +2,26 @@ use deku::prelude::*;
 use serde::Serialize;
 
 /**
- * ## GICB capability report (2 of 5) (BDS 1,9)
+ * ## Mode S Specific Services GICB Capability Report Part 2 (BDS 1,9)
  *
- * A bit when the corresponding register has a valid input that has been updated
- * at the required rate. This means that the same aircraft would respond with
- * different GICB reports due to the availability of the relevant data.
+ * Comm-B message indicating Mode S specific GICB service capabilities (Part 2 of 5).  
+ * Per ICAO Doc 9871 Table A-2-25: BDS code 1,9 — Mode S specific services GICB capability report (2 of 5)
  *
+ * Purpose: To indicate Mode S specific services currently supported by the
+ * aircraft installation (continuation of BDS 1,8).
+ *
+ * Message Structure: Similar to BDS 1,7 and 1,8 but covers additional register range
+ *
+ * Encoding Rules per ICAO Doc 9871:
+ * - Each bit indicates availability of corresponding Mode S specific register
+ * - Bit set to 1 only when valid data is being input at required rate
+ * - Independent of BDS 1,7 (common usage GICB capability)
+ * - Part of extended capability reporting system (1,8 through 1,C)
+ *
+ * Note: Most bits must be 0 as they represent reserved/unused Mode S registers.
+ * This register is part of the Mode S specific services capability indication.
+ *
+ * Reference: ICAO Doc 9871 Table A-2-25, §3.1.2.6.10.2
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]

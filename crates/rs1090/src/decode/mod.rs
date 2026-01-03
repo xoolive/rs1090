@@ -673,7 +673,9 @@ impl From<IcaoParity> for ICAO {
     }
 }
 
-/// 13 bit identity code (squawk code), a 4-octal digit identifier
+/// Mode A Code / Squawk (bits 12-24): Per ICAO Doc 9871 Table B-2-97a
+/// 13-bit identity code (standard 4-digit octal squawk).
+/// Encoded in Gillham format.
 #[derive(PartialEq, DekuRead, Copy, Clone)]
 pub struct IdentityCode(#[deku(reader = "Self::read(deku::reader)")] pub u16);
 
@@ -713,10 +715,42 @@ impl Serialize for IdentityCode {
     }
 }
 
-/// 13 bit encoded altitude
-/// Can be negative for airports below sea level (e.g., Amsterdam Schiphol at -11 ft)
-/// Can be positive up to ~50,000 ft for high-altitude cruise
-/// None indicates altitude data is not available (all-zeros per DO-260B §2.2.5.1.5)
+/// 13-bit encoded altitude field (AC field) per ICAO Annex 10 Vol IV §3.1.2.6.5.4
+///
+/// # Encoding Modes
+///
+/// The AC field supports three encoding modes determined by M-bit and Q-bit:
+///
+/// 1. **Q-bit encoding (M=0, Q=1)**: 25 ft resolution
+///    - Range: -1000 ft to +50,175 ft
+///    - Formula: altitude = (N × 25) - 1000 ft
+///    - LSB: 25 ft
+///    - Supports negative altitudes for below-sea-level airports
+///
+/// 2. **Gillham code (M=0, Q=0)**: 100 ft resolution
+///    - Range: -1200 ft to +126,700 ft
+///    - Uses Gray code encoding (Mode C compatible)
+///    - LSB: 100 ft
+///
+/// 3. **Metric encoding (M=1)**: Reserved for metric altitudes
+///    - Converts meters to feet for compatibility
+///
+/// # Special Values
+///
+/// - All zeros (0x0000) = altitude not available (DO-260B §2.2.5.1.5)
+/// - Invalid Gillham patterns → None
+///
+/// # Examples
+///
+/// - Amsterdam Schiphol: -11 ft (below sea level)
+/// - Sea level: 0 ft
+/// - Typical cruise: 35,000 ft
+/// - Maximum: 50,175 ft (Q-bit) or 126,700 ft (Gillham)
+///
+/// # References
+///
+/// - ICAO Annex 10 Volume IV §3.1.2.6.5.4 (AC altitude code)
+/// - DO-260B §2.2.5.1.5 (all-zeros = not available)
 #[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
 pub struct AC13Field(
     #[deku(reader = "Self::read(deku::reader)")] pub Option<i32>,
@@ -731,35 +765,43 @@ impl AC13Field {
             (deku::ctx::Endian::Big, deku::ctx::BitSize(13)),
         )?;
 
-        // Check for all-zeros: altitude not available (DO-260B §2.2.5.1.5)
+        // All zeros = altitude not available (ICAO Annex 10 Vol IV §3.1.2.6.5.4.f)
         if ac13field == 0 {
             return Ok(None);
         }
 
-        let m_bit = ac13field & 0x0040;
-        let q_bit = ac13field & 0x0010;
+        // Extract M-bit (bit 26 in message, bit 6 in 13-bit field) and Q-bit (bit 28 in message, bit 4 in field)
+        let m_bit = ac13field & 0x0040; // Bit 6: 0=feet, 1=meters
+        let q_bit = ac13field & 0x0010; // Bit 4: 0=Gillham code, 1=25ft resolution
 
         if m_bit != 0 {
-            // Metric encoding (meters converted to feet)
+            // Metric encoding (M=1): ICAO Annex 10 Vol IV §3.1.2.6.5.4.e
+            // Reserved for future use - converts to feet for compatibility
             let meters = ((ac13field & 0x1f80) >> 2) | (ac13field & 0x3f);
             let feet = (meters as f32 * 3.28084) as i32;
             Ok(Some(feet))
         } else if q_bit != 0 {
-            // Q-bit encoding: 25 ft increments with -1000 ft offset
-            // This supports negative altitudes for below-sea-level airports
-            // 11 bit integer resulting from the removal of bit Q and M
-            let n = ((ac13field & 0x1f80) >> 2)
-                | ((ac13field & 0x0020) >> 1)
-                | (ac13field & 0x000f);
+            // Q-bit encoding (M=0, Q=1): ICAO Annex 10 Vol IV §3.1.2.6.5.4.d
+            // 11-bit binary field with 25 ft LSB
+            // Formula: altitude = (N × 25) - 1000 ft, range: [-1000, +50175] ft
+            //
+            // Bit pattern: C1 A1 C2 A2 C4 A4 [M=0] B1 [Q=1] B2 D2 B4 D4
+            // Remove M and Q bits to get N (bits: C1 A1 C2 A2 C4 A4 B1 B2 D2 B4 D4)
+            let n = ((ac13field & 0x1f80) >> 2)  // Upper 6 bits (C1-A4)
+                | ((ac13field & 0x0020) >> 1)    // B1 (bit after Q)
+                | (ac13field & 0x000f); // Lower 4 bits (B2-D4)
             let altitude = i32::from(n) * 25 - 1000;
             Ok(Some(altitude))
         } else {
-            // 11 bit Gillham coded altitude
+            // Gillham code (M=0, Q=0): ICAO Annex 10 Vol IV §3.1.2.6.5.4.c
+            // Mode C compatible encoding with Gray code
+            // Bit pattern: C1 A1 C2 A2 C4 A4 [M=0] B1 [Q=0] B2 D2 B4 D4
+            // 100 ft increments, range: [-1200, +126700] ft
             if let Ok(n) = gray2alt(decode_id13(ac13field)) {
                 let altitude = 100 * n;
                 Ok(Some(altitude))
             } else {
-                // Invalid Gillham pattern
+                // Invalid Gillham pattern - return None per spec
                 Ok(None)
             }
         }

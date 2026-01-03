@@ -4,45 +4,127 @@ use tracing::trace;
 
 /**
  * ## Meteorological Hazard Report (BDS 4,5)
+ *
+ * Comm-B message providing reports on severity of meteorological hazards.  
+ * Per ICAO Doc 9871 Table A-2-69: BDS code 4,5 — Meteorological hazard report
+ *
+ * Purpose: Provides hazard severity reports, particularly useful for low-level flight.
+ *
+ * Message Structure (56 bits):
+ * | TURB | SHEAR | BURST | ICE | WAKE | TEMP | PRESS | HEIGHT | RSVD |
+ * |------|-------|-------|-----|------|------|-------|--------|------|
+ * | 1+2  | 1+2   | 1+2   | 1+2 | 1+2  | 1+10 | 1+11  | 1+12   | 5    |
+ *
+ * Field Encoding per ICAO Doc 9871:
+ *
+ * **Turbulence** (bits 1-3):
+ *   - Bit 1: Status (0=invalid, 1=valid)
+ *   - Bits 2-3: 2-bit severity level
+ *
+ * **Wind Shear** (bits 4-6):
+ *   - Bit 4: Status (0=invalid, 1=valid)
+ *   - Bits 5-6: 2-bit severity level
+ *
+ * **Microburst** (bits 7-9):
+ *   - Bit 7: Status (0=invalid, 1=valid)
+ *   - Bits 8-9: 2-bit severity level
+ *
+ * **Icing** (bits 10-12):
+ *   - Bit 10: Status (0=invalid, 1=valid)
+ *   - Bits 11-12: 2-bit severity level
+ *
+ * **Wake Vortex** (bits 13-15):
+ *   - Bit 13: Status (0=invalid, 1=valid)
+ *   - Bits 14-15: 2-bit severity level
+ *
+ * **Severity Level Encoding** (for all hazards):
+ *   - 00 (0): Nil
+ *   - 01 (1): Light
+ *   - 10 (2): Moderate
+ *   - 11 (3): Severe
+ *   - Definitions per PANS-ATM (Doc 4444)
+ *
+ * **Static Air Temperature** (bits 16-26):
+ *   - Bit 16: Status (0=invalid, 1=valid)
+ *   - Bit 17: Sign (0=positive, 1=negative)
+ *   - Bits 18-26: 9-bit temperature value
+ *     * MSB = 64°C, LSB = 0.25°C
+ *     * Range: [-128, +128]°C (Annex 3 requires [-80, +60]°C)
+ *     * Two's complement encoding
+ *
+ * **Average Static Pressure** (bits 27-38):
+ *   - Bit 27: Status (0=invalid, 1=valid)
+ *   - Bits 28-38: 11-bit pressure value
+ *     * MSB = 1024 hPa, LSB = 1 hPa
+ *     * **Direct encoding**: value = pressure in hPa (no offset)
+ *     * Range: [0, 2048] hPa
+ *
+ * **Radio Height** (bits 39-51):
+ *   - Bit 39: Status (0=invalid, 1=valid)
+ *   - Bits 40-51: 12-bit radio altitude
+ *     * MSB = 32,768 ft, LSB = 16 ft
+ *     * Range: [0, 65,528] ft
+ *     * Radio height = radar altimeter reading above ground level
+ *
+ * **Reserved** (bits 52-56): 5 bits reserved
+ *
+ * Note: Two's complement coding used for all signed fields (§A.2.2.2)
  */
 
 #[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
 #[serde(tag = "bds", rename = "45")]
 pub struct MeteorologicalHazardReport {
     #[deku(reader = "read_level(deku::reader)")]
-    /// Turbulence level
+    /// Turbulence (bits 1-3): Per ICAO Doc 9871 Table A-2-69  
+    /// Severity level (Nil, Light, Moderate, Severe) per PANS-ATM (Doc 4444)  
+    /// Returns None if status bit (bit 1) is 0.
     pub turbulence: Option<Level>,
 
     #[deku(reader = "read_level(deku::reader)")]
-    /// Wind shear
+    /// Wind Shear (bits 4-6): Per ICAO Doc 9871 Table A-2-69  
+    /// Severity level (Nil, Light, Moderate, Severe) per PANS-ATM (Doc 4444)  
+    /// Returns None if status bit (bit 4) is 0.
     pub wind_shear: Option<Level>,
 
     #[deku(reader = "read_level(deku::reader)")]
-    /// Microburst
+    /// Microburst (bits 7-9): Per ICAO Doc 9871 Table A-2-69  
+    /// Severity level (Nil, Light, Moderate, Severe) per PANS-ATM (Doc 4444)  
+    /// Returns None if status bit (bit 7) is 0.
     pub microburst: Option<Level>,
 
     #[deku(reader = "read_level(deku::reader)")]
-    /// Icing
+    /// Icing (bits 10-12): Per ICAO Doc 9871 Table A-2-69  
+    /// Severity level (Nil, Light, Moderate, Severe) per PANS-ATM (Doc 4444)  
+    /// Returns None if status bit (bit 10) is 0.
     pub icing: Option<Level>,
 
     #[deku(reader = "read_level(deku::reader)")]
-    /// Wake vortex
+    /// Wake Vortex (bits 13-15): Per ICAO Doc 9871 Table A-2-69  
+    /// Severity level (Nil, Light, Moderate, Severe) per PANS-ATM (Doc 4444)  
+    /// Returns None if status bit (bit 13) is 0.
     pub wake_vortex: Option<Level>,
 
     #[deku(reader = "read_temperature(deku::reader)")]
-    /// Static air temperature (in °C)
+    /// Static Air Temperature (bits 16-26): Per ICAO Doc 9871 Table A-2-69  
+    /// 10-bit signed temperature (LSB=0.25°C, range [-128, +128]°C)  
+    /// Two's complement encoding. Returns None if status bit (bit 16) is 0.
     pub static_temperature: Option<f64>,
 
     #[deku(reader = "read_pressure(deku::reader)")]
-    /// Average static pressure (in hPa)
+    /// Average Static Pressure (bits 27-38): Per ICAO Doc 9871 Table A-2-69  
+    /// 11-bit pressure in hPa (LSB=1 hPa, direct encoding, range [0, 2048] hPa)  
+    /// Returns None if status bit (bit 27) is 0.
     pub static_pressure: Option<u32>,
 
     #[deku(reader = "read_height(deku::reader)")]
-    /// Radio height (in ft)
+    /// Radio Height (bits 39-51): Per ICAO Doc 9871 Table A-2-69  
+    /// 12-bit radio altitude above ground (LSB=16 ft, range [0, 65,528] ft)  
+    /// Returns None if status bit (bit 39) is 0.
     pub radio_height: Option<u32>,
 
     #[deku(bits = "5", map = "fail_if_not_zero")]
     #[serde(skip)]
+    /// Reserved (bits 52-56): Must be all zeros
     pub reserved: u8,
 }
 
@@ -135,11 +217,6 @@ fn read_pressure<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 
     trace!("Reading pressure status {} value {}", status, value);
 
-    // BDS 4,5 Average Static Pressure: 11-bit value represents pressure directly in hPa
-    // Per ICAO Doc 9871 Table A-2-69:
-    //   - Range: [0, 2048] hPa
-    //   - LSB = 1 hPa (raw value = pressure in hPa)
-    //   - MSB = 1024 hPa
     // No scaling formula needed (unlike BDS 4,0 which uses 800 + value * 0.1)
     match (status, value) {
         (true, value) => Ok(Some(value)),
