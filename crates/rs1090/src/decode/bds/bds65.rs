@@ -132,11 +132,11 @@ pub struct OperationStatusAirborne {
     pub version: ADSBVersionAirborne,
 }
 
-// TODO implement ADSBVersionAirborne
 impl fmt::Display for OperationStatusAirborne {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "   Capability classes: {}", self.capability_class)?;
         writeln!(f, "   Operational modes:  {}", self.operational_mode)?;
+        write!(f, "   {}", self.version)?;
         Ok(())
     }
 }
@@ -228,11 +228,11 @@ pub struct OperationStatusSurface {
     pub version: ADSBVersionSurface,
 }
 
-// TODO implement ADSBVersionAirborne
 impl fmt::Display for OperationStatusSurface {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.capability_class)?;
-        write!(f, "   Operational modes: {}", self.operational_mode)?;
+        writeln!(f, "   Operational modes: {}", self.operational_mode)?;
+        write!(f, "   {}", self.version)?;
         Ok(())
     }
 }
@@ -354,6 +354,84 @@ pub enum ADSBVersionAirborne {
     Reserved { id: u8 },
 }
 
+impl ADSBVersionAirborne {
+    /// Get the ADS-B version number as an integer
+    ///
+    /// Returns:
+    /// - 0 for DO-260 (not implemented in practice)
+    /// - 1 for DO-260A
+    /// - 2 for DO-260B
+    /// - 3-7 for reserved/future versions
+    pub fn version_number(&self) -> u8 {
+        match self {
+            Self::DOC9871AppendixA(_) => 0,
+            Self::DOC9871AppendixB(_) => 1,
+            Self::DOC9871AppendixC(_) => 2,
+            Self::Reserved { id } => *id,
+        }
+    }
+}
+
+impl fmt::Display for ADSBVersionAirborne {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DOC9871AppendixA(_) => write!(f, "Version 0 (DO-260)"),
+            Self::DOC9871AppendixB(v1) => {
+                writeln!(f, "Version 1 (DO-260A)")?;
+                writeln!(f, "   NIC supplement:     {}", v1.nic_s)?;
+                writeln!(f, "   NACp:               {}", v1.nac_p)?;
+                writeln!(
+                    f,
+                    "   BAQ:                {}",
+                    v1.barometric_altitude_quality
+                )?;
+                writeln!(f, "   SIL:                {}", v1.sil)?;
+                writeln!(
+                    f,
+                    "   BAI:                {}",
+                    v1.barometric_altitude_integrity
+                )?;
+                write!(
+                    f,
+                    "   HRD:                {}",
+                    if v1.horizontal_reference_direction == 0 {
+                        "True North"
+                    } else {
+                        "Magnetic North"
+                    }
+                )
+            }
+            Self::DOC9871AppendixC(v2) => {
+                writeln!(f, "Version 2 (DO-260B)")?;
+                writeln!(f, "   NIC supplement A:   {}", v2.nic_a)?;
+                writeln!(f, "   NACp:               {}", v2.nac_p)?;
+                writeln!(
+                    f,
+                    "   GVA:                {}",
+                    v2.geometry_vertical_accuracy
+                )?;
+                writeln!(f, "   SIL:                {}", v2.sil)?;
+                writeln!(f, "   SIL supplement:     {}", v2.sil_s)?;
+                writeln!(
+                    f,
+                    "   BAI:                {}",
+                    v2.barometric_altitude_integrity
+                )?;
+                write!(
+                    f,
+                    "   HRD:                {}",
+                    if v2.horizontal_reference_direction == 0 {
+                        "True North"
+                    } else {
+                        "Magnetic North"
+                    }
+                )
+            }
+            Self::Reserved { id } => write!(f, "Version {} (Reserved)", id),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct AirborneV1 {
     #[deku(bits = "1")]
@@ -457,6 +535,74 @@ pub enum ADSBVersionSurface {
     Reserved { id: u8 },
 }
 
+impl ADSBVersionSurface {
+    /// Get the ADS-B version number as an integer
+    ///
+    /// Returns:
+    /// - 0 for DO-260 (not implemented in practice)
+    /// - 1 for DO-260A
+    /// - 2 for DO-260B
+    /// - 3-7 for reserved/future versions
+    pub fn version_number(&self) -> u8 {
+        match self {
+            Self::DOC9871AppendixA(_) => 0,
+            Self::DOC9871AppendixB(_) => 1,
+            Self::DOC9871AppendixC(_) => 2,
+            Self::Reserved { id } => *id,
+        }
+    }
+}
+
+impl fmt::Display for ADSBVersionSurface {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DOC9871AppendixA(_) => write!(f, "Version 0 (DO-260)"),
+            Self::DOC9871AppendixB(v1) => {
+                writeln!(f, "Version 1 (DO-260A)")?;
+                writeln!(f, "   NIC supplement:     {}", v1.nic_s)?;
+                writeln!(f, "   NACp:               {}", v1.nac_p)?;
+                writeln!(f, "   SIL:                {}", v1.sil)?;
+                writeln!(
+                    f,
+                    "   TAH:                {}",
+                    v1.track_angle_or_heading
+                )?;
+                write!(
+                    f,
+                    "   HRD:                {}",
+                    if v1.horizontal_reference_direction == 0 {
+                        "True North"
+                    } else {
+                        "Magnetic North"
+                    }
+                )
+            }
+            Self::DOC9871AppendixC(v2) => {
+                writeln!(f, "Version 2 (DO-260B)")?;
+                writeln!(f, "   NIC supplement A:   {}", v2.nic_a)?;
+                writeln!(f, "   NACp:               {}", v2.nac_p)?;
+                writeln!(f, "   SIL:                {}", v2.sil)?;
+                writeln!(f, "   SIL supplement:     {}", v2.sil_supplement)?;
+                writeln!(
+                    f,
+                    "   TAH:                {}",
+                    v2.track_angle_or_heading
+                )?;
+                write!(
+                    f,
+                    "   HRD:                {}",
+                    if v2.horizontal_reference_direction == 0 {
+                        "True North"
+                    } else {
+                        "Magnetic North"
+                    }
+                )
+            }
+            Self::Reserved { id } => write!(f, "Version {} (Reserved)", id),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct SurfaceV1 {
     #[deku(bits = "1")]
@@ -534,4 +680,147 @@ pub struct EmptyU8 {
 #[derive(Debug, PartialEq, Serialize, DekuRead, Copy, Clone)]
 pub struct ReservedStatus {
     pub data: [u8; 5],
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::decode::DF;
+    use crate::prelude::*;
+    use hexlit::hex;
+
+    #[test]
+    fn test_bds65_version2_surface() {
+        // Real message from 3a33ff - Surface status, version 2 (DO-260B)
+        // Version: 2, NICa: 0, NACp: 9, SIL: 0, TAH: 0, HRD: 0, SILs: 0
+        let bytes = hex!("903a33fff90200040049001ea8e2");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+
+        if let DF::ExtendedSquitterTisB { cf, .. } = msg.df {
+            if let ME::BDS65(AircraftOperationStatus::Surface(surface)) = cf.me
+            {
+                // Check version number method
+                assert_eq!(surface.version.version_number(), 2);
+
+                // Check it's a version 2 message
+                if let ADSBVersionSurface::DOC9871AppendixC(v2) =
+                    surface.version
+                {
+                    assert_eq!(v2.nic_a, 0);
+                    assert_eq!(v2.nac_p, 9);
+                    assert_eq!(v2.sil, 0);
+                    assert_eq!(v2.sil_supplement, 0);
+                    assert_eq!(v2.track_angle_or_heading, 0);
+                    assert_eq!(v2.horizontal_reference_direction, 0);
+                } else {
+                    panic!("Expected version 2");
+                }
+
+                // Test Display implementation
+                let display = format!("{}", surface.version);
+                assert!(display.contains("Version 2 (DO-260B)"));
+                assert!(display.contains("NIC supplement A:"));
+                assert!(display.contains("NACp:"));
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_adsb_version_display_airborne() {
+        // Test Display implementation for airborne versions
+        // Since TC=31 subtype 1 (airborne) messages are rare in our samples,
+        // we construct the version structures directly to test formatting
+
+        // Test Version 0 (DO-260) - uses Empty struct
+        let v0 = ADSBVersionAirborne::DOC9871AppendixA(Empty {});
+        let display = format!("{}", v0);
+        assert!(display.contains("Version 0 (DO-260)"));
+        assert_eq!(v0.version_number(), 0);
+
+        // Test Version 1 (DO-260A)
+        let v1 = ADSBVersionAirborne::DOC9871AppendixB(AirborneV1 {
+            nic_s: 1,
+            nac_p: 9,
+            barometric_altitude_quality: 1,
+            sil: 2,
+            barometric_altitude_integrity: 1,
+            horizontal_reference_direction: 0,
+        });
+        let display = format!("{}", v1);
+        assert!(display.contains("Version 1 (DO-260A)"));
+        assert!(display.contains("NIC supplement:"));
+        assert!(display.contains("NACp:               9"));
+        assert!(display.contains("BAQ:                1"));
+        assert!(display.contains("SIL:                2"));
+        assert!(display.contains("BAI:                1"));
+        assert!(display.contains("HRD:                True North"));
+        assert_eq!(v1.version_number(), 1);
+
+        // Test Version 2 (DO-260B)
+        let v2 = ADSBVersionAirborne::DOC9871AppendixC(AirborneV2 {
+            nic_a: 0,
+            nac_p: 9,
+            geometry_vertical_accuracy: 2,
+            sil: 3,
+            barometric_altitude_integrity: 1,
+            horizontal_reference_direction: 0,
+            sil_s: 0,
+        });
+        let display = format!("{}", v2);
+        assert!(display.contains("Version 2 (DO-260B)"));
+        assert!(display.contains("NIC supplement A:   0"));
+        assert!(display.contains("NACp:               9"));
+        assert!(display.contains("GVA:                2"));
+        assert!(display.contains("SIL:                3"));
+        assert!(display.contains("BAI:                1"));
+        assert!(display.contains("HRD:                True North"));
+        assert!(display.contains("SIL supplement:     0"));
+        assert_eq!(v2.version_number(), 2);
+
+        // Test Reserved version
+        let vr = ADSBVersionAirborne::Reserved { id: 5 };
+        let display = format!("{}", vr);
+        assert!(display.contains("Version 5 (Reserved)"));
+        assert_eq!(vr.version_number(), 5);
+    }
+
+    #[test]
+    fn test_version_number_method() {
+        // Test the version_number() helper method for all versions
+
+        // Version 0
+        let v0 = ADSBVersionAirborne::DOC9871AppendixA(Empty {});
+        assert_eq!(v0.version_number(), 0);
+
+        // Version 1
+        let v1 = ADSBVersionAirborne::DOC9871AppendixB(AirborneV1 {
+            nic_s: 0,
+            nac_p: 0,
+            barometric_altitude_quality: 0,
+            sil: 0,
+            barometric_altitude_integrity: 0,
+            horizontal_reference_direction: 0,
+        });
+        assert_eq!(v1.version_number(), 1);
+
+        // Version 2
+        let v2 = ADSBVersionAirborne::DOC9871AppendixC(AirborneV2 {
+            nic_a: 0,
+            nac_p: 0,
+            geometry_vertical_accuracy: 0,
+            sil: 0,
+            barometric_altitude_integrity: 0,
+            horizontal_reference_direction: 0,
+            sil_s: 0,
+        });
+        assert_eq!(v2.version_number(), 2);
+
+        // Reserved versions
+        for id in 3..=7 {
+            let vr = ADSBVersionAirborne::Reserved { id };
+            assert_eq!(vr.version_number(), id);
+        }
+    }
 }
