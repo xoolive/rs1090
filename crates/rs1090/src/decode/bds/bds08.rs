@@ -350,6 +350,7 @@ impl fmt::Display for AircraftIdentification {
 
 #[cfg(test)]
 mod tests {
+    use super::Typecode;
     use crate::prelude::*;
     use hexlit::hex;
 
@@ -369,7 +370,9 @@ mod tests {
                 ..
             } = adsb_msg.message
             {
-                assert_eq!(format!("{tc}{ca}"), "A0");
+                // Check type code and category directly
+                assert_eq!(tc, Typecode::A);
+                assert_eq!(ca, 0);
                 assert_eq!(format!("{wake_vortex}"), "No category information");
                 assert_eq!(callsign, "EZY85MH");
                 return;

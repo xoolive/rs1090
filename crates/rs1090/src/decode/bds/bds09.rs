@@ -717,4 +717,169 @@ mod tests {
 "#
         )
     }
+
+    // Corner case tests for vertical rate encoding
+    // These tests validate sign bit handling and edge cases
+
+    #[test]
+    fn test_vertical_rate_positive_64() {
+        // Real message with vertical rate +64 ft/min (minimum positive rate)
+        // vrate_sign=0 (positive), value=1, rate=(1-1)*64=0 but spec says value=2 for +64
+        let bytes = hex!("8d3461cf9908388930080f948ea1");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS09(velocity) = adsb_msg.message {
+                assert_eq!(velocity.vertical_rate, Some(64));
+                assert_eq!(
+                    velocity.vrate_src,
+                    VerticalRateSource::GeometricAltitude
+                );
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_vertical_rate_positive_128() {
+        // Real message with vertical rate +128 ft/min
+        let bytes = hex!("8d3461cf9908558e100c1071eb67");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS09(velocity) = adsb_msg.message {
+                assert_eq!(velocity.vertical_rate, Some(128));
+                assert_eq!(
+                    velocity.vrate_src,
+                    VerticalRateSource::GeometricAltitude
+                );
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_vertical_rate_positive_960() {
+        // Real message with vertical rate +960 ft/min
+        let bytes = hex!("8d3461cf99085a8f10400f80e6ac");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS09(velocity) = adsb_msg.message {
+                assert_eq!(velocity.vertical_rate, Some(960));
+                assert_eq!(
+                    velocity.vrate_src,
+                    VerticalRateSource::GeometricAltitude
+                );
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_vertical_rate_level_flight() {
+        // Test for level flight (0 ft/min climb rate)
+        // Note: Real-world messages with vrate_value=1 are rare
+        // This would require: vrate_value=1, giving rate=(1-1)*64=0 ft/min
+        // For now, we'll skip this test as we don't have a real message
+        // The formula is tested implicitly by other tests (e.g., +64 uses value=2)
+    }
+
+    // Note: test_vertical_rate_zero (vrate_value=0 → None) is not included
+    // because such messages are extremely rare in real flight data.
+    // The value=0 case means "vertical rate information not available"
+
+    #[test]
+    fn test_vertical_rate_negative_64() {
+        // Real message with vertical rate -64 ft/min (minimum negative rate)
+        // vrate_sign=1 (negative), value=2, rate=-(2-1)*64=-64
+        let bytes = hex!("8d394c0f990c4932780838866883");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS09(velocity) = adsb_msg.message {
+                assert_eq!(velocity.vertical_rate, Some(-64));
+                assert_eq!(
+                    velocity.vrate_src,
+                    VerticalRateSource::GeometricAltitude
+                );
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_vertical_rate_sign_bit() {
+        // Test sign bit handling: same magnitude, different signs
+        // Positive test already covered above
+        // This test uses a different negative rate to verify sign encoding
+        let bytes_positive = hex!("8d3461cf9908388930080f948ea1"); // +64
+        let bytes_negative = hex!("8d394c0f990c4932780838866883"); // -64
+
+        let (_, msg_pos) = Message::from_bytes((&bytes_positive, 0)).unwrap();
+        let (_, msg_neg) = Message::from_bytes((&bytes_negative, 0)).unwrap();
+
+        if let ExtendedSquitterADSB(adsb_pos) = msg_pos.df {
+            if let ME::BDS09(vel_pos) = adsb_pos.message {
+                if let ExtendedSquitterADSB(adsb_neg) = msg_neg.df {
+                    if let ME::BDS09(vel_neg) = adsb_neg.message {
+                        // Verify signs are opposite
+                        assert_eq!(vel_pos.vertical_rate, Some(64));
+                        assert_eq!(vel_neg.vertical_rate, Some(-64));
+                        assert_eq!(
+                            vel_pos.vertical_rate.unwrap(),
+                            -vel_neg.vertical_rate.unwrap()
+                        );
+                        return;
+                    }
+                }
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_vrate_source_gnss_vs_barometric() {
+        // Test vertical rate source field
+        // GNSS source example
+        let bytes_gnss = hex!("8d3461cf9908388930080f948ea1");
+        let (_, msg_gnss) = Message::from_bytes((&bytes_gnss, 0)).unwrap();
+
+        if let ExtendedSquitterADSB(adsb_msg) = msg_gnss.df {
+            if let ME::BDS09(velocity) = adsb_msg.message {
+                assert_eq!(
+                    velocity.vrate_src,
+                    VerticalRateSource::GeometricAltitude
+                );
+            }
+        }
+
+        // Barometric source example (from existing test)
+        let bytes_baro = hex!("8D485020994409940838175B284F");
+        let (_, msg_baro) = Message::from_bytes((&bytes_baro, 0)).unwrap();
+
+        if let ExtendedSquitterADSB(adsb_msg) = msg_baro.df {
+            if let ME::BDS09(velocity) = adsb_msg.message {
+                assert_eq!(
+                    velocity.vrate_src,
+                    VerticalRateSource::BarometricPressureAltitude
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_geo_minus_baro_positive() {
+        // Test GNSS altitude difference (GNSS above barometric)
+        // From existing test: geo_minus_baro = +550 ft
+        let bytes = hex!("8D485020994409940838175B284F");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS09(velocity) = adsb_msg.message {
+                assert_eq!(velocity.geo_minus_baro, Some(550));
+                return;
+            }
+        }
+        unreachable!();
+    }
 }

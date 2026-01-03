@@ -276,4 +276,213 @@ mod tests {
 "#
         )
     }
+
+    // Corner case tests for movement field (groundspeed) encoding
+    // These tests validate the fix for BDS 0,6 ground speed formula bug
+    // where movement codes 13-38 were incorrectly using 0.25 kt steps instead of 0.5 kt
+
+    #[test]
+    fn test_movement_2_15kt_range() {
+        // Real message with groundspeed 8.0 kt (movement code 25 in 13-38 range)
+        // This validates the 0.5 kt step fix for codes 13-38
+        // Note: Original JSONL showed 5.0 kt (buggy decode with 0.25 kt steps)
+        // Correct decode with 0.5 kt steps: 2.0 + (25-13)*0.5 = 8.0 kt
+        let bytes = hex!("8c3461cf399d6059814ea81483a9");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { groundspeed, .. },
+                ..
+            } = adsb_msg.message
+            {
+                assert_eq!(groundspeed, Some(8.0));
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_movement_4_75kt() {
+        // Real message with groundspeed 7.5 kt (movement code 24 in 13-38 range)
+        // Tests movement code 13-38 range with 0.5 kt steps
+        // Note: Original JSONL showed 4.75 kt (buggy decode with 0.25 kt steps)
+        // Correct decode with 0.5 kt steps: 2.0 + (24-13)*0.5 = 7.5 kt
+        let bytes = hex!("8c3461cf398d60597b4ea434c4d7");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { groundspeed, .. },
+                ..
+            } = adsb_msg.message
+            {
+                assert_eq!(groundspeed, Some(7.5));
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_movement_stopped() {
+        // Real message with groundspeed 0.0 kt (movement code = 1, aircraft stopped)
+        let bytes = hex!("903a33ff40100858d34ff3cce976");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterTisB { cf, .. } = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { groundspeed, .. },
+                ..
+            } = cf.me
+            {
+                assert_eq!(groundspeed, Some(0.0));
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_movement_no_info() {
+        // Real message with movement code 0 (no information available)
+        // Movement field = 0 should return None
+        let bytes = hex!("8c3944f8400002acb23cda192b95");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { groundspeed, .. },
+                ..
+            } = adsb_msg.message
+            {
+                // Movement code 0 should return None
+                assert_eq!(groundspeed, None);
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_movement_1_2kt_range() {
+        // Real message with movement codes 9-12 (1.0-2.0 kt range with 0.25 kt steps)
+        // Movement code 9 = 1.0 kt
+        let bytes = hex!("8c394c0f389b1667e947db7bb8bc");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { groundspeed, .. },
+                ..
+            } = adsb_msg.message
+            {
+                assert_eq!(groundspeed, Some(1.0));
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_movement_15_70kt_range() {
+        // Real message with movement codes 39-93 (15-70 kt range with 1.0 kt steps)
+        // Movement code 39 = 15.0 kt (lower bound)
+        let bytes = hex!("8c3461cf3a7f3059c94e5bf4e169");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { groundspeed, .. },
+                ..
+            } = adsb_msg.message
+            {
+                assert_eq!(groundspeed, Some(15.0));
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_movement_70_100kt_range() {
+        // Real message with movement codes 94-108 (70-100 kt range with 2.0 kt steps)
+        // Movement code 94 = 70.0 kt (lower bound)
+        let bytes = hex!("8c3950cf3dede47bac304d3b5122");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { groundspeed, .. },
+                ..
+            } = adsb_msg.message
+            {
+                assert_eq!(groundspeed, Some(70.0));
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_movement_100_175kt_range() {
+        // Real message with movement codes 109-123 (100-175 kt range with 5.0 kt steps)
+        // Movement code 109 = 100.0 kt (lower bound)
+        let bytes = hex!("8c3933203edde47b9e2ffa5e77b8");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { groundspeed, .. },
+                ..
+            } = adsb_msg.message
+            {
+                assert_eq!(groundspeed, Some(100.0));
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    #[test]
+    fn test_movement_175kt_plus() {
+        // Real message with movement code 124 (≥175 kt)
+        let bytes = hex!("8d3933203fcde2a84e39e1c6c5bc");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterADSB(adsb_msg) = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { groundspeed, .. },
+                ..
+            } = adsb_msg.message
+            {
+                assert_eq!(groundspeed, Some(175.0));
+                return;
+            }
+        }
+        unreachable!();
+    }
+
+    // TODO: Add test for movement codes 125-127 (reserved, should return None)
+    // This requires either finding a real message or computing valid CRC for synthetic message
+    //
+    // #[test]
+    // fn test_movement_reserved() {
+    //     // Movement codes 125-127 are reserved and should return None
+    //     let bytes = hex!("...");
+    //     let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+    //     ...
+    //     assert_eq!(groundspeed, None);
+    // }
+
+    #[test]
+    fn test_track_invalid() {
+        // Test track_status = 0 (track invalid, should return None)
+        let bytes = hex!("903a33ff40100858d34ff3cce976");
+        let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+        if let ExtendedSquitterTisB { cf, .. } = msg.df {
+            if let ME::BDS06 {
+                inner: SurfacePosition { track, .. },
+                ..
+            } = cf.me
+            {
+                // Track status = 0, so track should be None
+                assert_eq!(track, None);
+                return;
+            }
+        }
+        unreachable!();
+    }
 }
