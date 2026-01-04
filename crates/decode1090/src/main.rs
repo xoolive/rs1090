@@ -1,14 +1,19 @@
 #![doc = include_str!("../readme.md")]
 
 use clap::Parser;
+use flate2::read::GzDecoder;
+use rs1090::decode::commb::MessageProcessor;
 use rs1090::decode::cpr::{decode_position, AircraftState, Position, UpdateIf};
 use rs1090::decode::SensorMetadata;
 use rs1090::prelude::*;
 use serde::{Deserialize, Serialize};
+use sevenz_rust::SevenZReader;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
+use std::io::Read;
+use std::path::Path;
 use tokio::fs::{self, File};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -40,6 +45,43 @@ struct Options {
     msgs: Vec<String>,
 }
 
+/// Read and decompress input file based on extension
+async fn read_input_file(
+    input_path: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let path = Path::new(input_path);
+    let extension = path.extension().and_then(|e| e.to_str());
+
+    match extension {
+        Some("7z") => {
+            // Read .7z file directly into memory without temp files
+            let mut archive =
+                SevenZReader::open(path, sevenz_rust::Password::empty())?;
+            let mut content = String::new();
+
+            // Read first entry in archive (assume single .jsonl file inside)
+            archive.for_each_entries(|_entry, reader| {
+                reader.read_to_string(&mut content)?;
+                Ok(false) // Stop after first entry
+            })?;
+
+            Ok(content)
+        }
+        Some("gz") => {
+            // Decompress .gz file using flate2
+            let file = std::fs::File::open(path)?;
+            let mut decoder = GzDecoder::new(file);
+            let mut content = String::new();
+            decoder.read_to_string(&mut content)?;
+            Ok(content)
+        }
+        _ => {
+            // Regular file - read directly
+            Ok(tokio::fs::read_to_string(path).await?)
+        }
+    }
+}
+
 // We create this struct because it is too troublesome to have Deserialize for
 // Message at this point.
 #[derive(Serialize, Deserialize)]
@@ -55,22 +97,57 @@ struct JSONEntry {
     metadata: Vec<SensorMetadata>,
 }
 
+/// Parse Beast format from CSV line (timestamp,hexdata)
+/// Beast format: 0x1a \[type\] \[6-byte timestamp\] \[1-byte signal\] \[message\]
+///  - 0x1a 0x32: Mode-S short (16 bytes total, 7-byte message)
+///  - 0x1a 0x33: Mode-S long (23 bytes total, 14-byte message)
+fn parse_beast_csv_line(line: &str) -> Option<JSONEntry> {
+    let parts: Vec<&str> = line.trim().split(',').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let timestamp: f64 = parts[0].parse().ok()?;
+    let hex_data = hex::decode(parts[1]).ok()?;
+
+    // Check Beast format: starts with 0x1a
+    if hex_data.is_empty() || hex_data[0] != 0x1a {
+        return None;
+    }
+
+    // Check message type and extract Mode S message
+    let frame = match hex_data.get(1) {
+        Some(0x32) if hex_data.len() >= 16 => {
+            // Mode-S short: 0x1a 0x32 [6-byte ts] [1-byte signal] [7-byte message]
+            hex_data[9..16].to_vec()
+        }
+        Some(0x33) if hex_data.len() >= 23 => {
+            // Mode-S long: 0x1a 0x33 [6-byte ts] [1-byte signal] [14-byte message]
+            hex_data[9..23].to_vec()
+        }
+        _ => return None,
+    };
+
+    Some(JSONEntry {
+        timestamp,
+        rssi: None,
+        frame,
+        metadata: vec![],
+    })
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let options = Options::parse();
 
-    let input_file = if let Some(input_path) = options.input {
-        let file = fs::File::open(input_path).await?;
-        Some(file)
-    } else {
-        None
-    };
+    let input_file = options.input;
 
     let mut output_file = if let Some(output_path) = options.output {
         Some(
             fs::OpenOptions::new()
-                .append(true)
+                .write(true)
                 .create(true)
+                .truncate(true)
                 .open(output_path)
                 .await?,
         )
@@ -81,18 +158,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut reference = options.reference;
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
 
-    if let Some(mut file) = input_file {
-        let mut contents = vec![];
-        file.read_to_end(&mut contents).await?;
-        let content_str = String::from_utf8_lossy(&contents);
+    if let Some(input_path) = input_file {
+        let content_str = read_input_file(&input_path).await?;
 
         let raw_messages: Vec<&str> = content_str.split('\n').collect();
 
-        // Parse each segment as a JSON object
-        let json_objects: Vec<Result<JSONEntry, _>> = raw_messages
+        // Detect format: CSV (Beast) or JSONL
+        // CSV format: timestamp,hexdata (e.g., "1539371430.786029,1a330000519c8b74068c3c648d...")
+        // JSONL format: {"timestamp":...,"frame":"..."}
+        let is_csv = raw_messages
             .iter()
-            .map(|msg| serde_json::from_str(msg))
-            .collect();
+            .find(|line| !line.trim().is_empty())
+            .map(|first_line| {
+                !first_line.trim().starts_with('{')
+                    && first_line.contains(',')
+                    && first_line.split(',').count() == 2
+            })
+            .unwrap_or(false);
+
+        // Parse each line based on detected format
+        let json_objects: Vec<JSONEntry> = if is_csv {
+            // Parse CSV (Beast format)
+            raw_messages
+                .iter()
+                .filter(|line| !line.trim().is_empty())
+                .filter_map(|line| parse_beast_csv_line(line))
+                .collect()
+        } else {
+            // Parse JSONL format
+            raw_messages
+                .iter()
+                .filter_map(|msg| serde_json::from_str(msg).ok())
+                .collect()
+        };
 
         let mut cache: HashMap<Vec<u8>, Vec<JSONEntry>> = HashMap::new();
         // Need to do timestamps in u128 because f64 is not comparable (Ord)
@@ -105,7 +203,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             as Box<dyn Fn(&AirbornePosition) -> bool>);
 
         // Print the JSON objects
-        for mut json in json_objects.into_iter().flatten() {
+        for mut json in json_objects.into_iter() {
             // In case there is a rssi field (older version), create a source
             if json.rssi.is_some() {
                 json.metadata.push(SensorMetadata {
@@ -213,6 +311,7 @@ async fn process_entries(
         decode_time: None,
     };
     if let Some(message) = &mut msg.message {
+        // Decode positions for ADS-B messages
         match &mut message.df {
             ExtendedSquitterADSB(adsb) => decode_position(
                 &mut adsb.message,
@@ -230,20 +329,14 @@ async fn process_entries(
                 reference,
                 update_reference,
             ),
-            CommBAltitudeReply { bds, .. } => {
-                if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-                    bds.bds50 = None;
-                    bds.bds60 = None
-                }
-            }
-            CommBIdentityReply { bds, .. } => {
-                if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-                    bds.bds50 = None;
-                    bds.bds60 = None
-                }
-            }
             _ => {}
         }
+
+        // Sanitize Comm-B messages
+        MessageProcessor::new(message, aircraft)
+            .sanitize_commb()
+            .finish();
+
         let json = serde_json::to_string(&msg).unwrap();
         if let Some(file) = &mut output_file {
             file.write_all(json.as_bytes()).await?;

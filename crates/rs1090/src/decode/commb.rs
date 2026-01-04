@@ -12,9 +12,12 @@ use super::bds::bds45::MeteorologicalHazardReport;
 use super::bds::bds50::TrackAndTurnReport;
 use super::bds::bds60::HeadingAndSpeedReport;
 use super::bds::bds65::AircraftOperationStatus;
+use super::cpr::AircraftState;
 use super::AC13Field;
+use super::ICAO;
 use deku::{ctx::Order, prelude::*};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::fmt;
 use tracing::debug;
 
@@ -75,6 +78,49 @@ pub struct DF20DataSelector {
     pub bds65: Option<AircraftOperationStatus>,
 }
 
+impl DF20DataSelector {
+    /// Sanitize Comm-B data using optional aircraft state context
+    ///
+    /// Current implementation invalidates BDS 5,0 and BDS 6,0 if both are present,
+    /// as this typically indicates unreliable data.
+    ///
+    /// Future implementations will use the context for more sophisticated validation:
+    /// - Check if groundspeed/track changes are physically possible
+    /// - Validate against reference altitude from DF20 header
+    /// - Temporal consistency checks
+    pub fn sanitize(&mut self, _context: Option<&CommBContext>) {
+        // Basic validation: if both BDS50 and BDS60 are present, invalidate both
+        // This is a common pattern indicating unreliable Comm-B data
+        if self.bds50.is_some() && self.bds60.is_some() {
+            self.bds50 = None;
+            self.bds60 = None;
+        }
+
+        // Future: context-based validation
+        // if let Some(ctx) = context {
+        //     // Validate BDS 5,0 groundspeed against last known value
+        //     if let Some(bds50) = &self.bds50 {
+        //         if let (Some(gs), Some(last_gs)) = (bds50.groundspeed, ctx.last_groundspeed) {
+        //             // Check if change is physically possible (e.g., < 100 kt/s)
+        //             if (gs as f64 - last_gs).abs() > 100.0 {
+        //                 self.bds50 = None;
+        //             }
+        //         }
+        //     }
+        //
+        //     // Validate against reference altitude from DF20 AC13 field
+        //     if let (Some(ref_alt), Some(bds40)) = (ctx.reference_altitude, &self.bds40) {
+        //         if let Some(sel_alt) = bds40.selected_altitude_mcp {
+        //             // Selected altitude should be reasonably close to current altitude
+        //             if (sel_alt as i32 - ref_alt).abs() > 10000 {
+        //                 self.bds40 = None;
+        //             }
+        //         }
+        //     }
+        // }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Clone, Default)]
 pub struct DF21DataSelector {
     #[serde(skip)]
@@ -122,6 +168,35 @@ pub struct DF21DataSelector {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bds65: Option<AircraftOperationStatus>,
+}
+
+impl DF21DataSelector {
+    /// Sanitize Comm-B data using optional aircraft state context
+    ///
+    /// See [`DF20DataSelector::sanitize`] for details.
+    pub fn sanitize(&mut self, _context: Option<&CommBContext>) {
+        if self.bds50.is_some() && self.bds60.is_some() {
+            self.bds50 = None;
+            self.bds60 = None;
+        }
+    }
+}
+
+/// Context for Comm-B message validation and sanitization
+///
+/// This context is used to validate Comm-B data against known aircraft state.
+/// Currently used for basic validation (e.g., invalidating BDS 5,0 and 6,0 if both present).
+/// Future implementations will use this for more sophisticated validation based on
+/// temporal consistency, physical constraints, and cross-field validation.
+#[derive(Debug, Default, Clone)]
+pub struct CommBContext {
+    /// Reference altitude from DF20 AC13 field (for cross-validation)
+    pub reference_altitude: Option<i32>,
+    // Future: Add more fields when we have a proper aircraft tracking structure
+    // pub last_altitude: Option<i32>,
+    // pub last_groundspeed: Option<f64>,
+    // pub last_track: Option<f64>,
+    // pub last_timestamp: Option<f64>,
 }
 
 impl fmt::Display for DF21DataSelector {
@@ -348,6 +423,70 @@ impl DekuReader<'_> for DF21DataSelector {
 
         Ok(result)
     }
+}
+
+/// Message processor for Comm-B sanitization
+///
+/// This provides a simple builder-pattern API for sanitizing Comm-B messages
+/// based on aircraft state context. It can be chained with other message
+/// processing operations.
+///
+/// # Example
+///
+/// ```no_run
+/// use rs1090::decode::commb::MessageProcessor;
+/// use rs1090::prelude::*;
+/// use std::collections::BTreeMap;
+///
+/// # let mut message = todo!();
+/// # let aircraft = todo!();
+/// MessageProcessor::new(&mut message, &aircraft)
+///     .sanitize_commb()
+///     .finish();
+/// ```
+pub struct MessageProcessor<'a> {
+    message: &'a mut super::Message,
+    #[allow(dead_code)] // Reserved for future context-based validation
+    aircraft: &'a BTreeMap<ICAO, AircraftState>,
+}
+
+impl<'a> MessageProcessor<'a> {
+    /// Create a new message processor
+    pub fn new(
+        message: &'a mut super::Message,
+        aircraft: &'a BTreeMap<ICAO, AircraftState>,
+    ) -> Self {
+        Self { message, aircraft }
+    }
+
+    /// Sanitize Comm-B data using aircraft state context
+    ///
+    /// This will invalidate BDS 5,0 and BDS 6,0 if both are present.
+    /// Future implementations will perform more sophisticated validation
+    /// using the aircraft state context.
+    pub fn sanitize_commb(self) -> Self {
+        use super::DF::*;
+
+        match &mut self.message.df {
+            CommBAltitudeReply { bds, ac, .. } => {
+                let context = CommBContext {
+                    reference_altitude: ac.0,
+                };
+                bds.sanitize(Some(&context));
+            }
+            CommBIdentityReply { bds, .. } => {
+                let context = CommBContext {
+                    reference_altitude: None,
+                };
+                bds.sanitize(Some(&context));
+            }
+            _ => {}
+        }
+        self
+    }
+
+    /// Finish processing and consume the processor
+    pub fn finish(self) {}
 }
 
 #[cfg(test)]
