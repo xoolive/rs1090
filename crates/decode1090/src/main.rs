@@ -2,6 +2,7 @@
 
 use clap::Parser;
 use flate2::read::GzDecoder;
+use rs1090::decode::commb::MessageProcessor;
 use rs1090::decode::cpr::{decode_position, AircraftState, Position, UpdateIf};
 use rs1090::decode::SensorMetadata;
 use rs1090::prelude::*;
@@ -97,7 +98,7 @@ struct JSONEntry {
 }
 
 /// Parse Beast format from CSV line (timestamp,hexdata)
-/// Beast format: 0x1a [type] [6-byte timestamp] [1-byte signal] [message]
+/// Beast format: 0x1a \[type\] \[6-byte timestamp\] \[1-byte signal\] \[message\]
 ///  - 0x1a 0x32: Mode-S short (16 bytes total, 7-byte message)
 ///  - 0x1a 0x33: Mode-S long (23 bytes total, 14-byte message)
 fn parse_beast_csv_line(line: &str) -> Option<JSONEntry> {
@@ -310,6 +311,7 @@ async fn process_entries(
         decode_time: None,
     };
     if let Some(message) = &mut msg.message {
+        // Decode positions for ADS-B messages
         match &mut message.df {
             ExtendedSquitterADSB(adsb) => decode_position(
                 &mut adsb.message,
@@ -327,20 +329,14 @@ async fn process_entries(
                 reference,
                 update_reference,
             ),
-            CommBAltitudeReply { bds, .. } => {
-                if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-                    bds.bds50 = None;
-                    bds.bds60 = None
-                }
-            }
-            CommBIdentityReply { bds, .. } => {
-                if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-                    bds.bds50 = None;
-                    bds.bds60 = None
-                }
-            }
             _ => {}
         }
+
+        // Sanitize Comm-B messages
+        MessageProcessor::new(message, aircraft)
+            .sanitize_commb()
+            .finish();
+
         let json = serde_json::to_string(&msg).unwrap();
         if let Some(file) = &mut output_file {
             file.write_all(json.as_bytes()).await?;

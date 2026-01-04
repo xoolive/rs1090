@@ -271,11 +271,6 @@ pub async fn update_snapshot(
                     }
                 }
                 CommBAltitudeReply { bds, .. } => {
-                    // Invalidate data if marked as both BDS50 and BDS60
-                    if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-                        bds.bds50 = None;
-                        bds.bds60 = None
-                    }
                     if let Some(bds20) = &bds.bds20 {
                         if !bds20.callsign.contains("#") {
                             aircraft.cur.callsign =
@@ -304,11 +299,6 @@ pub async fn update_snapshot(
                     }
                 }
                 CommBIdentityReply { bds, .. } => {
-                    // Invalidate data if marked as both BDS50 and BDS60
-                    if let (Some(_), Some(_)) = (&bds.bds50, &bds.bds60) {
-                        bds.bds50 = None;
-                        bds.bds60 = None
-                    }
                     if let Some(bds20) = &bds.bds20 {
                         if !bds20.callsign.contains("#") {
                             aircraft.cur.callsign =

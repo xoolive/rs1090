@@ -18,6 +18,7 @@ use crossterm::event::KeyCode;
 use ratatui::widgets::*;
 use redis::AsyncCommands;
 use rs1090::data::aircraft;
+use rs1090::decode::commb::MessageProcessor;
 use rs1090::decode::cpr::{decode_position, AircraftState};
 use rs1090::decode::serialize_config;
 use rs1090::prelude::*;
@@ -497,6 +498,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => {}
             }
         };
+
+        // Sanitize Comm-B messages before updating snapshot
+        if let Some(message) = &mut msg.message {
+            MessageProcessor::new(message, &aircraft)
+                .sanitize_commb()
+                .finish();
+        }
 
         snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
 

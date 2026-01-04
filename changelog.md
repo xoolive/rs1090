@@ -2,17 +2,40 @@
 
 ## Unreleased
 
+### Decoding Improvements
 - Fix BDS 0,6 ground speed formula: movement codes 13-38 now use correct 0.5 kt steps instead of 0.25 kt per ICAO Doc 9871
   - Affected taxiing aircraft and slow ground movements (2-15 kt range)
-- Add comprehensive ICAO Doc 9871 specification documentation across all 20 BDS decoder files
-  - Every BDS register now includes ICAO table references and section numbers
-  - All field encodings documented with formulas, ranges, and LSB resolutions
 - Fix altitude decoding to support negative altitudes for below-sea-level airports (EHAM, etc.) (#422, #424)
 - Fix altitude field 0x000 (all-zeros) to return None instead of 0 per DO-260B spec (#425, #426)
   - Affects ~1.3% of Mode S messages with altitude unavailable
 - **BREAKING**: Change AC13Field to wrap Option<i32> instead of i32 for proper "altitude unavailable" handling
 - Fix invalid Gillham altitude patterns returning misleading 0 ft instead of None
 - Reinforce pressure decode logic
+
+### New Features
+- **decode1090**: Add CSV (Beast format) support with auto-detection
+  - Supports Beast protocol (0x1a 0x32/0x33) message parsing
+  - Extracts RSSI signal strength from Beast format
+  - Auto-detects CSV vs JSONL format
+  - Works with compressed files (.7z, .gz)
+- **rs1090**: Add MessageProcessor builder pattern for Comm-B sanitization
+  - Centralized Comm-B data sanitization with CommBContext
+  - Extensible design for future context-based validation
+  - Eliminates code duplication across decode1090 and jet1090
+
+### Testing & Quality
+- Add comprehensive regression test suite in `tests/regression/`
+  - Automated field-level comparison between decoder versions
+  - Executive summary with change statistics and validation
+  - Support for both JSONL and CSV Beast format inputs
+  - Documentation and quickstart guides included
+
+### Documentation
+- Add comprehensive ICAO Doc 9871 specification documentation across all 20 BDS decoder files
+  - Every BDS register now includes ICAO table references and section numbers
+  - All field encodings documented with formulas, ranges, and LSB resolutions
+
+### Other
 - Implement no_history_expire option (fix #391)
 - Include README in Python package distribution
 - Fix Docker release script
