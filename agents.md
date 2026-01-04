@@ -208,6 +208,11 @@ Published automatically to https://docs.rs/rs1090
 - `readme.md`: Main repository README with quickstart examples
 - `changelog.md`: Version history and release notes
 
+## Release
+
+- Ensure latest commmit on master has no failing CI actions
+- `cargo release [patch,minor]`
+
 ## Decoding specifications and test data
 
 ### Reference materials
@@ -234,6 +239,7 @@ The `samples/` directory contains real-world trajectory data in JSONL format:
 
 Do not commit files there, they must remain private.
 You may only extract individual or cherry-picked sequences of messages for testing and/or statistical purposes.
+Do not edit or uncompress files in place but you may do that in /tmp folder if needed
 
 ## Git workflow and commits
 
@@ -248,6 +254,7 @@ You may only extract individual or cherry-picked sequences of messages for testi
 **IMPORTANT:**
 
 - **Never commit without explicit user approval**
+- If the user gives you approval for one commit, do not commit again later without explicit user approval.
 - Always ask for confirmation before creating commits
 - If fixing a GitHub issue, create a dedicated branch and PR
 
@@ -259,17 +266,6 @@ type: brief description (imperative mood)
 Optional longer explanation of what changed and why.
 
 Fixes #123
-```
-
-**Types:** `feat`, `fix`, `refactor`, `docs`, `test`, `perf`, `chore`
-
-**Examples:**
-
-```
-feat: add support for ADS-B version 2 messages
-fix: correct altitude decoding for odd CPR frames (#456)
-refactor: simplify Beast protocol parser
-docs: update installation instructions for Nix users
 ```
 
 ### GitHub issues and PRs
