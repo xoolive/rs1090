@@ -220,7 +220,7 @@ fn read_geobaro<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
 #[serde(untagged)]
 pub enum AirborneVelocitySubType {
     #[deku(id = "0")]
-    Reserved0(#[deku(bits = "22")] u32),
+    Reserved0(ReservedVelocityData),
 
     #[deku(id_pat = "1..=2")]
     GroundSpeedDecoding(GroundSpeedDecoding),
@@ -231,7 +231,13 @@ pub enum AirborneVelocitySubType {
     AirspeedSupersonic(AirspeedSupersonicDecoding),
 
     #[deku(id_pat = "5..=7")]
-    Reserved1(#[deku(bits = "22")] u32),
+    Reserved1(ReservedVelocityData),
+}
+
+#[derive(Debug, PartialEq, Serialize, DekuRead, Clone)]
+pub struct ReservedVelocityData {
+    #[deku(bits = "22")]
+    pub reserved_data: u32,
 }
 
 #[derive(Debug, PartialEq, DekuRead, Copy, Clone)]
