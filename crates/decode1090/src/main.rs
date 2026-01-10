@@ -177,7 +177,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or(false);
 
         // Parse each line based on detected format
-        let json_objects: Vec<JSONEntry> = if is_csv {
+        let mut json_objects: Vec<JSONEntry> = if is_csv {
             // Parse CSV (Beast format)
             raw_messages
                 .iter()
@@ -192,6 +192,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect()
         };
 
+        // Sort messages by timestamp to ensure chronological processing
+        // This is critical for CPR decoding which uses reference positions
+        // from previous messages. Out-of-order messages cause wrong reference
+        // positions, especially for surface messages (TC 5-8, BDS 06).
+        json_objects.sort_by(|a, b| {
+            a.timestamp
+                .partial_cmp(&b.timestamp)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         let mut cache: HashMap<Vec<u8>, Vec<JSONEntry>> = HashMap::new();
         // Need to do timestamps in u128 because f64 is not comparable (Ord)
         let mut expiration_heap: BinaryHeap<Reverse<(u128, Vec<u8>)>> =
@@ -201,6 +211,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             pos.alt.is_some_and(|alt| alt < 1000)
         })
             as Box<dyn Fn(&AirbornePosition) -> bool>);
+
+        let mut last_reference_update: f64 = 0.0;
 
         // Print the JSON objects
         for mut json in json_objects.into_iter() {
@@ -217,6 +229,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             let timestamp_ms = (json.timestamp * 1e3) as u128;
             let frame = json.frame.clone();
+
+            // Periodically update global reference to lowest aircraft position
+            if json.timestamp - last_reference_update > 300.0 {
+                rs1090::decode::cpr::update_global_reference(
+                    &aircraft,
+                    &mut reference,
+                    json.timestamp,
+                );
+                last_reference_update = json.timestamp;
+            }
 
             // Push the JSON to the list of similar messages received
             cache.entry(frame.clone()).or_default().push(json);
@@ -337,7 +359,16 @@ async fn process_entries(
             .sanitize_commb()
             .finish();
 
-        let json = serde_json::to_string(&msg).unwrap();
+        let json = match serde_json::to_string(&msg) {
+            Ok(j) => j,
+            Err(e) => {
+                eprintln!("Serialization error: {}", e);
+                eprintln!("Message timestamp: {}", msg.timestamp);
+                eprintln!("Frame: {}", hex::encode(&msg.frame));
+                eprintln!("Message: {:?}", msg.message);
+                panic!("Failed to serialize message");
+            }
+        };
         if let Some(file) = &mut output_file {
             file.write_all(json.as_bytes()).await?;
             file.write_all("\n".as_bytes()).await?;

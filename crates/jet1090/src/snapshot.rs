@@ -5,7 +5,8 @@ use rs1090::decode::bds::bds09::AirborneVelocitySubType::{
     AirspeedSubsonic, GroundSpeedDecoding,
 };
 use rs1090::decode::bds::bds09::AirspeedType::{IAS, TAS};
-use rs1090::decode::{IdentityCode, SensorMetadata};
+use rs1090::decode::cpr::AircraftState;
+use rs1090::decode::{IdentityCode, SensorMetadata, ICAO};
 use rs1090::prelude::*;
 use serde::Serialize;
 use tokio::sync::Mutex;
@@ -63,6 +64,8 @@ pub struct Snapshot {
     pub count: usize,
     /// Metadata information from the sensors seeing the aircraft
     pub metadata: Vec<SensorMetadata>,
+    /// The ICAO code of the airport where the aircraft is currently located (surface only)
+    pub airport: Option<String>,
 }
 
 /**
@@ -120,6 +123,7 @@ impl StateVectors {
             nacp: None,
             count: 0,
             metadata: vec![],
+            airport: None,
         };
         StateVectors {
             cur,
@@ -147,6 +151,7 @@ pub async fn update_snapshot(
     states: &Mutex<Jet1090>,
     msg: &mut TimedMessage,
     aircraftdb: &BTreeMap<String, Aircraft>,
+    cpr_aircraft: &BTreeMap<ICAO, AircraftState>,
 ) {
     if let TimedMessage {
         timestamp,
@@ -181,6 +186,8 @@ pub async fn update_snapshot(
                         aircraft.cur.latitude = bds05.latitude;
                         aircraft.cur.longitude = bds05.longitude;
                         aircraft.cur.altitude = bds05.alt;
+                        // Clear airport when airborne
+                        aircraft.cur.airport = None;
                     }
                     ME::BDS06 { inner: bds06, .. } => {
                         aircraft.cur.latitude = bds06.latitude;
@@ -188,6 +195,12 @@ pub async fn update_snapshot(
                         aircraft.cur.track = bds06.track;
                         aircraft.cur.groundspeed = bds06.groundspeed;
                         aircraft.cur.altitude = None;
+                        // Extract airport from CPR aircraft state
+                        if let Ok(icao) = aircraft.cur.icao24.parse::<ICAO>() {
+                            if let Some(state) = cpr_aircraft.get(&icao) {
+                                aircraft.cur.airport = state.airport.clone();
+                            }
+                        }
                     }
                     ME::BDS08 { inner: bds08, .. } => {
                         if !bds08.callsign.contains("#") {
@@ -255,6 +268,8 @@ pub async fn update_snapshot(
                             aircraft.cur.latitude = bds05.latitude;
                             aircraft.cur.longitude = bds05.longitude;
                             aircraft.cur.altitude = bds05.alt;
+                            // Clear airport when airborne
+                            aircraft.cur.airport = None;
                         }
                         ME::BDS06 { inner: bds06, .. } => {
                             aircraft.cur.latitude = bds06.latitude;
@@ -262,6 +277,15 @@ pub async fn update_snapshot(
                             aircraft.cur.track = bds06.track;
                             aircraft.cur.groundspeed = bds06.groundspeed;
                             aircraft.cur.altitude = None;
+                            // Extract airport from CPR aircraft state
+                            if let Ok(icao) =
+                                aircraft.cur.icao24.parse::<ICAO>()
+                            {
+                                if let Some(state) = cpr_aircraft.get(&icao) {
+                                    aircraft.cur.airport =
+                                        state.airport.clone();
+                                }
+                            }
                         }
                         ME::BDS08 { inner: bds08, .. } => {
                             aircraft.cur.callsign =
