@@ -377,9 +377,11 @@ impl Render for ColumnRender {
                 .longitude
                 .map(|v| format!("{v}"))
                 .unwrap_or("".to_string()),
-            Self::ALTITUDE => {
-                s.altitude.map(|v| format!("{v}")).unwrap_or("".to_string())
-            }
+            Self::ALTITUDE => match (s.altitude, &s.airport) {
+                (Some(alt), _) => format!("{alt}"),
+                (None, Some(airport)) => airport.clone(),
+                (None, None) => "".to_string(),
+            },
             Self::SELALT => match (s.selected_altitude, s.altitude) {
                 (Some(sel), Some(alt))
                     if i32::abs_diff(i32::from(sel), alt) <= 50 =>

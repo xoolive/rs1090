@@ -43,6 +43,87 @@ fn dist_haversine(pos1: &Position, pos2: &Position) -> f64 {
     haversine(pos1.latitude, pos1.longitude, pos2.latitude, pos2.longitude)
 }
 
+/// Check if a position is near any known airport
+///
+/// This is used to validate surface position decodes - surface messages should
+/// only occur at airports. If a decoded surface position is not within
+/// `max_distance_km` of any known airport, it's likely decoded with the wrong
+/// reference position.
+fn is_near_airport(pos: &Position, max_distance_km: f64) -> bool {
+    use crate::data::airports::AIRPORTS;
+
+    AIRPORTS.iter().any(|airport| {
+        haversine(pos.latitude, pos.longitude, airport.lat, airport.lon)
+            < max_distance_km
+    })
+}
+
+/// Find the nearest airport to a position within max_distance_km
+///
+/// Returns the ICAO code of the nearest airport, or None if no airport
+/// is within max_distance_km.
+fn find_nearest_airport(
+    pos: &Position,
+    max_distance_km: f64,
+) -> Option<String> {
+    use crate::data::airports::AIRPORTS;
+
+    AIRPORTS
+        .iter()
+        .filter_map(|airport| {
+            let distance = haversine(
+                pos.latitude,
+                pos.longitude,
+                airport.lat,
+                airport.lon,
+            );
+            if distance < max_distance_km {
+                Some((distance, airport.icao.clone()))
+            } else {
+                None
+            }
+        })
+        .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
+        .map(|(_, icao)| icao)
+}
+
+/// Update global reference to position of lowest aircraft
+///
+/// Scans all aircraft that have been active within the last 5 minutes and
+/// updates the reference to the position of the aircraft with the lowest altitude.
+/// Surface messages (altitude = None) are preferred over any airborne aircraft.
+///
+/// This ensures the global reference is typically at an airport, which improves
+/// surface position decoding for aircraft that haven't established a per-aircraft
+/// reference yet.
+///
+/// Returns true if the reference was updated.
+pub fn update_global_reference(
+    aircraft: &BTreeMap<ICAO, AircraftState>,
+    reference: &mut Option<Position>,
+    current_timestamp: f64,
+) -> bool {
+    const ACTIVE_WINDOW: f64 = 300.0; // 5 minutes
+
+    let lowest = aircraft
+        .values()
+        .filter(|state| current_timestamp - state.timestamp < ACTIVE_WINDOW)
+        .filter_map(|state| state.pos.map(|pos| (state.last_altitude, pos)))
+        .min_by(|a, b| match (a.0, b.0) {
+            (None, None) => std::cmp::Ordering::Equal, // Both surface
+            (None, Some(_)) => std::cmp::Ordering::Less, // Surface < airborne
+            (Some(_), None) => std::cmp::Ordering::Greater, // Airborne > surface
+            (Some(alt_a), Some(alt_b)) => alt_a.partial_cmp(&alt_b).unwrap(),
+        });
+
+    if let Some((_, pos)) = lowest {
+        *reference = Some(pos);
+        return true;
+    }
+
+    false
+}
+
 /// A flag to qualify a CPR position as odd or even
 #[derive(Debug, PartialEq, Eq, Serialize, DekuRead, Copy, Clone)]
 #[repr(u8)]
@@ -107,6 +188,8 @@ impl FromStr for Position {
 pub struct AircraftState {
     timestamp: f64,
     pos: Option<Position>,
+    last_altitude: Option<i32>,
+    pub airport: Option<String>,
     odd_ts: f64,
     odd_msg: Option<AirbornePosition>,
     even_ts: f64,
@@ -444,6 +527,8 @@ pub fn decode_position(
     let latest = aircraft.entry(*icao24).or_insert(AircraftState {
         timestamp,
         pos: None,
+        last_altitude: None,
+        airport: None,
         odd_ts: timestamp,
         odd_msg: None,
         even_ts: timestamp,
@@ -526,7 +611,6 @@ pub fn decode_position(
                         pos = None
                     }
                     // Note: We intentionally do NOT clear latest.pos on validation failure
-                    // (unlike the old code that had `else { latest.pos = None; }`)
                     // This allows subsequent messages to still be validated against the
                     // last known good position, preventing cascading failures.
                 }
@@ -539,6 +623,9 @@ pub fn decode_position(
                 // Then update the reference in aircraft
                 latest.pos = Some(pos);
                 latest.timestamp = timestamp;
+                latest.last_altitude = airborne.alt;
+                // Clear airport when airborne
+                latest.airport = None;
                 // If necessary (according to the callback) update the reference position
                 if let Some(update_reference) = update_reference {
                     if update_reference(airborne) {
@@ -580,11 +667,28 @@ pub fn decode_position(
             }
             if let Some(reference) = reference {
                 if pos.is_none() {
-                    pos = surface_position_with_reference(
+                    let candidate_pos = surface_position_with_reference(
                         surface,
                         reference.latitude,
                         reference.longitude,
-                    )
+                    );
+
+                    // If this is the first surface message for this aircraft,
+                    // validate that the decoded position is near a known airport
+                    if let Some(candidate) = candidate_pos {
+                        if latest.pos.is_none() {
+                            if is_near_airport(&candidate, 10.0) {
+                                // Position is within 10km of an airport - accept it
+                                pos = Some(candidate);
+                            }
+                        } else {
+                            pos = candidate_pos;
+                        }
+                        // Otherwise reject - likely wrong reference was used
+                    } else {
+                        // Not first message, accept the decode
+                        pos = candidate_pos;
+                    }
                 }
             }
             if let Some(pos) = pos {
@@ -594,6 +698,12 @@ pub fn decode_position(
                 // Then update the reference in aircraft
                 latest.pos = Some(pos);
                 latest.timestamp = timestamp;
+                // Surface = on ground = no altitude
+                latest.last_altitude = None;
+                // Find and store the nearest airport
+                if latest.airport.is_none() {
+                    latest.airport = find_nearest_airport(&pos, 10.0);
+                }
             }
         }
         _ => (),

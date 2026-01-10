@@ -430,6 +430,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         false => None,
     };
 
+    let mut last_reference_update: f64 = 0.0;
     let mut first_msg = true;
     while let Some(mut msg) = rx_dedup.recv().await {
         if first_msg {
@@ -440,6 +441,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             app_dec.lock().await.should_clear = true;
             first_msg = false;
+        }
+
+        // Periodically update all sensor references to lowest aircraft position
+        if msg.timestamp - last_reference_update > 300.0 {
+            for (_, reference) in references.iter_mut() {
+                rs1090::decode::cpr::update_global_reference(
+                    &aircraft,
+                    reference,
+                    msg.timestamp,
+                );
+            }
+            last_reference_update = msg.timestamp;
         }
 
         if let Some(message) = &mut msg.message {
@@ -463,8 +476,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         );
 
                         // References may have been modified.
-                        // With static receivers, we don't care; for dynamic ones, we may
-                        // want to update the reference position.
+                        // With static receivers, we don't care.
+                        // With dynamic ones, we may want to update the reference position.
                         if options.update_position {
                             for meta in &msg.metadata {
                                 let _ =
@@ -506,7 +519,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .finish();
         }
 
-        snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb).await;
+        snapshot::update_snapshot(&app_dec, &mut msg, &aircraftdb, &aircraft)
+            .await;
 
         let is_in = filters::Filters::is_in(&filters, &msg);
 

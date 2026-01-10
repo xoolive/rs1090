@@ -212,6 +212,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
             as Box<dyn Fn(&AirbornePosition) -> bool>);
 
+        let mut last_reference_update: f64 = 0.0;
+
         // Print the JSON objects
         for mut json in json_objects.into_iter() {
             // In case there is a rssi field (older version), create a source
@@ -227,6 +229,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             let timestamp_ms = (json.timestamp * 1e3) as u128;
             let frame = json.frame.clone();
+
+            // Periodically update global reference to lowest aircraft position
+            if json.timestamp - last_reference_update > 300.0 {
+                rs1090::decode::cpr::update_global_reference(
+                    &aircraft,
+                    &mut reference,
+                    json.timestamp,
+                );
+                last_reference_update = json.timestamp;
+            }
 
             // Push the JSON to the list of similar messages received
             cache.entry(frame.clone()).or_default().push(json);
