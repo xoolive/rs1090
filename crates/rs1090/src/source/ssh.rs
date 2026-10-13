@@ -200,6 +200,8 @@ async fn connect_server(
     connect_server_inner(server, params, connection_map).await
 }
 
+// async_recursion adds #[must_use] to a boxed Future, which is already must-use.
+#[allow(clippy::double_must_use)]
 #[async_recursion::async_recursion]
 async fn connect_server_inner(
     server: &str,
