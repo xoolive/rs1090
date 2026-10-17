@@ -11,9 +11,8 @@ use clap::{Parser, Subcommand};
 use deku::DekuContainerRead;
 use rs1090::decode::bds::infer_bds;
 use rs1090::decode::cpr::Position;
+use rs1090::output::JsonlWriter;
 use rs1090::prelude::*;
-use tokio::fs;
-use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -26,7 +25,7 @@ struct Options {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    /// Output file instead of stdout
+    /// Output file instead of stdout (.jsonl.zst enables Zstandard)
     #[arg(long, short, default_value=None)]
     output: Option<String>,
 
@@ -36,13 +35,18 @@ struct Options {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    /// Follow a growing JSONL or .jsonl.zst file from the first byte
+    Follow {
+        /// Existing file to follow (no rotation or truncation handling)
+        input: String,
+    },
     /// Decode ASTERIX CAT48 files (.raw, .da1) to JSON
     Cat48 {
         /// Input files or glob patterns (e.g., "*.da1", "data/*.raw")
         #[arg(required = true)]
         inputs: Vec<String>,
 
-        /// Output file instead of stdout
+        /// Output file instead of stdout (.jsonl.zst enables Zstandard)
         #[arg(long, short)]
         output: Option<String>,
 
@@ -100,7 +104,7 @@ enum Commands {
         #[arg(long)]
         format: Option<String>,
 
-        /// Output file instead of stdout
+        /// Output file instead of stdout (.jsonl.zst enables Zstandard)
         #[arg(long, short)]
         output: Option<String>,
 
@@ -125,6 +129,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Handle subcommands
     match options.command {
+        Some(Commands::Follow { input }) => {
+            tokio::select! {
+                result = rs1090::output::follow_file(input, tokio::io::stdout()) => result?,
+                signal = tokio::signal::ctrl_c() => signal?,
+            }
+            return Ok(());
+        }
         Some(Commands::Cat48 {
             inputs,
             output,
@@ -175,14 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Default behavior: decode raw Mode S / BDS messages
     let mut output_file = if let Some(output_path) = options.output {
-        Some(
-            fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(output_path)
-                .await?,
-        )
+        Some(JsonlWriter::open(output_path, false).await?)
     } else {
         None
     };
@@ -252,8 +256,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
             if let Some(file) = &mut output_file {
-                file.write_all(json.as_bytes()).await?;
-                file.write_all(b"\n").await?;
+                file.write_line(&json).await?;
             } else {
                 println!("{json}");
             }
@@ -261,7 +264,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(file) = &mut output_file {
-        file.flush().await?;
+        file.finish().await?;
     }
     Ok(())
 }
@@ -269,6 +272,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn follow_command_accepts_compressed_file() {
+        let options = Options::try_parse_from([
+            "decode1090",
+            "follow",
+            "capture.jsonl.zst",
+        ])
+        .unwrap();
+        assert!(
+            matches!(options.command, Some(Commands::Follow { input }) if input == "capture.jsonl.zst")
+        );
+    }
 
     #[test]
     fn file_defaults_preserve_order_without_deduplication() {
