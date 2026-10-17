@@ -22,6 +22,8 @@
 - Share positional ADS-B dispatch and per-sensor below-5000-ft reference
   updates with jet1090; expose `--update-position` for moving receivers.
 - Parse floating-point timestamps with round-trip precision.
+- Read `.jsonl.zst` / `.csv.zst` inputs, including concatenated frames;
+  report corrupt and truncated streams as errors.
 - Reject output aliases of input captures, including hard links, and
   propagate write/flush errors.
 

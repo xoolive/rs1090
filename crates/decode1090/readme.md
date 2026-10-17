@@ -47,9 +47,10 @@ See `--help` for more information.
   }
   ```
 
-- Decode files. The `file` subcommand accepts JSONL and Beast CSV inputs directly, including compressed `.gz` and `.7z` files such as `.jsonl.7z` and `.csv.7z`.
+- Decode files. The `file` subcommand accepts JSONL and Beast CSV inputs directly, including compressed `.gz`, `.zst` and `.7z` files such as `.jsonl.zst`, `.jsonl.7z` and `.csv.7z`.
 
   ```sh
+  decode1090 file flight.jsonl.zst --reference LFBO --output decoded.jsonl
   decode1090 file flight.jsonl.7z --reference LFBO --output decoded.jsonl
   decode1090 file raw_beast.csv.7z --reference LFPO --output decoded.jsonl
   ```
