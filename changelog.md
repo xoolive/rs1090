@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### DF11 decoding
+
+- Export a typed `interrogator` in DF11 all-call replies. Keep the raw
+  `crc_syndrome` internal (`serde(skip)`); the enum lives alongside the DF
+  structures in `decode/mod.rs`, without a standalone DF11 module.
+  Syndromes 0–15 identify II0–II15, 17–79 identify SI1–SI63; 16 is explicitly
+  `invalid_si0`, and values above 79 remain `invalid` with their full syndrome.
+  Invalid frames are retained, not silently masked or discarded. The textual
+  decoder display also shows these fields. Legacy JSON without the new fields
+  remains readable and does not invent II0. Rust construction of the
+  `DF::AllCallReply` variant now requires the two additional optional fields;
+  binary decoding always populates them.
+
 ### Bug Fixes
 
 - Keep BDS 2,0 decoded when identification is empty or contains reserved

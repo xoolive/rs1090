@@ -138,6 +138,17 @@ pub enum DF {
         /// Parity/Interrogator identifier
         #[serde(skip, default = "serde_default_icao_empty")]
         p_icao: ICAO,
+        /// Full 24-bit parity syndrome, not raw transmitted parity. Always
+        /// present on binary decode; omitted from JSON and unavailable after
+        /// JSON deserialization. The typed interrogator is exported instead.
+        #[deku(skip, default = "Some(crc)")]
+        #[serde(skip)]
+        crc_syndrome: Option<u32>,
+        /// Typed II/SI interpretation, including forbidden SI0 and invalid
+        /// full-width syndromes. None means unavailable, not II0.
+        #[deku(skip, default = "Some(InterrogatorIdentifier::from(crc))")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        interrogator: Option<InterrogatorIdentifier>,
     },
 
     #[deku(id = "16")]
@@ -281,6 +292,49 @@ pub enum DF {
     },
 }
 
+/// Identifier recovered from a DF11 CRC syndrome (Annex 10 IV 3.1.2.3.3.2).
+///
+/// Interpretation requires the full 24-bit syndrome: masking it to seven bits
+/// can turn invalid frames into plausible identifiers. II0 also covers
+/// unsolicited acquisition squitters and intermode all-call replies; it does
+/// not identify a unique radar or establish a preceding UF11.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
+pub enum InterrogatorIdentifier {
+    /// Interrogator Identifier, 0 through 15.
+    II(u8),
+    /// Surveillance Identifier, 1 through 63 (syndrome minus 16).
+    SI(u8),
+    /// Syndrome 16 would encode SI0, which is not an allocated SI code.
+    #[serde(rename = "invalid_si0")]
+    InvalidSI0,
+    /// Full syndrome outside the permitted II/SI range, retained for diagnosis.
+    #[serde(rename = "invalid")]
+    Invalid(u32),
+}
+
+impl From<u32> for InterrogatorIdentifier {
+    fn from(syndrome: u32) -> Self {
+        match syndrome {
+            0..=15 => Self::II(syndrome as u8),
+            16 => Self::InvalidSI0,
+            17..=79 => Self::SI((syndrome - 16) as u8),
+            _ => Self::Invalid(syndrome),
+        }
+    }
+}
+
+impl fmt::Display for InterrogatorIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::II(code) => write!(f, "II{code}"),
+            Self::SI(code) => write!(f, "SI{code}"),
+            Self::InvalidSI0 => write!(f, "invalid SI0"),
+            Self::Invalid(syndrome) => write!(f, "invalid ({syndrome:#08x})"),
+        }
+    }
+}
+
 pub fn serde_default_icao_empty() -> ICAO {
     ICAO(0)
 }
@@ -290,8 +344,9 @@ pub fn serde_default_icao_empty() -> ICAO {
 /// Use as `Message::try_from()` in mostly all applications
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Message {
-    /// Calculated from all bits, should be 0 for ADS-B (raises a DekuError),
-    /// icao24 otherwise
+    /// Full parity syndrome: zero for valid ADS-B, a recovered aircraft
+    /// address for AP formats, and the II/SI overlay for DF11. It is not
+    /// universally an ICAO address or a zero/nonzero validity test.
     #[serde(skip, default = "u32::default")]
     pub crc: u32,
 
@@ -438,11 +493,21 @@ impl fmt::Display for Message {
                 writeln!(f, "  Squawk:        {id}")?;
             }
             DF::AllCallReply {
-                capability, icao, ..
+                capability,
+                icao,
+                crc_syndrome,
+                interrogator,
+                ..
             } => {
                 writeln!(f, " DF11. All Call Reply")?;
                 writeln!(f, "  ICAO Address:  {icao} (Mode S / ADS-B)")?;
                 writeln!(f, "  Air/Ground:    {capability}")?;
+                if let Some(syndrome) = crc_syndrome {
+                    writeln!(f, "  CRC syndrome: {syndrome:#08x}")?;
+                }
+                if let Some(identifier) = interrogator {
+                    writeln!(f, "  Interrogator:  {identifier}")?;
+                }
             }
             DF::LongAirAirSurveillance { ac, .. } => {
                 writeln!(f, " DF16. Long Air-Air ACAS")?;
@@ -1165,6 +1230,101 @@ mod tests {
 
     use super::*;
     use hexlit::hex;
+
+    #[test]
+    fn test_df11_syndrome_boundaries_and_full_width() {
+        for (syndrome, expected) in [
+            (0, InterrogatorIdentifier::II(0)),
+            (15, InterrogatorIdentifier::II(15)),
+            (16, InterrogatorIdentifier::InvalidSI0),
+            (17, InterrogatorIdentifier::SI(1)),
+            (79, InterrogatorIdentifier::SI(63)),
+            (80, InterrogatorIdentifier::Invalid(80)),
+            (0x800001, InterrogatorIdentifier::Invalid(0x800001)),
+            (0xffffff, InterrogatorIdentifier::Invalid(0xffffff)),
+        ] {
+            assert_eq!(InterrogatorIdentifier::from(syndrome), expected);
+            // Construct parity for a desired syndrome independently of decoding.
+            let mut frame = hex!("5d39d30e000000");
+            let parity = modes_checksum(&frame, 56).unwrap() ^ syndrome;
+            frame[4..7].copy_from_slice(&parity.to_be_bytes()[1..4]);
+            let (_, decoded) = Message::from_bytes((&frame, 0)).unwrap();
+            assert_eq!(decoded.crc, syndrome);
+            if let DF::AllCallReply {
+                crc_syndrome,
+                interrogator,
+                ..
+            } = decoded.df
+            {
+                assert_eq!(crc_syndrome, Some(syndrome));
+                assert_eq!(interrogator, Some(expected));
+            } else {
+                panic!("Expected DF11");
+            }
+            let json = serde_json::to_value(&decoded).unwrap();
+            assert!(json.get("crc_syndrome").is_none());
+            assert_eq!(
+                json["interrogator"],
+                serde_json::to_value(expected).unwrap()
+            );
+            assert_eq!(json["icao24"], "39d30e");
+            assert!(json.get("p_icao").is_none());
+            assert!(json.get("crc").is_none());
+            let restored: Message = serde_json::from_value(json).unwrap();
+            if let DF::AllCallReply {
+                crc_syndrome,
+                interrogator,
+                ..
+            } = restored.df
+            {
+                assert_eq!(crc_syndrome, None);
+                assert_eq!(interrogator, Some(expected));
+            } else {
+                panic!("Expected DF11");
+            }
+            assert_eq!(
+                serde_json::to_value(restored).unwrap(),
+                serde_json::to_value(decoded).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn test_df11_captured_invalid_syndrome_is_retained() {
+        // One cherry-picked DF11; no flight metadata or full private capture.
+        let bytes = hex!("5d34530e459ca0");
+        let decoded = Message::try_from(bytes.as_slice()).unwrap();
+        assert_eq!(
+            serde_json::to_value(&decoded).unwrap(),
+            serde_json::json!({
+                "df": "11", "icao24": "34530e", "capability": "airborne",
+                "interrogator": {"type": "invalid", "value": 92}
+            })
+        );
+        assert!(decoded.to_string().contains("invalid (0x00005c)"));
+    }
+
+    #[test]
+    fn test_df11_legacy_json_does_not_invent_ii0() {
+        let decoded: Message = serde_json::from_str(
+            r#"{"df":"11","icao24":"39d30e","capability":"airborne"}"#,
+        )
+        .unwrap();
+        if let DF::AllCallReply {
+            crc_syndrome,
+            interrogator,
+            ..
+        } = decoded.df
+        {
+            assert_eq!(crc_syndrome, None);
+            assert_eq!(interrogator, None);
+        } else {
+            panic!("Expected DF11");
+        }
+        let json = serde_json::to_value(decoded).unwrap();
+        assert!(json.get("crc_syndrome").is_none());
+        assert!(json.get("interrogator").is_none());
+    }
 
     #[test]
     fn test_ac13field() {
