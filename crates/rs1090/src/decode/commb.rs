@@ -518,10 +518,12 @@ fn sanitize_candidates<C: CommBCandidates>(
         }
     }
 
-    // Winner-take-all: BDS 1,0 / 2,0 / 3,0 are identified by a mandatory
-    // byte-header prefix that no other register produces. BDS 2,1 is not a
-    // winner: even after registration validation, short registration-looking
-    // phantoms are common enough that they must not evict other candidates.
+    // Winner-take-all heuristic: BDS 1,0 / 2,0 / 3,0 carry mandatory byte
+    // headers. Unheadered register layouts can still match the same bytes;
+    // preferring these candidates is not independent proof of the register.
+    // BDS 2,1 is not a winner: even after registration validation, short
+    // registration-looking phantoms are common enough that they must not
+    // evict other candidates.
     let has_winner = sel.has_bds10() || sel.has_bds20() || sel.has_bds30();
     if has_winner {
         sel.clear_non_winner();
@@ -1016,6 +1018,24 @@ mod tests {
     use super::*;
     use crate::prelude::*;
     use hexlit::hex;
+
+    #[test]
+    #[cfg(feature = "bds-infer")]
+    fn test_unavailable_bds20_does_not_become_weather() {
+        for bytes in [
+            hex!("a100000020000000000000685487"),
+            hex!("a8281e8a20000000000000caa2c7"),
+            hex!("a0001838208208208208207cdfa5"),
+        ] {
+            let (_, mut message) = Message::from_bytes((&bytes, 0)).unwrap();
+            MessageProcessor::new(&mut message, &mut BTreeMap::new())
+                .sanitize_commb()
+                .finish();
+            let json = serde_json::to_value(message).unwrap();
+            assert_eq!(json["bds20"], serde_json::json!({"bds":"20"}));
+            assert!(json.get("bds44").is_none());
+        }
+    }
 
     #[test]
     fn test_bds5060_no65() {
