@@ -53,3 +53,5 @@ See `--help` for more information.
   decode1090 file flight.jsonl.7z --reference LFBO --output decoded.jsonl
   decode1090 file raw_beast.csv.7z --reference LFPO --output decoded.jsonl
   ```
+
+Output paths that alias an input (including hard links) are rejected.
