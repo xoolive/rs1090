@@ -54,4 +54,22 @@ See `--help` for more information.
   decode1090 file raw_beast.csv.7z --reference LFPO --output decoded.jsonl
   ```
 
-Output paths that alias an input (including hard links) are rejected.
+  For a moving receiver recorded by `jet1090 --update-position`, replay using
+  the same per-sensor reference policy (airborne updates below 5000 ft):
+
+  ```sh
+  decode1090 file flight.jsonl --reference LFBO --update-position --output replay.jsonl
+  ```
+
+  By default, file replay preserves recorded arrival order (`--input-order=true`),
+  including small timestamp inversions, and disables deduplication
+  (`--deduplication 0`). To sort by timestamp, use `--input-order=false`.
+  Nonzero deduplication requires sorting; for example,
+  `--input-order=false --deduplication 400` restores the previous defaults.
+  Without `--update-position`, per-message reference updates are
+  disabled; the periodic lowest-aircraft reference refresh remains active, as
+  in jet1090. Exact historical re-decoding also depends on the original decoder
+  version and state: intentional validation fixes may change old hypotheses.
+
+  File replay always re-decodes the raw frames; there is no enrichment-only
+  shortcut. Output paths that alias an input (including hard links) are rejected.

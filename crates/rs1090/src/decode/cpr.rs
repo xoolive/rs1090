@@ -638,6 +638,65 @@ pub fn surface_position_with_reference(
 
 pub type UpdateIf = Option<Box<dyn Fn(&AirbornePosition) -> bool>>;
 
+/// Reference-update policy shared by live decoding and file replay.
+/// Dynamic receivers follow decoded airborne positions below 5000 ft.
+pub fn reference_update_policy(enabled: bool) -> UpdateIf {
+    enabled.then(|| {
+        Box::new(|pos: &AirbornePosition| pos.alt.is_some_and(|alt| alt < 5000))
+            as Box<dyn Fn(&AirbornePosition) -> bool>
+    })
+}
+
+/// Decode positional ADS-B using the primary sensor's reference.
+///
+/// Updated DF17 references propagate only to sensors that observed the message.
+/// DF18 uses a temporary reference, matching the live receiver behavior. Missing
+/// metadata uses sensor zero for offline/legacy inputs. Non-positional messages
+/// must not create CPR state as a side effect.
+pub fn decode_sensor_position(
+    msg: &mut TimedMessage,
+    aircraft: &mut BTreeMap<ICAO, AircraftState>,
+    references: &mut BTreeMap<u64, Option<Position>>,
+    update_reference: &UpdateIf,
+    update_position: bool,
+) {
+    let serial = msg.metadata.first().map(|meta| meta.serial).unwrap_or(0);
+    let Some(message) = &mut msg.message else {
+        return;
+    };
+    let (address, payload, persist) = match &mut message.df {
+        DF::ExtendedSquitterADSB(adsb)
+            if matches!(adsb.message, ME::BDS05 { .. } | ME::BDS06 { .. }) =>
+        {
+            (adsb.icao24, &mut adsb.message, update_position)
+        }
+        DF::ExtendedSquitterTisB { cf, .. }
+            if matches!(cf.me, ME::BDS05 { .. } | ME::BDS06 { .. }) =>
+        {
+            (cf.aa, &mut cf.me, false)
+        }
+        _ => return,
+    };
+    let mut reference = references.get(&serial).copied().flatten();
+    decode_position(
+        payload,
+        msg.timestamp,
+        &address,
+        aircraft,
+        &mut reference,
+        update_reference,
+    );
+    if persist {
+        if msg.metadata.is_empty() {
+            references.insert(0, reference);
+        } else {
+            for meta in &msg.metadata {
+                references.insert(meta.serial, reference);
+            }
+        }
+    }
+}
+
 /**
  * Mutates the ME message based on recent past positions (parameter `timestamp`)
  * of the same aircraft (parameter `icao24`). For surface messages, the
@@ -910,9 +969,124 @@ pub fn decode_positions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::decode::{ControlField, ControlFieldType};
     use crate::prelude::*;
     use approx::assert_relative_eq;
     use hexlit::hex;
+
+    #[test]
+    fn test_live_reference_policy_and_sensor_propagation() {
+        let dynamic = reference_update_policy(true).unwrap();
+        let (_, message) =
+            Message::from_bytes((&hex!("8D40058B58C901375147EFD09357"), 0))
+                .unwrap();
+        let ExtendedSquitterADSB(adsb) = message.df else {
+            panic!();
+        };
+        let ME::BDS05 { mut inner, .. } = adsb.message else {
+            panic!();
+        };
+        for (altitude, expected) in [
+            (Some(1000), true),
+            (Some(4999), true),
+            (Some(5000), false),
+            (None, false),
+        ] {
+            inner.alt = altitude;
+            assert_eq!(dynamic(&inner), expected);
+        }
+        assert!(reference_update_policy(false).is_none());
+        let initial = Position {
+            latitude: 43.629,
+            longitude: 1.364,
+        };
+        for (enabled, tisb) in [(false, false), (true, false), (true, true)] {
+            let mut aircraft = BTreeMap::new();
+            let mut references = BTreeMap::from([
+                (1, Some(initial)),
+                (2, Some(initial)),
+                (3, Some(initial)),
+            ]);
+            let update = reference_update_policy(enabled);
+            for (i, bytes) in [
+                hex!("8D40058B58C901375147EFD09357"),
+                hex!("8D40058B58C904A87F402D3B8C59"),
+            ]
+            .iter()
+            .enumerate()
+            {
+                let (_, mut message) = Message::from_bytes((bytes, 0)).unwrap();
+                if let ExtendedSquitterADSB(ref mut adsb) = message.df {
+                    if let ME::BDS05 { ref mut inner, .. } = adsb.message {
+                        inner.alt = Some(3500);
+                    }
+                }
+                if tisb {
+                    if let ExtendedSquitterADSB(adsb) = message.df.clone() {
+                        message.df = ExtendedSquitterTisB {
+                            cf: ControlField {
+                                field_type: ControlFieldType::ADSB_ES_NT,
+                                aa: adsb.icao24,
+                                me: adsb.message,
+                            },
+                            pi: ICAO(0),
+                        };
+                    }
+                }
+                let timestamp = 1000. + i as f64;
+                let metadata = [1, 2]
+                    .into_iter()
+                    .map(|serial| super::super::SensorMetadata {
+                        serial,
+                        system_timestamp: timestamp,
+                        gnss_timestamp: None,
+                        nanoseconds: None,
+                        rssi: None,
+                        name: None,
+                    })
+                    .collect();
+                let mut timed = TimedMessage {
+                    timestamp,
+                    frame: bytes.to_vec(),
+                    message: Some(message),
+                    metadata,
+                    decode_time: None,
+                };
+                decode_sensor_position(
+                    &mut timed,
+                    &mut aircraft,
+                    &mut references,
+                    &update,
+                    enabled,
+                );
+            }
+            assert_eq!(references[&1], references[&2]);
+            assert_eq!(references[&3], Some(initial));
+            assert_eq!(references[&1] != Some(initial), enabled && !tisb);
+        }
+    }
+
+    #[test]
+    fn test_nonpositional_message_does_not_create_cpr_state() {
+        let bytes = hex!("8D406B902015A678D4D220AA4BDA");
+        let (_, message) = Message::from_bytes((&bytes, 0)).unwrap();
+        let mut timed = TimedMessage {
+            timestamp: 1000.,
+            frame: bytes.to_vec(),
+            message: Some(message),
+            metadata: vec![],
+            decode_time: None,
+        };
+        let mut aircraft = BTreeMap::new();
+        decode_sensor_position(
+            &mut timed,
+            &mut aircraft,
+            &mut BTreeMap::new(),
+            &reference_update_policy(true),
+            true,
+        );
+        assert!(aircraft.is_empty());
+    }
 
     #[test]
     fn decode_airporne_position() {

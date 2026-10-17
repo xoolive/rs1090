@@ -42,7 +42,7 @@ enum Commands {
         #[arg(required = true)]
         inputs: Vec<String>,
 
-        /// Output file instead of stdout (JSONL format)
+        /// Output file instead of stdout
         #[arg(long, short)]
         output: Option<String>,
 
@@ -85,7 +85,7 @@ enum Commands {
     },
     /// Decode Mode S messages from files (JSONL, CSV; plain, .gz, or .7z)
     File {
-        /// Input files (JSONL or CSV Beast format; .jsonl.7z and .csv.7z are supported directly)
+        /// Input files (JSONL or Beast CSV; .gz and .7z compression supported directly)
         #[arg(required = true)]
         inputs: Vec<String>,
 
@@ -104,8 +104,17 @@ enum Commands {
         #[arg(long, short)]
         output: Option<String>,
 
-        /// Deduplication threshold (in ms)
-        #[arg(long, default_value = "400")]
+        /// Follow moving receiver references below 5000 ft, as in jet1090
+        #[arg(long)]
+        update_position: bool,
+
+        /// Preserve file order; use --input-order=false to sort by timestamp
+        #[arg(long, action = clap::ArgAction::Set, default_value_t = true,
+              num_args = 0..=1, default_missing_value = "true", require_equals = true)]
+        input_order: bool,
+
+        /// Deduplication threshold in ms (nonzero requires --input-order=false)
+        #[arg(long, default_value = "0")]
         deduplication: u128,
     },
 }
@@ -147,6 +156,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             format,
             output,
             deduplication,
+            update_position,
+            input_order,
         }) => {
             return file::process_file_decode(
                 inputs,
@@ -154,6 +165,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 format,
                 output,
                 deduplication,
+                update_position,
+                input_order,
             )
             .await;
         }
@@ -240,12 +253,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             if let Some(file) = &mut output_file {
                 file.write_all(json.as_bytes()).await?;
-                file.write_all("\n".as_bytes()).await?;
+                file.write_all(b"\n").await?;
             } else {
                 println!("{json}");
             }
         }
     }
 
+    if let Some(file) = &mut output_file {
+        file.flush().await?;
+    }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_defaults_preserve_order_without_deduplication() {
+        let options =
+            Options::try_parse_from(["decode1090", "file", "capture.jsonl"])
+                .unwrap();
+        assert!(matches!(
+            options.command,
+            Some(Commands::File {
+                input_order: true,
+                deduplication: 0,
+                update_position: false,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn file_order_can_be_explicitly_enabled_or_disabled() {
+        let explicit = Options::try_parse_from([
+            "decode1090",
+            "file",
+            "capture.jsonl",
+            "--input-order",
+        ])
+        .unwrap();
+        assert!(matches!(
+            explicit.command,
+            Some(Commands::File {
+                input_order: true,
+                ..
+            })
+        ));
+        let sorted = Options::try_parse_from([
+            "decode1090",
+            "file",
+            "capture.jsonl",
+            "--input-order=false",
+            "--deduplication",
+            "400",
+        ])
+        .unwrap();
+        assert!(matches!(
+            sorted.command,
+            Some(Commands::File {
+                input_order: false,
+                deduplication: 400,
+                ..
+            })
+        ));
+    }
 }

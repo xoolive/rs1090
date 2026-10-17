@@ -17,6 +17,11 @@
 
 ### File replay
 
+- Default to recorded input order and zero deduplication. Use
+  `--input-order=false --deduplication 400` to restore sorting and deduplication.
+- Share positional ADS-B dispatch and per-sensor below-5000-ft reference
+  updates with jet1090; expose `--update-position` for moving receivers.
+- Parse floating-point timestamps with round-trip precision.
 - Reject output aliases of input captures, including hard links, and
   propagate write/flush errors.
 
