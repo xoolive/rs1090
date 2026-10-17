@@ -291,11 +291,10 @@ pub async fn update_snapshot(
                     }
                 }
                 CommBAltitudeReply { bds, .. } => {
-                    if let Some(bds20) = &bds.bds20 {
-                        if !bds20.callsign.contains("#") {
-                            aircraft.cur.callsign =
-                                Some(bds20.callsign.to_string());
-                        }
+                    if let Some(callsign) =
+                        bds.bds20.as_ref().and_then(|bds| bds.callsign.as_ref())
+                    {
+                        aircraft.cur.callsign = Some(callsign.clone());
                     }
                     if let Some(bds40) = &bds.bds40 {
                         aircraft.cur.selected_altitude =
@@ -319,11 +318,10 @@ pub async fn update_snapshot(
                     }
                 }
                 CommBIdentityReply { bds, .. } => {
-                    if let Some(bds20) = &bds.bds20 {
-                        if !bds20.callsign.contains("#") {
-                            aircraft.cur.callsign =
-                                Some(bds20.callsign.to_string());
-                        }
+                    if let Some(callsign) =
+                        bds.bds20.as_ref().and_then(|bds| bds.callsign.as_ref())
+                    {
+                        aircraft.cur.callsign = Some(callsign.clone());
                     }
                     if let Some(bds40) = &bds.bds40 {
                         aircraft.cur.selected_altitude =

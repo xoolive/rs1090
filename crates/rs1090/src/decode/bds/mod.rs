@@ -652,9 +652,9 @@ pub fn infer_bds(payload: &[u8], icao24: Option<u32>) -> Vec<DecodedBds> {
     }
 
     // Winner-take-all.
-    // BDS 1,0 / 2,0 / 3,0 are identified by a mandatory byte-header prefix
-    // (0x10 / 0x20 / 0x30) that no other register produces, making them
-    // high-confidence identifications. BDS 2,1 is deliberately excluded from
+    // Prefer BDS 1,0 / 2,0 / 3,0 with their mandatory byte-header prefixes
+    // (0x10 / 0x20 / 0x30). This is an inference heuristic: unheadered
+    // register layouts can also match those bytes. BDS 2,1 is deliberately excluded from
     // this tier: registration validation helps, but registration-looking
     // phantoms are still common enough that they must not evict other
     // surviving candidates.

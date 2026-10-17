@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
  *   - Same encoding as used in Extended Squitter BDS 0,8
  *   - Valid characters: A-Z, 0-9, and space
  *   - Character set (6-bit encoding):
- *     * 000000 = (no character/space)
+ *     * 000000 = invalid/reserved (not a space)
  *     * 000001-011010 = A-Z
  *     * 110000-111001 = 0-9
  *     * 100000 = space
@@ -69,8 +69,33 @@ pub struct AircraftIdentification {
     ///   - Aircraft registration marking (when no flight plan)
     ///
     /// Same encoding as Extended Squitter BDS 0,8.
-    #[deku(reader = "bds08::callsign_read(deku::reader)")]
-    pub callsign: String,
+    /// Empty identification or reserved character codes leave this field
+    /// unavailable, without invalidating the BDS20 register hypothesis.
+    #[deku(reader = "callsign_read(deku::reader)")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_callsign",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub callsign: Option<String>,
+}
+
+fn callsign_read<R: deku::no_std_io::Read + deku::no_std_io::Seek>(
+    reader: &mut Reader<R>,
+) -> Result<Option<String>, DekuError> {
+    let callsign = bds08::callsign_read(reader)?;
+    Ok(available_callsign(callsign))
+}
+
+fn available_callsign(callsign: String) -> Option<String> {
+    (!callsign.trim().is_empty() && !callsign.contains('#')).then_some(callsign)
+}
+
+fn deserialize_callsign<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    Ok(Option::<String>::deserialize(deserializer)?
+        .and_then(available_callsign))
 }
 
 fn fail_if_not20(value: u8) -> Result<u8, DekuError> {
@@ -98,13 +123,88 @@ mod tests {
                 bds.bds20,
                 Some(super::AircraftIdentification {
                     bds: 32,
-                    callsign: "EXS2MF".to_string()
+                    callsign: Some("EXS2MF".to_string())
                 })
+            );
+            assert_eq!(
+                serde_json::to_value(&bds).unwrap()["bds20"]["callsign"],
+                "EXS2MF"
             );
         } else {
             unreachable!();
         }
     }
+    #[test]
+    fn test_unavailable_bds20_retains_register_with_no_callsign() {
+        // These synthetic frames exercise payload inference, not RF CRC
+        // validation: all-zero identification, all spaces, and a reserved
+        // character mixed with otherwise valid identification.
+        for bytes in [
+            hex!("a0001838200000000000007cdfa5"),
+            hex!("a0001838208208208208207cdfa5"),
+            hex!("a0001838200184f23468207cdfa5"),
+        ] {
+            let (_, msg) = Message::from_bytes((&bytes, 0)).unwrap();
+            if let CommBAltitudeReply { bds, .. } = msg.df {
+                let identification =
+                    bds.bds20.as_ref().expect("BDS20 header remains valid");
+                assert_eq!(identification.callsign, None);
+                let json = serde_json::to_value(&bds).unwrap();
+                assert_eq!(json["bds20"], serde_json::json!({"bds":"20"}));
+                let restored: super::AircraftIdentification =
+                    serde_json::from_value(json["bds20"].clone()).unwrap();
+                assert_eq!(restored.callsign, None);
+                assert_eq!(
+                    serde_json::to_value(restored).unwrap(),
+                    json["bds20"]
+                );
+            } else {
+                unreachable!();
+            }
+        }
+    }
+
+    #[test]
+    fn test_legacy_json_unavailable_callsigns_are_normalized() {
+        for callsign in [
+            serde_json::Value::Null,
+            serde_json::json!(""),
+            serde_json::json!("   "),
+            serde_json::json!("########"),
+            serde_json::json!("F#HRBE"),
+        ] {
+            let identification: super::AircraftIdentification =
+                serde_json::from_value(
+                    serde_json::json!({"bds":"20", "callsign":callsign}),
+                )
+                .unwrap();
+            assert!(identification.callsign.is_none());
+            assert_eq!(
+                serde_json::to_value(identification).unwrap(),
+                serde_json::json!({"bds":"20"})
+            );
+        }
+        let valid: super::AircraftIdentification = serde_json::from_value(
+            serde_json::json!({"bds":"20", "callsign":"EXS2MF"}),
+        )
+        .unwrap();
+        assert_eq!(valid.callsign.as_deref(), Some("EXS2MF"));
+    }
+
+    #[test]
+    #[cfg(feature = "bds-infer")]
+    fn test_zero_identification_has_a_structural_weather_alternative() {
+        use crate::decode::bds::{decode_bds, infer_bds, DecodedBds};
+        let zero_identification = hex!("20000000000000");
+        assert!(decode_bds(&zero_identification, 0x44).is_ok());
+        assert!(decode_bds(&hex!("20820820820820"), 0x44).is_err());
+        let selected = infer_bds(&zero_identification, None);
+        assert_eq!(selected.len(), 1);
+        assert!(
+            matches!(&selected[0], DecodedBds::Bds20(identification) if identification.callsign.is_none())
+        );
+    }
+
     #[test]
     fn test_invalid_bds20() {
         let bytes = hex!("a800178d10010080f50000d5893c");

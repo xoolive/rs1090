@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- Keep BDS 2,0 decoded when identification is empty or contains reserved
+  characters: `AircraftIdentification.callsign` is now `Option<String>`.
+  Unavailable values are `None` and omitted from JSON; the `bds20` object stays
+  present. Valid callsigns serialize unchanged. Live aircraft state retains its
+  last known callsign when a new identification is unavailable.
+- Retain existing BDS20 inference precedence when identification is unavailable.
+  Header-based winner selection is a heuristic, not proof against alternative
+  unheadered layouts (e.g. BDS44 for payload `20000000000000`).
+
 ## 0.6.0
 
 ### Breaking Changes
