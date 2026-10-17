@@ -2,7 +2,10 @@
 use crate::beast::decode_beast_timestamp;
 use flate2::read::GzDecoder;
 use rs1090::decode::commb::MessageProcessor;
-use rs1090::decode::cpr::{decode_position, AircraftState, Position, UpdateIf};
+use rs1090::decode::cpr::{
+    decode_sensor_position, reference_update_policy, AircraftState, Position,
+    UpdateIf,
+};
 use rs1090::decode::SensorMetadata;
 use rs1090::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -142,9 +145,10 @@ fn parse_beast_csv_line(line: &str) -> Option<JSONEntry> {
 async fn process_entries(
     mut entries: Vec<JSONEntry>,
     aircraft: &mut BTreeMap<ICAO, AircraftState>,
-    reference: &mut Option<Position>,
+    references: &mut BTreeMap<u64, Option<Position>>,
     update_reference: &UpdateIf,
     output_file: &mut Option<File>,
+    update_position: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let merged_metadata: Vec<SensorMetadata> = entries
         .iter()
@@ -166,28 +170,14 @@ async fn process_entries(
         metadata: merged_metadata,
         decode_time: None,
     };
+    decode_sensor_position(
+        &mut msg,
+        aircraft,
+        references,
+        update_reference,
+        update_position,
+    );
     if let Some(message) = &mut msg.message {
-        // Decode positions for ADS-B messages
-        match &mut message.df {
-            ExtendedSquitterADSB(adsb) => decode_position(
-                &mut adsb.message,
-                msg.timestamp,
-                &adsb.icao24,
-                aircraft,
-                reference,
-                update_reference,
-            ),
-            ExtendedSquitterTisB { cf, .. } => decode_position(
-                &mut cf.me,
-                msg.timestamp,
-                &cf.aa,
-                aircraft,
-                reference,
-                update_reference,
-            ),
-            _ => {}
-        }
-
         // Sanitize Comm-B messages and record surviving BDS registers
         // for use as evidence in subsequent GICB bitmap validation.
         MessageProcessor::new(message, aircraft)
@@ -207,7 +197,7 @@ async fn process_entries(
         };
         if let Some(file) = &mut *output_file {
             file.write_all(json.as_bytes()).await?;
-            file.write_all("\n".as_bytes()).await?;
+            file.write_all(b"\n").await?;
         } else {
             println!("{json}");
         }
@@ -222,7 +212,12 @@ pub async fn process_file_decode(
     format: Option<String>,
     output_path: Option<String>,
     deduplication: u128,
+    update_position: bool,
+    input_order: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if input_order && deduplication != 0 {
+        return Err("--input-order requires --deduplication 0".into());
+    }
     ensure_distinct_output(&inputs, output_path.as_deref())?;
     let mut output_file = if let Some(out_path) = output_path {
         Some(
@@ -238,7 +233,6 @@ pub async fn process_file_decode(
     };
 
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
-    let mut reference = reference;
     let mut messages = Vec::new();
 
     // Process each input file
@@ -284,22 +278,29 @@ pub async fn process_file_decode(
         messages.extend(json_objects);
     }
 
-    // Sort messages by timestamp
-    messages.sort_by(|a, b| {
-        a.timestamp
-            .partial_cmp(&b.timestamp)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    // A recorded live stream may contain small timestamp inversions. Replay
+    // its arrival order explicitly when comparing stateful decoding.
+    if !input_order {
+        messages.sort_by(|a, b| {
+            a.timestamp
+                .partial_cmp(&b.timestamp)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+    let mut references: BTreeMap<u64, Option<Position>> = messages
+        .iter()
+        .flat_map(|message| {
+            message.metadata.iter().map(|meta| (meta.serial, reference))
+        })
+        .collect();
+    references.insert(0, reference);
 
     // Setup deduplication structures
     let mut cache: HashMap<Vec<u8>, Vec<JSONEntry>> = HashMap::new();
     let mut expiration_heap: BinaryHeap<Reverse<(u128, Vec<u8>)>> =
         BinaryHeap::new();
 
-    let update_reference = Some(Box::new(|pos: &AirbornePosition| {
-        pos.alt.is_some_and(|alt| alt < 1000)
-    })
-        as Box<dyn Fn(&AirbornePosition) -> bool>);
+    let update_reference = reference_update_policy(update_position);
 
     let mut last_reference_update: f64 = 0.0;
 
@@ -321,11 +322,13 @@ pub async fn process_file_decode(
 
         // Periodically update global reference to lowest aircraft position
         if json.timestamp - last_reference_update > 300.0 {
-            rs1090::decode::cpr::update_global_reference(
-                &aircraft,
-                &mut reference,
-                json.timestamp,
-            );
+            for reference in references.values_mut() {
+                rs1090::decode::cpr::update_global_reference(
+                    &aircraft,
+                    reference,
+                    json.timestamp,
+                );
+            }
             last_reference_update = json.timestamp;
         }
 
@@ -351,9 +354,10 @@ pub async fn process_file_decode(
                 process_entries(
                     entries,
                     &mut aircraft,
-                    &mut reference,
+                    &mut references,
                     &update_reference,
                     &mut output_file,
+                    update_position,
                 )
                 .await?;
             }
@@ -366,14 +370,14 @@ pub async fn process_file_decode(
             process_entries(
                 entries,
                 &mut aircraft,
-                &mut reference,
+                &mut references,
                 &update_reference,
                 &mut output_file,
+                update_position,
             )
             .await?;
         }
     }
-
     if let Some(file) = &mut output_file {
         file.flush().await?;
     }
@@ -383,6 +387,14 @@ pub async fn process_file_decode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn timestamp_parser_roundtrips_exactly() {
+        let text = "1791864596.9800305";
+        let decoded: f64 = serde_json::from_str(text).unwrap();
+        assert_eq!(decoded.to_bits(), text.parse::<f64>().unwrap().to_bits());
+    }
+
     #[test]
     fn input_output_alias_is_rejected() {
         let input = std::env::temp_dir().join(format!(

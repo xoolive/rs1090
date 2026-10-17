@@ -23,7 +23,9 @@ use ratatui::widgets::*;
 use redis::AsyncCommands;
 use rs1090::data::aircraft;
 use rs1090::decode::commb::MessageProcessor;
-use rs1090::decode::cpr::{decode_position, AircraftState};
+use rs1090::decode::cpr::{
+    decode_sensor_position, reference_update_policy, AircraftState,
+};
 use rs1090::decode::serialize_config;
 use rs1090::prelude::*;
 use sensor::Sensor;
@@ -697,14 +699,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // If we choose to update the reference (only useful for surface positions)
-    // then we define the callback (for now, if the altitude is below 5000ft)
-    let update_reference = match options.update_position {
-        true => Some(Box::new(|pos: &AirbornePosition| {
-            pos.alt.is_some_and(|alt| alt < 5000)
-        }) as Box<dyn Fn(&AirbornePosition) -> bool>),
-        false => None,
-    };
+    let update_reference = reference_update_policy(options.update_position);
 
     let mut last_reference_update: f64 = 0.0;
     let mut first_msg = true;
@@ -740,62 +735,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             last_reference_update = msg.timestamp;
         }
 
-        if let Some(message) = &mut msg.message {
-            match &mut message.df {
-                ExtendedSquitterADSB(adsb) => match adsb.message {
-                    ME::BDS05 { .. } | ME::BDS06 { .. } => {
-                        let serial = msg
-                            .metadata
-                            .first()
-                            .map(|meta| meta.serial)
-                            .unwrap();
-                        let mut reference = references[&serial];
-
-                        decode_position(
-                            &mut adsb.message,
-                            msg.timestamp,
-                            &adsb.icao24,
-                            &mut aircraft,
-                            &mut reference,
-                            &update_reference,
-                        );
-
-                        // References may have been modified.
-                        // With static receivers, we don't care.
-                        // With dynamic ones, we may want to update the reference position.
-                        if options.update_position {
-                            for meta in &msg.metadata {
-                                let _ =
-                                    references.insert(meta.serial, reference);
-                            }
-                        }
-                    }
-                    _ => {}
-                },
-                ExtendedSquitterTisB { cf, .. } => match cf.me {
-                    ME::BDS05 { .. } | ME::BDS06 { .. } => {
-                        let serial = msg
-                            .metadata
-                            .first()
-                            .map(|meta| meta.serial)
-                            .unwrap();
-
-                        let mut reference = references[&serial];
-
-                        decode_position(
-                            &mut cf.me,
-                            msg.timestamp,
-                            &cf.aa,
-                            &mut aircraft,
-                            &mut reference,
-                            &update_reference,
-                        )
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-        };
+        decode_sensor_position(
+            &mut msg,
+            &mut aircraft,
+            &mut references,
+            &update_reference,
+            options.update_position,
+        );
 
         // Sanitize Comm-B messages and record surviving BDS registers
         // for use as evidence in subsequent GICB bitmap validation.
@@ -824,7 +770,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 if let Some(f) = file.lock().await.as_mut() {
                     f.write_all(json.as_bytes()).await?;
-                    f.write_all("\n".as_bytes()).await?;
+                    f.write_all(b"\n").await?;
                 }
 
                 if let Some(c) = &mut redis_connect {
