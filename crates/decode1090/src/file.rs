@@ -73,6 +73,13 @@ async fn read_input_file(
 
             Ok(content)
         }
+        Some("zst") => {
+            let file = std::fs::File::open(path)?;
+            let mut decoder = zstd::stream::read::Decoder::new(file)?;
+            let mut content = String::new();
+            decoder.read_to_string(&mut content)?;
+            Ok(content)
+        }
         Some("gz") => {
             // Decompress .gz file using flate2
             let file = std::fs::File::open(path)?;
@@ -387,6 +394,91 @@ pub async fn process_file_decode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn zstd_and_concatenated_frames_match_plain_replay() {
+        let directory = std::env::temp_dir().join(format!(
+            "decode1090-zstd-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let lines = [
+            "{\"timestamp\":1791864596.9800305,\"frame\":\"5d34530e459ca0\"}\n",
+            "{\"timestamp\":1791864597.0,\"frame\":\"8d40058b58c901375147efd09357\"}\n",
+        ];
+        let content = lines.concat();
+        let mut concatenated = Vec::new();
+        for line in lines {
+            concatenated
+                .extend(zstd::stream::encode_all(line.as_bytes(), 0).unwrap());
+        }
+        let inputs = [
+            ("capture.jsonl", content.as_bytes().to_vec()),
+            (
+                "capture.jsonl.zst",
+                zstd::stream::encode_all(content.as_bytes(), 0).unwrap(),
+            ),
+            ("concatenated.jsonl.zst", concatenated),
+        ];
+        let mut expected_output = None;
+        for (index, (name, bytes)) in inputs.into_iter().enumerate() {
+            let input = directory.join(name);
+            std::fs::write(&input, bytes).unwrap();
+            let input = input.to_str().unwrap();
+            assert_eq!(read_input_file(input).await.unwrap(), content);
+            let output = directory.join(format!("output-{index}.jsonl"));
+            process_file_decode(
+                vec![input.to_owned()],
+                None,
+                None,
+                Some(output.to_str().unwrap().to_owned()),
+                0,
+                true,
+                true,
+            )
+            .await
+            .unwrap();
+            let decoded = std::fs::read(output).unwrap();
+            assert_eq!(
+                decoded
+                    .split(|byte| *byte == b'\n')
+                    .filter(|line| !line.is_empty())
+                    .count(),
+                2
+            );
+            if let Some(expected) = &expected_output {
+                assert_eq!(&decoded, expected);
+            } else {
+                expected_output = Some(decoded);
+            }
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[tokio::test]
+    async fn invalid_or_truncated_zstd_returns_an_error() {
+        let input = std::env::temp_dir().join(format!(
+            "decode1090-invalid-zstd-{}-{}.jsonl.zst",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut compressed =
+            zstd::stream::encode_all(b"{\"timestamp\":1}\n".as_slice(), 0)
+                .unwrap();
+        compressed.truncate(compressed.len() - 3);
+        for bytes in [b"not zstandard".to_vec(), compressed] {
+            std::fs::write(&input, bytes).unwrap();
+            assert!(read_input_file(input.to_str().unwrap()).await.is_err());
+        }
+        std::fs::remove_file(input).unwrap();
+    }
 
     #[test]
     fn timestamp_parser_roundtrips_exactly() {

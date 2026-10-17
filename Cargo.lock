@@ -1291,6 +1291,7 @@ dependencies = [
  "serde_json",
  "sevenz-rust",
  "tokio",
+ "zstd 0.13.3",
 ]
 
 [[package]]

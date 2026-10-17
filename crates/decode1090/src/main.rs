@@ -83,9 +83,9 @@ enum Commands {
         #[arg(long, short)]
         bds: Option<String>,
     },
-    /// Decode Mode S messages from files (JSONL, CSV; plain, .gz, or .7z)
+    /// Decode Mode S messages from files (JSONL, CSV; plain, .gz, .zst, or .7z)
     File {
-        /// Input files (JSONL or Beast CSV; .gz and .7z compression supported directly)
+        /// Input files (JSONL or Beast CSV; .gz, .zst and .7z compression supported directly)
         #[arg(required = true)]
         inputs: Vec<String>,
 
