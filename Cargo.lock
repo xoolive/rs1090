@@ -1286,6 +1286,7 @@ dependencies = [
  "hex",
  "rayon",
  "rs1090",
+ "same-file",
  "serde",
  "serde_json",
  "sevenz-rust",

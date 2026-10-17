@@ -15,6 +15,11 @@
   `DF::AllCallReply` variant now requires the two additional optional fields;
   binary decoding always populates them.
 
+### File replay
+
+- Reject output aliases of input captures, including hard links, and
+  propagate write/flush errors.
+
 ### Bug Fixes
 
 - Keep BDS 2,0 decoded when identification is empty or contains reserved

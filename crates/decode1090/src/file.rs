@@ -29,6 +29,25 @@ pub struct JSONEntry {
     pub metadata: Vec<SensorMetadata>,
 }
 
+/// Refuse output aliases of an input before opening with truncation.
+fn ensure_distinct_output(
+    inputs: &[String],
+    output: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(output) = output {
+        if let Ok(output) = Path::new(output).canonicalize() {
+            for input in inputs {
+                if same_file::is_same_file(input, &output)? {
+                    return Err(
+                        "Output must not overwrite an input capture".into()
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Read and decompress input file based on extension.
 async fn read_input_file(
     input_path: &str,
@@ -204,6 +223,7 @@ pub async fn process_file_decode(
     output_path: Option<String>,
     deduplication: u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    ensure_distinct_output(&inputs, output_path.as_deref())?;
     let mut output_file = if let Some(out_path) = output_path {
         Some(
             fs::OpenOptions::new()
@@ -328,14 +348,14 @@ pub async fn process_file_decode(
 
             // Otherwise clear the cache and process the deduplicated message
             if let Some(entries) = cache.remove(&frame) {
-                let _ = process_entries(
+                process_entries(
                     entries,
                     &mut aircraft,
                     &mut reference,
                     &update_reference,
                     &mut output_file,
                 )
-                .await;
+                .await?;
             }
         }
     }
@@ -343,16 +363,52 @@ pub async fn process_file_decode(
     // Flush remaining entries after processing all lines
     while let Some(Reverse((_curtime, frame))) = expiration_heap.pop() {
         if let Some(entries) = cache.remove(&frame) {
-            let _ = process_entries(
+            process_entries(
                 entries,
                 &mut aircraft,
                 &mut reference,
                 &update_reference,
                 &mut output_file,
             )
-            .await;
+            .await?;
         }
     }
 
+    if let Some(file) = &mut output_file {
+        file.flush().await?;
+    }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn input_output_alias_is_rejected() {
+        let input = std::env::temp_dir().join(format!(
+            "decode1090-alias-{}-{}.jsonl",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::write(&input, b"original").unwrap();
+        let path = input.to_string_lossy().into_owned();
+        assert!(ensure_distinct_output(
+            std::slice::from_ref(&path),
+            Some(&path)
+        )
+        .is_err());
+        let alias = input.with_extension("alias.jsonl");
+        std::fs::hard_link(&input, &alias).unwrap();
+        assert!(ensure_distinct_output(
+            std::slice::from_ref(&path),
+            Some(alias.to_str().unwrap())
+        )
+        .is_err());
+        assert_eq!(std::fs::read(&input).unwrap(), b"original");
+        std::fs::remove_file(alias).unwrap();
+        std::fs::remove_file(input).unwrap();
+    }
 }
