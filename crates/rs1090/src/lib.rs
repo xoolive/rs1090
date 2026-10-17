@@ -3,6 +3,8 @@
 #![doc = include_str!("../readme.md")]
 pub mod data;
 pub mod decode;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod output;
 pub mod source;
 
 pub mod prelude {

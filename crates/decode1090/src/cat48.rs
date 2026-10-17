@@ -5,8 +5,7 @@ use glob::glob;
 use rayon::prelude::*;
 use rs1090::decode::cat48::Cat48Record;
 use rs1090::decode::cpr::Position;
-use tokio::fs;
-use tokio::io::AsyncWriteExt;
+use rs1090::output::JsonlWriter;
 
 /// Helper function to filter out zero-payload BDS records from a CAT48 record.
 /// This modifies the record in-place to remove BDS records with all-zero payloads.
@@ -132,14 +131,7 @@ pub async fn process_cat48(
 
     // Open output file if specified
     let mut output_file = if let Some(output_path) = output {
-        Some(
-            fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(output_path)
-                .await?,
-        )
+        Some(JsonlWriter::open(output_path, false).await?)
     } else {
         None
     };
@@ -247,8 +239,7 @@ pub async fn process_cat48(
         // Output as single JSON array
         let json = serde_json::to_string(&all_records)?;
         if let Some(file) = &mut output_file {
-            file.write_all(json.as_bytes()).await?;
-            file.write_all(b"\n").await?;
+            file.write_line(&json).await?;
         } else {
             println!("{json}");
         }
@@ -257,12 +248,15 @@ pub async fn process_cat48(
         for record in all_records {
             let json = serde_json::to_string(&record)?;
             if let Some(file) = &mut output_file {
-                file.write_all(json.as_bytes()).await?;
-                file.write_all(b"\n").await?;
+                file.write_line(&json).await?;
             } else {
                 println!("{json}");
             }
         }
+    }
+
+    if let Some(file) = &mut output_file {
+        file.finish().await?;
     }
 
     eprintln!(

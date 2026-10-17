@@ -14,6 +14,27 @@ cargo install decode1090
 
 See `--help` for more information.
 
+Output filenames ending in `.jsonl.zst` automatically enable streaming Zstandard
+compression (including `file`, individual-message and CAT48 output). Other names
+remain uncompressed. Output is flushed approximately once per second, including
+while idle, and finalized on normal completion.
+
+```sh
+decode1090 file flight.jsonl.zst --reference LFBO --update-position --output replay.jsonl.zst
+decode1090 follow replay.jsonl.zst
+```
+
+`follow` copies existing records from the first byte, then waits for new bytes;
+it does not re-decode frames. It supports plain JSONL and concatenated Zstandard
+frames, including a still-open frame. Stop with Ctrl-C. The file must already
+exist; rotation/replacement and truncation are not supported.
+
+Unlike `tail -c +1 -f file.jsonl.zst | zstd -dc`, which can buffer piped input
+and lag at low traffic rates, `follow` reads incremental chunks and immediately
+flushes decoded output. Downstream programs can still add their own buffering.
+Forced process termination can leave an unfinished frame; normal completion
+writes its footer.
+
 - Decode a Beast feed, coming from your radarcape for instance
 
   ```sh

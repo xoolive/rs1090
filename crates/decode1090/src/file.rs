@@ -7,6 +7,7 @@ use rs1090::decode::cpr::{
     UpdateIf,
 };
 use rs1090::decode::SensorMetadata;
+use rs1090::output::JsonlWriter;
 use rs1090::prelude::*;
 use serde::{Deserialize, Serialize};
 use sevenz_rust::SevenZReader;
@@ -14,8 +15,6 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
 use std::io::Read;
 use std::path::Path;
-use tokio::fs::{self, File};
-use tokio::io::AsyncWriteExt;
 
 // We create this struct because it is too troublesome to have Deserialize for
 // Message at this point.
@@ -154,7 +153,7 @@ async fn process_entries(
     aircraft: &mut BTreeMap<ICAO, AircraftState>,
     references: &mut BTreeMap<u64, Option<Position>>,
     update_reference: &UpdateIf,
-    output_file: &mut Option<File>,
+    output_file: &mut Option<JsonlWriter>,
     update_position: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let merged_metadata: Vec<SensorMetadata> = entries
@@ -203,8 +202,7 @@ async fn process_entries(
             }
         };
         if let Some(file) = &mut *output_file {
-            file.write_all(json.as_bytes()).await?;
-            file.write_all(b"\n").await?;
+            file.write_line(&json).await?;
         } else {
             println!("{json}");
         }
@@ -227,14 +225,7 @@ pub async fn process_file_decode(
     }
     ensure_distinct_output(&inputs, output_path.as_deref())?;
     let mut output_file = if let Some(out_path) = output_path {
-        Some(
-            fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(out_path)
-                .await?,
-        )
+        Some(JsonlWriter::open(out_path, false).await?)
     } else {
         None
     };
@@ -386,7 +377,7 @@ pub async fn process_file_decode(
         }
     }
     if let Some(file) = &mut output_file {
-        file.flush().await?;
+        file.finish().await?;
     }
     Ok(())
 }

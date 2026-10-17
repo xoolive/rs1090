@@ -25,6 +25,34 @@ In the table view, aircraft can be sorted by:
 
 The `-o` or `--output` option enables the dumping of decoded messages to a file in the JSON line format.
 
+If the filename ends in `.jsonl.zst`, output is automatically compressed with
+Zstandard. All other filenames keep the existing uncompressed behavior.
+
+```sh
+jet1090 --output capture.jsonl.zst tcp://127.0.0.1:30005
+decode1090 follow capture.jsonl.zst
+```
+
+The compressor and file buffers are flushed approximately every second, even
+when no new messages arrive, so the file can be followed while it is still
+being written. `decode1090 follow` reads from the **first byte**, displaying
+existing records before following additions without re-decoding their frames.
+It accepts plain JSONL too and stops with Ctrl-C. The file must already exist;
+rotation/replacement and truncation are not supported.
+
+A plain `tail -f` cannot start arbitrarily inside a compressed frame. The
+`tail -c +1 -f file.jsonl.zst | zstd -dc` pipeline reads from the beginning but
+can lag at low traffic rates because the `zstd` CLI buffers piped input.
+`decode1090 follow` instead reads incrementally and flushes decoded output
+immediately. Further downstream pipes may still add their own buffering.
+
+`jet1090` retains its append behavior: restarting with the same output filename
+adds another Zstandard frame. The `zstd` CLI and `decode1090 file` accept these
+concatenated frames. Graceful shutdown (including SIGINT/SIGTERM in headless
+mode) finalizes the current frame. Forced termination such as SIGKILL or power
+loss may leave an unfinished final frame. `decode1090` also supports automatic
+`.jsonl.zst` output, but overwrites its output file as before rather than appending.
+
 That format is easily accessible from several libraries across programming languages:
 
 === "Pandas (Python)"

@@ -27,6 +27,7 @@ use rs1090::decode::cpr::{
     decode_sensor_position, reference_update_policy, AircraftState,
 };
 use rs1090::decode::serialize_config;
+use rs1090::output::JsonlWriter;
 use rs1090::prelude::*;
 use sensor::Sensor;
 use serde::Deserialize;
@@ -37,7 +38,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
 use tokio::sync::{broadcast, watch, Mutex, RwLock};
 use tokio::time::{sleep, Duration};
 use tracing::{error, warn};
@@ -56,7 +56,7 @@ struct Options {
     #[serde(default)]
     verbose: bool,
 
-    /// Dump a copy of the received messages as .jsonl
+    /// Dump messages as JSONL (Zstandard if the filename ends in .jsonl.zst)
     #[arg(short, long, default_value=None, value_hint=ValueHint::FilePath)]
     output: Option<String>,
 
@@ -372,21 +372,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         aircraft_filter: options.aircraft_filter,
     };
 
-    let file = if let Some(output_path) = options.output {
+    let mut file = if let Some(output_path) = options.output {
         let output_path = expanduser(PathBuf::from(output_path));
-        Some(
-            fs::OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(output_path)
-                .await?,
-        )
+        Some(JsonlWriter::open(output_path, true).await?)
     } else {
         None
     };
-
-    // Wrap file in Arc<Mutex> for sharing with flush task
-    let file = Arc::new(Mutex::new(file));
 
     let aircraftdb = aircraft::aircraft().await;
 
@@ -474,9 +465,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let mut events = terminal.is_some().then(|| tui::EventHandler::new(width));
 
-    // Handle signals (SIGINT, SIGTERM, SIGHUP) to ensure terminal restoration
-    if terminal.is_some() {
+    // Handle signals in headless mode too, so compressed output is finalized.
+    {
         let shared_signal = shared.clone();
+        let restore_terminal = terminal.is_some();
 
         #[cfg(unix)]
         tokio::spawn(async move {
@@ -498,7 +490,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // Restore terminal and signal shutdown
-            tui::restore().ok();
+            if restore_terminal {
+                tui::restore().ok();
+            }
             shared_signal.request_quit();
         });
 
@@ -521,7 +515,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // Restore terminal and signal shutdown
-            tui::restore().ok();
+            if restore_terminal {
+                tui::restore().ok();
+            }
             shared_signal.request_quit();
         });
     }
@@ -613,20 +609,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(port) = options.serve_port {
         tokio::spawn(serve_web_api(shared_web, port));
-    }
-
-    // Spawn periodic file flush task to ensure timely writes
-    // Flushes every 1 second to prevent 15-30s delays from mutex contention
-    if file.lock().await.is_some() {
-        let file_flush = file.clone();
-        tokio::spawn(async move {
-            loop {
-                sleep(Duration::from_secs(1)).await;
-                if let Some(f) = file_flush.lock().await.as_mut() {
-                    let _ = f.flush().await;
-                }
-            }
-        });
     }
 
     // I am not sure whether this size calibration is relevant, but let's try...
@@ -768,9 +750,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("{json}");
                 }
 
-                if let Some(f) = file.lock().await.as_mut() {
-                    f.write_all(json.as_bytes()).await?;
-                    f.write_all(b"\n").await?;
+                if let Some(f) = &mut file {
+                    f.write_line(&json).await?;
                 }
 
                 if let Some(c) = &mut redis_connect {
@@ -802,6 +783,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    let output_result = if let Some(file) = &mut file {
+        file.finish().await
+    } else {
+        Ok(())
+    };
+
     // Signal all source tasks and the TUI to shut down.
     shared_dec.request_quit();
     let _ = shutdown_tx.send(());
@@ -819,6 +806,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         health::print_report(&health);
     }
 
+    output_result?;
     Ok(())
 }
 

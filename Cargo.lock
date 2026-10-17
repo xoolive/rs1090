@@ -4127,6 +4127,7 @@ version = "0.7.0"
 dependencies = [
  "ansi_term",
  "approx",
+ "async-compression",
  "async-recursion",
  "async-stream",
  "bytes",

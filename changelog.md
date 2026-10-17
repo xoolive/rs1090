@@ -15,17 +15,34 @@
   `DF::AllCallReply` variant now requires the two additional optional fields;
   binary decoding always populates them.
 
+### Streaming file output
+
+- Automatically compress `.jsonl.zst` output in jet1090 and decode1090 (file,
+  raw messages and CAT48), using a shared asynchronous writer. Flush compressor
+  and file buffers every second, including idle periods; finalize on normal
+  completion. Other filenames remain uncompressed.
+- Preserve jet1090 append behavior using concatenated Zstandard frames and
+  finalize on SIGINT/SIGTERM/SIGHUP in headless mode as well as interactive mode.
+- Add `decode1090 follow capture.jsonl.zst` for incremental, flushed reading of
+  growing compressed/plain files and appended sessions (reads existing content
+  first; no rotation/truncation support). Avoid `zstd` CLI piped-input buffering
+  which can delay the equivalent `tail | zstd -dc` pipeline at low traffic rates.
+
 ### File replay
 
 - Default to recorded input order and zero deduplication. Use
-  `--input-order=false --deduplication 400` to restore sorting and deduplication.
-- Share positional ADS-B dispatch and per-sensor below-5000-ft reference
-  updates with jet1090; expose `--update-position` for moving receivers.
-- Parse floating-point timestamps with round-trip precision.
-- Read `.jsonl.zst` / `.csv.zst` inputs, including concatenated frames;
-  report corrupt and truncated streams as errors.
-- Reject output aliases of input captures, including hard links, and
-  propagate write/flush errors.
+  `--input-order=false` for timestamp sorting; combine it with
+  `--deduplication 400` to restore the previous defaults.
+- Support direct `.jsonl.zst` / `.csv.zst` input, including concatenated
+  Zstandard frames; report corrupt or truncated compressed streams as errors.
+- Share positional ADS-B dispatch and per-sensor reference updates with
+  jet1090. `decode1090 file --update-position` follows the same below-5000-ft
+  policy; without it, per-message updates are disabled. This replaces the
+  previous unconditional below-1000-ft single-reference replay policy.
+- Support recorded arrival-order replay with `--input-order` (requires zero
+  deduplication). Reject input/output aliases, including hard links.
+- Parse floating-point timestamps with round-trip precision; buffer output
+  and propagate write errors rather than silently ignoring them.
 
 ### Bug Fixes
 
