@@ -27,12 +27,13 @@ cargo install jet1090 --feature rtlsdr
   brew install soapyrtlsdr
   ```
 
-  Use the following commands if you want to keep your Mac awake while recording:
+  Use `--prevent-sleep warn` to keep the Mac awake and warn when battery sleep prevention is not enabled. Use `--prevent-sleep force` to additionally run `sudo pmset -b disablesleep 1` automatically:
 
   ```sh
-  caffeinate
-  sudo pmset -b disablesleep 1
+  jet1090 --prevent-sleep force
   ```
+
+  When jet1090 exits normally, it restores the previous battery sleep setting.
 
 - Recommended procedure with Linux:
 
