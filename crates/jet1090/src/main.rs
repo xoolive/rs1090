@@ -16,7 +16,7 @@ use crate::health::SharedHealth;
 use crate::tui::Event;
 use crate::util::expanduser;
 use crate::web::serve_web_api;
-use clap::{Command, CommandFactory, Parser, ValueHint};
+use clap::{Command, CommandFactory, Parser, ValueEnum, ValueHint};
 use clap_complete::{generate, Generator};
 use crossterm::event::KeyCode;
 use ratatui::widgets::*;
@@ -42,6 +42,15 @@ use tokio::sync::{broadcast, watch, Mutex, RwLock};
 use tokio::time::{sleep, Duration};
 use tracing::{error, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+enum PreventSleep {
+    #[default]
+    None,
+    Warn,
+    Force,
+}
 
 #[derive(Default, Deserialize, Parser)]
 #[command(
@@ -109,10 +118,10 @@ struct Options {
     #[arg(long, value_name = "ICAO24")]
     aircraft_filter: Option<Vec<ICAO>>,
 
-    /// Prevent the computer sleeping when decoding is in progress
-    #[arg(long, default_value=None)]
+    /// Prevent the computer sleeping: none, warn about macOS pmset, or force it
+    #[arg(long, value_enum)]
     #[serde(default)]
-    prevent_sleep: bool,
+    prevent_sleep: PreventSleep,
 
     /// Should we update the reference positions (if the receiver is moving)
     #[arg(short, long, default_value=None)]
@@ -183,6 +192,82 @@ struct Options {
     #[arg(long, value_name = "SECONDS")]
     #[serde(default)]
     redis_retry_interval: Option<u64>,
+}
+
+#[cfg(target_os = "macos")]
+async fn check_macos_sleep_setting(mode: PreventSleep) -> bool {
+    use tokio::process::Command;
+
+    let output =
+        match Command::new("pmset").arg("-g").arg("custom").output().await {
+            Ok(output) => output,
+            Err(error) => {
+                warn!(%error, "Unable to check macOS sleep settings");
+                return false;
+            }
+        };
+    let settings = String::from_utf8_lossy(&output.stdout);
+    let mut in_battery = false;
+    let battery_disablesleep = settings.lines().any(|line| {
+        let trimmed = line.trim();
+        if trimmed == "Battery Power:" || trimmed == "batt:" {
+            in_battery = true;
+            return false;
+        }
+        if trimmed == "AC Power:"
+            || (trimmed.ends_with(":") && trimmed != "Battery Power:")
+        {
+            in_battery = false;
+        }
+        if in_battery {
+            let mut fields = trimmed.split_whitespace();
+            return fields.next() == Some("disablesleep")
+                && fields.next() == Some("1");
+        }
+        false
+    });
+
+    if battery_disablesleep {
+        return false;
+    }
+
+    if matches!(mode, PreventSleep::Force) {
+        match Command::new("sudo")
+            .args(["pmset", "-b", "disablesleep", "1"])
+            .status()
+            .await
+        {
+            Ok(status) if status.success() => return true,
+            Ok(status) => {
+                warn!(%status, "Unable to enable macOS battery sleep prevention")
+            }
+            Err(error) => {
+                warn!(%error, "Unable to run sudo pmset for macOS sleep prevention")
+            }
+        }
+    }
+
+    warn!("macOS battery sleep prevention is disabled; run `sudo pmset -b disablesleep 1` to enable it");
+    false
+}
+
+#[cfg(target_os = "macos")]
+async fn restore_macos_sleep_setting() {
+    use tokio::process::Command;
+
+    match Command::new("sudo")
+        .args(["pmset", "-b", "disablesleep", "0"])
+        .status()
+        .await
+    {
+        Ok(status) if status.success() => {}
+        Ok(status) => {
+            warn!(%status, "Unable to restore macOS battery sleep setting")
+        }
+        Err(error) => {
+            warn!(%error, "Unable to restore macOS battery sleep setting")
+        }
+    }
 }
 
 #[tokio::main]
@@ -267,7 +352,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cli_options.aircraft_filter.is_some() {
         options.aircraft_filter = cli_options.aircraft_filter;
     }
-    if cli_options.prevent_sleep {
+    if !matches!(cli_options.prevent_sleep, PreventSleep::None) {
         options.prevent_sleep = cli_options.prevent_sleep;
     }
     if cli_options.update_position {
@@ -381,8 +466,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let aircraftdb = aircraft::aircraft().await;
 
+    #[cfg(target_os = "macos")]
+    let macos_sleep_changed =
+        if !matches!(options.prevent_sleep, PreventSleep::None) {
+            check_macos_sleep_setting(options.prevent_sleep).await
+        } else {
+            false
+        };
+
     let _awake = match options.prevent_sleep {
-        true => Some(
+        PreventSleep::None => None,
+        PreventSleep::Warn | PreventSleep::Force => Some(
             keepawake::Builder::default()
                 .display(false)
                 .idle(true)
@@ -392,7 +486,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .app_reverse_domain("io.github.jet1090")
                 .create()?,
         ),
-        false => None,
     };
 
     let mut aircraft: BTreeMap<ICAO, AircraftState> = BTreeMap::new();
@@ -807,6 +900,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     output_result?;
+    #[cfg(target_os = "macos")]
+    if macos_sleep_changed {
+        restore_macos_sleep_setting().await;
+    }
     Ok(())
 }
 
@@ -1056,7 +1153,7 @@ mod tests {
             interactive = true
             serve_port = 8080
             no_history_expire = true
-            prevent_sleep = false
+            prevent_sleep = "warn"
             update_position = false
 
             [[sources]]
